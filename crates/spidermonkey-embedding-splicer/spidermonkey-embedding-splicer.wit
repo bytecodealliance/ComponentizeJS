@@ -1,0 +1,34 @@
+world spidermonkey-embedding-splicer {
+  import console: interface {
+    log: func(msg: string)
+    error: func(msg: string)
+  }
+
+  default export interface {
+    enum errno {
+      unknown
+    }
+
+    enum corety {
+      %u32,
+      %u64,
+      %f32,
+      %f64
+    }
+
+    record core-export {
+      name: string,
+      args: list<corety>,
+      ret: option<corety>
+    }
+
+    record core-import {
+      name: string,
+      specifier: string,
+      args: list<corety>,
+      ret: option<corety>
+    }
+
+    splice: func(spidermonkey-engine: list<u8>, imports: list<core-import>, exports: list<core-export>) -> result<list<u8>, errno>
+  }
+}

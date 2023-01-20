@@ -1,0 +1,11 @@
+{
+  "name": "componentize-js",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "js-component-tools": "^0.2.3"
+  },
+  "dependencies": {
+    "@jakechampion/wizer": "^1.6.0"
+  }
+}

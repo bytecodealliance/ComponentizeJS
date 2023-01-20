@@ -1,0 +1,16 @@
+[package]
+name = "spidermonkey-embedding-splicer"
+authors = ["Guy Bedford"]
+publish = false
+
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = { workspace = true }
+wasmparser = { workspace = true }
+wasm-encoder = { workspace = true }
+wit-bindgen-guest-rust = { workspace = true, features = ['default'] }
