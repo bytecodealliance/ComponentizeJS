@@ -1,0 +1,34 @@
+default world spidermonkey-embedding-splicer {
+  import console: interface {
+    log: func(msg: string)
+    error: func(msg: string)
+  }
+
+  export exports: interface {
+    enum core-ty {
+      i32,
+      i64,
+      f32,
+      f64
+    }
+
+    record export-core-fn {
+      name: string,
+      args: list<core-ty>,
+      ret: option<core-ty>,
+      retptr: bool,
+      retsize: u32,
+      paramptr: bool,
+    }
+
+    record splice-result {
+      wasm: list<u8>,
+      js-bindings: string,
+      export-core-fns: list<export-core-fn>,
+      import-wrappers: list<tuple<string, string>>,
+      imports: list<tuple<string, list<string>>>,
+    }
+
+    splice-bindings: func(source-name: option<string>, spidermonkey-engine: list<u8>, wit-world: string, wit-path: option<string>) -> result<splice-result, string>
+  }
+}

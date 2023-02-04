@@ -11,6 +11,11 @@ crate-type = ["cdylib"]
 
 [dependencies]
 anyhow = { workspace = true }
+heck = { workspace = true }
+js-component-bindgen = { workspace = true }
 wasmparser = { workspace = true }
+wasmtime-environ = { workspace = true }
 wasm-encoder = { workspace = true }
-wit-bindgen-guest-rust = { workspace = true, features = ['default'] }
+wit-component = { workspace = true }
+wit-parser = { workspace = true }
+wit-bindgen = { workspace = true }

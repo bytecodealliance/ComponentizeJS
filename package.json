@@ -1,11 +1,22 @@
 {
-  "name": "componentize-js",
-  "private": true,
+  "name": "@bytecodealliance/componentize-js",
   "type": "module",
+  "exports": "./lib/componentize.js",
   "devDependencies": {
-    "js-component-tools": "^0.2.3"
+    "mocha": "^10.2.0"
   },
   "dependencies": {
+    "@bytecodealliance/jco": "^0.4.0",
     "@jakechampion/wizer": "^1.6.0"
-  }
+  },
+  "scripts": {
+    "build": "cargo build && make -j",
+    "test": "mocha -u tdd test/test.js --timeout 120000"
+  },
+  "files": [
+    "console.js",
+    "deps",
+    "dist",
+    "lib"
+  ]
 }

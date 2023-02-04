@@ -1,3 +1,6 @@
+#ifndef COMPONENTIZE_BUILTIN_TEXT_ENCODER_H
+#define COMPONENTIZE_BUILTIN_TEXT_ENCODER_H
+
 #include "builtins.h"
 
 #include <js/ArrayBuffer.h>
@@ -23,3 +26,5 @@ namespace TextEncoder
   bool constructor(JSContext *cx, unsigned argc, JS::Value *vp);
 
 } // namespace TextEncoder
+
+#endif

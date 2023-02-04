@@ -1,8 +1,11 @@
 #include <cstdio>
 #include <assert.h>
 #include <unistd.h>
+#include <map>
+#include <vector>
+#include <optional>
 
-// TODO: remove these once the warnings are fixed
+// remove these once the warnings are fixed
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
 #pragma clang diagnostic ignored "-Wdeprecated-enum-enum-conversion"
@@ -19,70 +22,10 @@
 #include <js/Promise.h>
 #pragma clang diagnostic pop
 
+// builtins
 #include "builtins/text_encoder.h"
 #include "builtins/text_decoder.h"
-
-#define FN_CNT_MAX 1024
-#define FREE_LIST_MAX 1024
-
-// init errors
-#define INIT_OK 0
-#define INIT_JSINIT 1
-#define INIT_INTRINSICS 2
-#define INIT_CUSTOM_INTRINSICS 3
-#define INIT_SOURCE_STDIN 4
-#define INIT_SOURCE_COMPILE 5
-#define INIT_SOURCE_LINK 6
-#define INIT_SOURCE_EXEC 7
-#define INIT_FN_LIST 8
-#define INIT_MEM_BUFFER 9
-#define INIT_REALLOC_FN 10
-#define INIT_MEM_BINDINGS 11
-#define INIT_PROMISE_REJECTIONS 12
-#define INIT_IMPORT_FN 12
-
-// runtime errors
-#define RUNTIME_OK 0
-#define RUNTIME_BIGINT 1
-
-uint8_t INIT_ERROR = INIT_OK;
-uint8_t RUNTIME_ERROR = RUNTIME_OK;
-JSContext *CX;
-JS::PersistentRootedObject GLOBAL;
-JS::PersistentRootedObject unhandledRejectedPromises;
-JS::PersistentRootedObject MOD;
-JS::PersistentRootedValue FN[FN_CNT_MAX];
-
-static JSClass global_class = {"global", JSCLASS_GLOBAL_FLAGS, &JS::DefaultGlobalClassOps};
-
-// Logging
-
-__attribute__((import_module("wasi-logging2"), import_name("log"))) void __wasm_import_wasi_logging_log(int32_t, int32_t, int32_t, int32_t, int32_t);
-
-void log_trace(const char *context, const char *msg)
-{
-  __wasm_import_wasi_logging_log(0, (int32_t)context, strlen(context), (int32_t)msg, strlen(msg));
-}
-
-void log_debug(const char *context, const char *msg)
-{
-  __wasm_import_wasi_logging_log(1, (int32_t)context, strlen(context), (int32_t)msg, strlen(msg));
-}
-
-void log_info(const char *context, const char *msg)
-{
-  __wasm_import_wasi_logging_log(2, (int32_t)context, strlen(context), (int32_t)msg, strlen(msg));
-}
-
-void log_warn(const char *context, const char *msg)
-{
-  __wasm_import_wasi_logging_log(3, (int32_t)context, strlen(context), (int32_t)msg, strlen(msg));
-}
-
-void log_error(const char *context, const char *msg)
-{
-  __wasm_import_wasi_logging_log(4, (int32_t)context, strlen(context), (int32_t)msg, strlen(msg));
-}
+#include "builtins/console.h"
 
 // WASI Adapter Memory Override Fix
 // Pending upstreaming via https://github.com/WebAssembly/wasi-libc/pull/377
@@ -106,10 +49,165 @@ extern "C" void *sbrk(intptr_t increment)
   }
   if (increment < 0)
   {
-    log_error("sbrk", "Bad sbrk call");
     abort();
   }
   return (void *)(__builtin_wasm_memory_grow(0, increment / PAGESIZE_2) * PAGESIZE_2);
+}
+
+// Logging
+
+static bool DEBUG = false;
+
+void log(const char *msg)
+{
+  if (DEBUG)
+  {
+    fprintf(stderr, "%s\n", msg);
+  }
+}
+
+// Runtime State
+
+enum class CoreVal : char
+{
+  I32,
+  I64,
+  F32,
+  F64
+};
+
+struct Runtime
+{
+  enum class InitError
+  {
+    OK,
+    JSInit,
+    Intrinsics,
+    CustomIntrinsics,
+    SourceStdin,
+    SourceCompile,
+    BindingsCompile,
+    ImportWrapperCompile,
+    SourceLink,
+    SourceExec,
+    BindingsExec,
+    FnList,
+    MemBuffer,
+    ReallocFn,
+    MemBindings,
+    PromiseRejections,
+    ImportFn,
+    TypeParse
+  };
+
+  enum class RuntimeError
+  {
+    OK,
+    BigInt,
+  };
+
+  JSContext *cx;
+  JSClass global_class = {"global", JSCLASS_GLOBAL_FLAGS, &JS::DefaultGlobalClassOps};
+  InitError init_err = InitError::OK;
+  RuntimeError runtime_err = RuntimeError::OK;
+  JS::PersistentRootedObject global;
+  JS::PersistentRootedObject unhandled_rejection_promises;
+
+  // The name of the source being executed
+  std::string source_name;
+
+  // The user module being executed
+  JS::PersistentRootedObject mod;
+  // The internal generated bindings module being executed
+  JS::PersistentRootedObject mod_bindings;
+  // The import wrappers for the user code imports
+  std::unordered_map<std::string, JS::PersistentRootedObject> import_wrappers;
+
+  // The core abi "lowered" functions for the user code being executed
+  struct CoreFn
+  {
+    // The compiled JS core function
+    JS::PersistentRootedValue func;
+    // The type of the function params
+    // If using a retptr, the last param will be the retptr
+    std::vector<CoreVal> args;
+    // The type of the function return
+    // Functions with more than one return value use a retptr
+    std::optional<CoreVal> ret;
+    // whether the function has a retptr
+    bool retptr = false;
+    // whether the function has a param ptr
+    bool paramptr = false;
+    // when using a retptr, the size of the ret area
+    uint32_t retsize = false;
+
+    CoreFn() : func(), args(), ret() {}
+  };
+  std::vector<CoreFn> fns;
+
+  // the current export function call
+  int cur_fn_idx = -1;
+  std::vector<void *> free_list;
+
+  void free_list_remove (void* ptr) {
+    free_list.erase(std::remove(free_list.begin(), free_list.end(), ptr), free_list.end());
+  }
+
+  Runtime() : import_wrappers(),
+              fns(),
+              free_list() {}
+};
+
+// State singleton
+Runtime R = Runtime();
+
+// Exception Handling
+
+// Note requires an AutoRealm
+bool ReportAndClearException(JSContext *cx)
+{
+  JS::ExceptionStack stack(cx);
+  if (!JS::StealPendingExceptionStack(cx, &stack))
+  {
+    log("(err) Uncatchable exception thrown");
+    return false;
+  }
+
+  JS::ErrorReportBuilder report(cx);
+  if (!report.init(cx, stack, JS::ErrorReportBuilder::WithSideEffects))
+  {
+    log("(err) Couldn't build error report");
+    return false;
+  }
+
+  JS::PrintError(stderr, report, false);
+  return true;
+}
+
+static void rejection_tracker(JSContext *cx, bool mutedErrors, JS::HandleObject promise,
+                              JS::PromiseRejectionHandlingState state, void *data)
+{
+  JS::RootedValue promiseVal(cx, JS::ObjectValue(*promise));
+
+  switch (state)
+  {
+  case JS::PromiseRejectionHandlingState::Unhandled:
+  {
+    if (!JS::SetAdd(cx, R.unhandled_rejection_promises, promiseVal))
+    {
+      log("(rejection_tracker) Adding an unhandled rejected promise to the promise rejection tracker failed");
+    }
+    return;
+  }
+  case JS::PromiseRejectionHandlingState::Handled:
+  {
+    bool deleted = false;
+    if (!JS::SetDelete(cx, R.unhandled_rejection_promises, promiseVal, &deleted))
+    {
+      log("(rejection_tracker) Removing an handled rejected promise from the promise rejection tracker failed");
+    }
+  }
+  }
 }
 
 // Import Splicing Functions
@@ -129,7 +227,7 @@ get_int64(JS::MutableHandleValue val)
   uint64_t arg0_uint64;
   if (!JS::detail::BigIntIsUint64(arg0, &arg0_uint64))
   {
-    log_error("get_int64", "Not a valid int64");
+    log("(get_int64) Not a valid int64");
     abort();
   }
   return arg0_uint64;
@@ -152,7 +250,7 @@ __attribute__((noinline)) void set_int32(JS::MutableHandleValue val, int32_t num
 
 __attribute__((noinline)) void set_int64(JS::MutableHandleValue val, int64_t num)
 {
-  val.setBigInt(JS::detail::BigIntFromUint64(CX, num));
+  val.setBigInt(JS::detail::BigIntFromUint64(R.cx, num));
 }
 
 __attribute__((noinline)) void set_float32(JS::MutableHandleValue val, float num)
@@ -209,76 +307,42 @@ __attribute__((export_name("coreabi_sample_f64"))) bool CoreAbiSampleF64(JSConte
  * after compilation.
  */
 __attribute__((export_name("coreabi_get_import")))
-JSFunction *coreabi_get_import(int32_t idx, const char *name)
+JSFunction *
+coreabi_get_import(int32_t idx, const char *name)
 {
-  switch (idx) {
-    case 0:
-      return JS_NewFunction(CX, CoreAbiSampleI32, 1, 0, name);
+  switch (idx)
+  {
+  case 0:
+    return JS_NewFunction(R.cx, CoreAbiSampleI32, 1, 0, name);
   }
-  // log_error("coreabi_get_import", "Unable to find import function");
+  // log("(coreabi_get_import) Unable to find import function");
   abort();
-}
-
-// Exception Handling
-
-// Note requires an AutoRealm
-bool ReportAndClearException(JSContext *cx)
-{
-  JS::ExceptionStack stack(cx);
-  if (!JS::StealPendingExceptionStack(cx, &stack))
-  {
-    // log_error("err", "Uncatchable exception thrown, out of memory or something");
-    return false;
-  }
-
-  JS::ErrorReportBuilder report(cx);
-  if (!report.init(cx, stack, JS::ErrorReportBuilder::WithSideEffects))
-  {
-    // log_error("err", "Couldn't build error report");
-    return false;
-  }
-
-  JS::PrintError(stderr, report, false);
-  return true;
-}
-
-static void rejection_tracker(JSContext *cx, bool mutedErrors, JS::HandleObject promise,
-                              JS::PromiseRejectionHandlingState state, void *data)
-{
-  JS::RootedValue promiseVal(cx, JS::ObjectValue(*promise));
-
-  switch (state)
-  {
-  case JS::PromiseRejectionHandlingState::Unhandled:
-  {
-    if (!JS::SetAdd(cx, unhandledRejectedPromises, promiseVal))
-    {
-      log_error("rejection_tracker", "Adding an unhandled rejected promise to the promise rejection tracker failed");
-    }
-    return;
-  }
-  case JS::PromiseRejectionHandlingState::Handled:
-  {
-    bool deleted = false;
-    if (!JS::SetDelete(cx, unhandledRejectedPromises, promiseVal, &deleted))
-    {
-      log_error("rejection_tracker", "Removing an handled rejected promise from the promise rejection tracker failed");
-    }
-  }
-  }
 }
 
 // Binding Functions
 
 __attribute__((export_name("cabi_realloc"))) void *cabi_realloc(void *ptr, size_t orig_size, size_t org_align, size_t new_size)
 {
-  void *ret = realloc(ptr, new_size);
+  void *ret = JS_realloc(R.cx, ptr, orig_size, new_size);
+  // track all allocations during a function "call" for freeing
+  R.free_list.push_back(ret);
   if (!ret)
   {
-    log_error("cabi_realloc", "Unable to realloc");
+    log("(cabi_realloc) Unable to realloc");
     abort();
   }
+  if (DEBUG)
+  {
+    fprintf(stderr, "(cabi_realloc) [%zu] %d\n", new_size, (uint32_t)ret);
+  }
   return ret;
+}
+
+void cabi_free (void* ptr) {
+  if (DEBUG) {
+    fprintf(stderr, "(cabi_free) %d\n", (uint32_t)ptr);
+  }
+  JS_free(R.cx, ptr);
 }
 
 void *LAST_SBRK;
@@ -288,7 +352,7 @@ static bool GetMemBuffer(JSContext *cx, unsigned argc, JS::Value *vp)
   if (sbrk(0) != LAST_SBRK)
   {
     LAST_SBRK = sbrk(0);
-    AB = JS::RootedObject(CX, JS::NewArrayBufferWithUserOwnedContents(CX, (size_t)LAST_SBRK, (void *)0));
+    AB = JS::RootedObject(R.cx, JS::NewArrayBufferWithUserOwnedContents(R.cx, (size_t)LAST_SBRK, (void *)0));
   }
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   args.rval().setObject(*AB);
@@ -302,10 +366,13 @@ static bool ReallocFn(JSContext *cx, unsigned argc, JS::Value *vp)
   size_t old_len = args[1].toInt32();
   size_t align = args[2].toInt32();
   size_t new_len = args[3].toInt32();
-
-  args.rval().setInt32((uint32_t)cabi_realloc(old_ptr, old_len, align, new_len));
+  void *ptr = cabi_realloc(old_ptr, old_len, align, new_len);
+  args.rval().setInt32((uint32_t)ptr);
   return true;
 }
+
+#define FN_CNT_MAX 1024
+#define FREE_LIST_MAX 1024
 
 // Main (Wizer initialize)
 
@@ -313,28 +380,72 @@ int main() {}
 
 extern "C" void __wasm_call_ctors();
 
+static JSObject *EmbeddingResolveHook(JSContext *cx,
+                                      JS::HandleValue modulePrivate,
+                                      JS::HandleObject moduleRequest)
+{
+  // Extract module specifier string.
+  JS::Rooted<JSString *> specifierString(
+      cx, JS::GetModuleRequestSpecifier(cx, moduleRequest));
+  if (!specifierString)
+  {
+    return nullptr;
+  }
+
+  JS::UniqueChars specChars = JS_EncodeStringToUTF8(cx, specifierString);
+  if (!specChars)
+  {
+    return nullptr;
+  }
+  std::string filename(specChars.get());
+  if (filename == R.source_name)
+  {
+    return R.mod;
+  }
+  else if (filename == "internal:bindings")
+  {
+    return R.mod_bindings;
+  }
+  else
+  {
+    if (R.import_wrappers.find(filename) == R.import_wrappers.end())
+    {
+      fprintf(stderr, "Import '%s' in '%s' is not defined as a world import. Only component-defined imports can be used.\n", filename.c_str(), R.source_name.c_str());
+      R.init_err = Runtime::InitError::SourceLink;
+      return nullptr;
+    }
+    return R.import_wrappers[filename];
+  }
+}
+
 __attribute__((export_name("wizer.initialize"))) void init()
 {
+  uint32_t is_debug = atoi(getenv("DEBUG"));
+  if (is_debug)
+  {
+    DEBUG = true;
+  }
+  log("(wizer) init");
   __wasm_call_ctors();
   if (!JS_Init())
   {
-    INIT_ERROR = INIT_JSINIT;
+    R.init_err = Runtime::InitError::JSInit;
     return;
   }
 
-  CX = JS_NewContext(JS::DefaultHeapMaxBytes);
-  if (!CX)
+  R.cx = JS_NewContext(JS::DefaultHeapMaxBytes);
+  if (!R.cx)
   {
-    INIT_ERROR = INIT_JSINIT;
+    R.init_err = Runtime::InitError::JSInit;
     return;
   }
 
-  if (!js::UseInternalJobQueues(CX) || !JS::InitSelfHostedCode(CX))
+  log("(wizer) init JS");
+  if (!js::UseInternalJobQueues(R.cx) || !JS::InitSelfHostedCode(R.cx))
   {
-    INIT_ERROR = INIT_JSINIT;
+    R.init_err = Runtime::InitError::JSInit;
     return;
   }
-  // TODO: check if we should set a different creation zone.
   JS::RealmOptions realm_options;
   realm_options.creationOptions()
       // .setFreezeBuiltins(true)
@@ -345,162 +456,389 @@ __attribute__((export_name("wizer.initialize"))) void init()
       .setWritableStreamsEnabled(true)
       .setWeakRefsEnabled(JS::WeakRefSpecifier::EnabledWithoutCleanupSome);
 
-  JS::DisableIncrementalGC(CX);
-  // JS_SetGCParameter(CX, JSGC_MAX_EMPTY_CHUNK_COUNT, 1);
-
-  GLOBAL = JS::PersistentRootedObject(CX, JS_NewGlobalObject(CX, &global_class, nullptr, JS::FireOnNewGlobalHook, realm_options));
-  if (!GLOBAL)
+  JS::DisableIncrementalGC(R.cx);
+  // JS_SetGCParameter(R.cx, JSGC_MAX_EMPTY_CHUNK_COUNT, 1);
+  log("(wizer) init global");
+  R.global = JS::PersistentRootedObject(R.cx, JS_NewGlobalObject(R.cx, &R.global_class, nullptr, JS::FireOnNewGlobalHook, realm_options));
+  if (!R.global)
   {
-    INIT_ERROR = INIT_INTRINSICS;
+    R.init_err = Runtime::InitError::Intrinsics;
     return;
   }
 
-  JSAutoRealm ar(CX, GLOBAL);
-  if (!JS::InitRealmStandardClasses(CX))
+  log("(wizer) init standard classes");
+  JSAutoRealm ar(R.cx, R.global);
+  if (!JS::InitRealmStandardClasses(R.cx))
   {
-    INIT_ERROR = INIT_INTRINSICS;
+    R.init_err = Runtime::InitError::Intrinsics;
     return;
   }
 
-  if (!TextEncoder::init_class(CX, GLOBAL))
+  log("(wizer) init custom intrinsics");
+  if (!builtins::Console::create(R.cx, R.global))
   {
-    INIT_ERROR = INIT_CUSTOM_INTRINSICS;
+    R.init_err = Runtime::InitError::CustomIntrinsics;
     return;
   }
-  if (!TextDecoder::init_class(CX, GLOBAL))
+  if (!TextEncoder::init_class(R.cx, R.global))
   {
-    INIT_ERROR = INIT_CUSTOM_INTRINSICS;
+    R.init_err = Runtime::InitError::CustomIntrinsics;
+    return;
+  }
+  if (!TextDecoder::init_class(R.cx, R.global))
+  {
+    R.init_err = Runtime::InitError::CustomIntrinsics;
     return;
   }
 
-  JS::SetPromiseRejectionTrackerCallback(CX, rejection_tracker);
+  JS::SetPromiseRejectionTrackerCallback(R.cx, rejection_tracker);
 
-  unhandledRejectedPromises.init(CX, JS::NewSetObject(CX));
-  if (!unhandledRejectedPromises)
+  R.unhandled_rejection_promises.init(R.cx, JS::NewSetObject(R.cx));
+  if (!R.unhandled_rejection_promises)
   {
-    INIT_ERROR = INIT_PROMISE_REJECTIONS;
+    R.init_err = Runtime::InitError::PromiseRejections;
     return;
   }
+
+  // -- Extract sources from stdin --
+  char env_name[100];
+
+  log("(wizer) init env data");
+  R.source_name = std::string(getenv("SOURCE_NAME"));
 
   uint32_t src_len = atoi(getenv("SOURCE_LEN"));
 
   char *code = (char *)malloc(src_len + 1);
-
-  if (read(0, code, src_len) != src_len)
+  size_t read_len = 0, cur_len = 0;
+  while ((cur_len = read(0, &code[read_len], src_len - read_len)))
+    read_len += cur_len;
+  if (read_len != src_len)
   {
-    INIT_ERROR = INIT_SOURCE_STDIN;
+    R.init_err = Runtime::InitError::SourceStdin;
     return;
   }
   code[src_len] = '\0';
 
-  JS::CompileOptions compile_options(CX);
-  compile_options.setFileAndLine(getenv("SOURCE_NAME"), 1);
-
-  JS::SourceText<mozilla::Utf8Unit> moz_source;
-  if (!moz_source.init(CX, code, strlen(code), JS::SourceOwnership::Borrowed))
+  uint32_t bindings_len = atoi(getenv("BINDINGS_LEN"));
+  char *bindings_code = (char *)malloc(bindings_len + 1);
+  read_len = cur_len = 0;
+  while ((cur_len = read(0, &bindings_code[read_len], bindings_len - read_len)))
+    read_len += cur_len;
+  if (read_len != bindings_len)
   {
-    INIT_ERROR = INIT_SOURCE_COMPILE;
+    R.init_err = Runtime::InitError::SourceStdin;
     return;
   }
+  bindings_code[bindings_len] = '\0';
 
-  JSObject *mod_obj = JS::CompileModule(CX, compile_options, moz_source);
-  if (!mod_obj)
+  uint32_t import_wrapper_cnt = atoi(getenv("IMPORT_WRAPPER_CNT"));
+  log("(wizer) load and compile dependency wrappers");
+  for (size_t i = 0; i < import_wrapper_cnt; i++)
   {
-    INIT_ERROR = INIT_SOURCE_COMPILE;
-    return;
-  }
+    sprintf(&env_name[0], "IMPORT_WRAPPER%zu_NAME", i);
+    char *import_wrapper_name = getenv(env_name);
 
-  MOD = JS::PersistentRootedObject(CX, mod_obj);
-
-  if (!JS::ModuleLink(CX, MOD))
-  {
-    INIT_ERROR = INIT_SOURCE_LINK;
-    return;
-  }
-
-  // Result value, used for top-level await.
-  JS::RootedValue rval(CX);
-
-  // Execute the module bytecode.
-  if (!JS::ModuleEvaluate(CX, MOD, &rval))
-  {
-    INIT_ERROR = INIT_SOURCE_EXEC;
-    return;
-  }
-
-  JS::RootedObject ns(CX, JS::GetModuleNamespace(CX, MOD));
-
-  uint32_t export_cnt = atoi(getenv("EXPORT_CNT"));
-  char env_name[100];
-  for (size_t i = 0; i < export_cnt; i++)
-  {
-    sprintf(&env_name[0], "EXPORT%zu", i);
-    if (!JS_GetProperty(CX, ns, getenv(env_name), &FN[i]))
+    sprintf(&env_name[0], "IMPORT_WRAPPER%zu_LEN", i);
+    uint32_t import_wrapper_len = atoi(getenv(env_name));
+    char *import_wrapper_code = (char *)malloc(import_wrapper_len + 1);
+    read_len = cur_len = 0;
+    while ((cur_len = read(0, &import_wrapper_code[read_len], import_wrapper_len - read_len)))
+      read_len += cur_len;
+    if (read_len != import_wrapper_len)
     {
-      INIT_ERROR = INIT_FN_LIST;
+      R.init_err = Runtime::InitError::SourceStdin;
+      return;
+    }
+    import_wrapper_code[import_wrapper_len] = '\0';
+
+    {
+      JS::CompileOptions compile_options(R.cx);
+      compile_options.setFileAndLine(import_wrapper_name, 1);
+
+      JS::SourceText<mozilla::Utf8Unit> moz_source;
+      if (!moz_source.init(R.cx, import_wrapper_code, strlen(import_wrapper_code), JS::SourceOwnership::Borrowed))
+      {
+        R.init_err = Runtime::InitError::SourceCompile;
+        return;
+      }
+
+      JSObject *mod_obj = JS::CompileModule(R.cx, compile_options, moz_source);
+      if (!mod_obj)
+      {
+        R.init_err = Runtime::InitError::SourceCompile;
+        return;
+      }
+
+      R.import_wrappers[import_wrapper_name] = JS::PersistentRootedObject(R.cx, mod_obj);
+    }
+  }
+
+  // -- Perform module instantiation & execution --
+  JS::SetModuleResolveHook(JS_GetRuntime(R.cx), EmbeddingResolveHook);
+  log("(wizer) compile source module");
+  {
+    JS::CompileOptions compile_options(R.cx);
+    compile_options.setFileAndLine(R.source_name.c_str(), 1);
+
+    JS::SourceText<mozilla::Utf8Unit> moz_source;
+    if (!moz_source.init(R.cx, code, strlen(code), JS::SourceOwnership::Borrowed))
+    {
+      R.init_err = Runtime::InitError::SourceCompile;
+      return;
+    }
+
+    JSObject *mod_obj = JS::CompileModule(R.cx, compile_options, moz_source);
+    if (!mod_obj)
+    {
+      R.init_err = Runtime::InitError::SourceCompile;
+      return;
+    }
+
+    R.mod = JS::PersistentRootedObject(R.cx, mod_obj);
+  }
+
+  log("(wizer) compile bindings module");
+  {
+    JS::CompileOptions compile_options(R.cx);
+    compile_options.setFileAndLine("internal:bindings", 1);
+
+    JS::SourceText<mozilla::Utf8Unit> moz_source;
+    if (!moz_source.init(R.cx, bindings_code, strlen(bindings_code), JS::SourceOwnership::Borrowed))
+    {
+      R.init_err = Runtime::InitError::BindingsCompile;
+      return;
+    }
+
+    JSObject *mod_obj = JS::CompileModule(R.cx, compile_options, moz_source);
+    if (!mod_obj)
+    {
+      R.init_err = Runtime::InitError::BindingsCompile;
+      return;
+    }
+
+    R.mod_bindings = JS::PersistentRootedObject(R.cx, mod_obj);
+  }
+
+  log("(wizer) link");
+  {
+    if (!JS::ModuleLink(R.cx, R.mod_bindings))
+    {
+      R.init_err = Runtime::InitError::SourceLink;
       return;
     }
   }
 
+  {
+    JS::RootedValue rval(R.cx);
+
+    // Execute the module bytecode.
+    log("(wizer) execute the bindings module");
+    if (!JS::ModuleEvaluate(R.cx, R.mod_bindings, &rval))
+    {
+      R.init_err = Runtime::InitError::BindingsExec;
+      return;
+    }
+
+    JS::Rooted<JSObject *> eval_promise(R.cx);
+    eval_promise.set(&rval.toObject());
+    if (!JS::ThrowOnModuleEvaluationFailure(R.cx, eval_promise, JS::ModuleErrorBehaviour::ThrowModuleErrorsSync))
+    {
+      R.init_err = Runtime::InitError::BindingsExec;
+      return;
+    }
+
+    // Execute the module bytecode.
+    // TODO: configure whether to execute the top-level during wizering or not?
+    log("(wizer) execute the source module");
+    if (!JS::ModuleEvaluate(R.cx, R.mod, &rval))
+    {
+      R.init_err = Runtime::InitError::SourceExec;
+      return;
+    }
+
+    eval_promise.set(&rval.toObject());
+    if (!JS::ThrowOnModuleEvaluationFailure(R.cx, eval_promise, JS::ModuleErrorBehaviour::ThrowModuleErrorsSync))
+    {
+      R.init_err = Runtime::InitError::SourceExec;
+      return;
+    }
+
+    // if (JS::GetPromiseState(eval_promise) == JS::PromiseState::Pending) {
+    //   R.init_err = Runtime::InitError::SourceExec;
+    //   return;
+    // }
+    // if (JS::GetPromiseState(eval_promise) == JS::PromiseState::Rejected) {
+    //   R.init_err = Runtime::InitError::SourceExec;
+    //   JS::Value result = JS::GetPromiseResult(eval_promise);
+
+    //   return;
+    // }
+  }
+
+  JS::RootedObject ns(R.cx, JS::GetModuleNamespace(R.cx, R.mod));
+  JS::RootedObject ns_bindings(R.cx, JS::GetModuleNamespace(R.cx, R.mod_bindings));
+
+  // -- Wire up the imports and exports and initialize the bindings --
+  log("(wizer) retrieve and generate the export bindings");
+  uint32_t export_cnt = atoi(getenv("EXPORT_CNT"));
+  for (size_t i = 0; i < export_cnt; i++)
+  {
+    Runtime::CoreFn *fn = &R.fns.emplace_back();
+
+    sprintf(&env_name[0], "EXPORT%zu_NAME", i);
+    if (!JS_GetProperty(R.cx, ns_bindings, getenv(env_name), &fn->func))
+    {
+      R.init_err = Runtime::InitError::FnList;
+      return;
+    }
+
+    // rudimentary data marshalling to parse the core ABI
+    // export type from the env vars
+    sprintf(&env_name[0], "EXPORT%zu_ARGS", i);
+    char *arg_tys = getenv(env_name);
+    int j = 0;
+    char ch;
+    if (arg_tys[0] == '*')
+    {
+      fn->paramptr = true;
+      j++;
+    }
+    while (true)
+    {
+      ch = arg_tys[j];
+      if (ch == '\0')
+        break;
+      if (strncmp(&arg_tys[j], "i32", 3) == 0)
+      {
+        fn->args.push_back(CoreVal::I32);
+        j += 3;
+      }
+      else if (strncmp(&arg_tys[j], "i64", 3) == 0)
+      {
+        fn->args.push_back(CoreVal::I64);
+        j += 3;
+      }
+      else if (strncmp(&arg_tys[j], "f32", 3) == 0)
+      {
+        fn->args.push_back(CoreVal::F32);
+        j += 3;
+      }
+      else if (strncmp(&arg_tys[j], "f64", 3) == 0)
+      {
+        fn->args.push_back(CoreVal::F64);
+        j += 3;
+      }
+      else
+      {
+        R.init_err = Runtime::InitError::TypeParse;
+        return;
+      }
+      if (arg_tys[j] == ',')
+      {
+        j++;
+      }
+    }
+
+    sprintf(&env_name[0], "EXPORT%zu_RET", i);
+    arg_tys = getenv(env_name);
+    j = 0;
+    if (arg_tys[0] != '\0')
+    {
+      if (arg_tys[0] == '*')
+      {
+        fn->retptr = true;
+        j++;
+      }
+      if (strncmp(&arg_tys[j], "i32", 3) == 0)
+      {
+        fn->ret.emplace(CoreVal::I32);
+      }
+      else if (strncmp(&arg_tys[j], "i64", 3) == 0)
+      {
+        fn->ret.emplace(CoreVal::I64);
+      }
+      else if (strncmp(&arg_tys[j], "f32", 3) == 0)
+      {
+        fn->ret.emplace(CoreVal::F32);
+      }
+      else if (strncmp(&arg_tys[j], "f64", 3) == 0)
+      {
+        fn->ret.emplace(CoreVal::F64);
+      }
+      else
+      {
+        R.init_err = Runtime::InitError::TypeParse;
+        return;
+      }
+    }
+
+    sprintf(&env_name[0], "EXPORT%zu_RETSIZE", i);
+    fn->retsize = atoi(getenv(env_name));
+  }
+
   uint32_t import_cnt = atoi(getenv("IMPORT_CNT"));
 
-  JS::RootedVector<JS::Value> args(CX);
+  JS::RootedVector<JS::Value> args(R.cx);
   if (!args.resize(2 + import_cnt))
   {
-    INIT_ERROR = INIT_FN_LIST;
+    R.init_err = Runtime::InitError::FnList;
     return;
   }
 
-  JS::RootedObject mem(CX, JS_NewPlainObject(CX));
-  if (!JS_DefineProperty(CX, mem, "buffer", GetMemBuffer,
+  log("(wizer) create the memory buffer JS object");
+  JS::RootedObject mem(R.cx, JS_NewPlainObject(R.cx));
+  if (!JS_DefineProperty(R.cx, mem, "buffer", GetMemBuffer,
                          nullptr, JSPROP_ENUMERATE))
   {
-    INIT_ERROR = INIT_MEM_BUFFER;
+    R.init_err = Runtime::InitError::MemBuffer;
     return;
   }
 
   args[0].setObject(*mem);
 
-  JSFunction *realloc_fn = JS_NewFunction(CX, ReallocFn, 0, 0, "realloc");
+  log("(wizer) create the realloc JS function");
+  JSFunction *realloc_fn = JS_NewFunction(R.cx, ReallocFn, 0, 0, "realloc");
   if (!realloc_fn)
   {
-    INIT_ERROR = INIT_REALLOC_FN;
+    R.init_err = Runtime::InitError::ReallocFn;
     return;
   }
   args[1].setObject(*JS_GetFunctionObject(realloc_fn));
 
+  log("(wizer) create the import JS functions");
   for (size_t i = 0; i < import_cnt; i++)
   {
-    sprintf(&env_name[0], "IMPORT%zu", i);
+    sprintf(&env_name[0], "IMPORT%zu_NAME", i);
     JSFunction *import_fn = coreabi_get_import(i, getenv(env_name));
     if (!import_fn)
     {
-      INIT_ERROR = INIT_IMPORT_FN;
+      R.init_err = Runtime::InitError::ImportFn;
       return;
     }
     args[2 + i].setObject(*JS_GetFunctionObject(import_fn));
   }
 
-  JS::RootedValue set_mem_realloc(CX);
-  JS_GetProperty(CX, ns, "initBindings", &set_mem_realloc);
-  JS::RootedValue r(CX);
-  if (!JS_CallFunctionValue(CX, nullptr, set_mem_realloc, args, &r))
+  log("(wizer) call the binding initialization function");
+  JS::RootedValue r(R.cx);
+  JS::RootedValue set_mem_realloc(R.cx);
+  JS_GetProperty(R.cx, ns_bindings, "$initBindings", &set_mem_realloc);
+  if (!JS_CallFunctionValue(R.cx, nullptr, set_mem_realloc, args, &r))
   {
-    INIT_ERROR = INIT_MEM_BINDINGS;
+    R.init_err = Runtime::InitError::MemBindings;
     return;
   }
 
-  js::RunJobs(CX);
-  JS_MaybeGC(CX);
+  log("(wizer) run jobs");
+  js::RunJobs(R.cx);
+  log("(wizer) gc");
+  JS_MaybeGC(R.cx);
 
-  // TODO: Run task queue / TLA / get top-level exec runtime error?
-  JS::RootedValue exc(CX);
-  if (JS_GetPendingException(CX, &exc))
+  if (JS_IsExceptionPending(R.cx))
   {
-    ReportAndClearException(CX);
-    INIT_ERROR = INIT_SOURCE_EXEC;
+    R.init_err = Runtime::InitError::SourceExec;
     return;
   }
+  log("(wizer) complete");
 }
 
 #define COMPONENT_RUNTIME_COREVAL_I32 0
@@ -520,101 +858,208 @@ typedef struct
   } val;
 } coreval;
 
-void *free_list[FREE_LIST_MAX];
-size_t free_list_len = 0;
-uint32_t LAST_FN_IDX = -1;
-
-// char s[10];
-// sprintf(s, "%d", src_len);
-
 __attribute__((export_name("check_init")))
-uint8_t
+Runtime::InitError
 check_init()
 {
-  JSAutoRealm ar(CX, GLOBAL);
-  switch (INIT_ERROR)
+  JSAutoRealm ar(R.cx, R.global);
+  JS::RootedValue exc(R.cx);
+  if (JS_GetPendingException(R.cx, &exc))
   {
-  case INIT_SOURCE_COMPILE:
-  case INIT_SOURCE_EXEC:
-  case INIT_MEM_BINDINGS:
-    ReportAndClearException(CX);
+    ReportAndClearException(R.cx);
   }
-  return INIT_ERROR;
+  return R.init_err;
 }
 
-__attribute__((export_name("call"))) void call(uint32_t fn, uint32_t retptr, uint32_t corearg_cnt, coreval *coreargs)
+__attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx, void *argptr)
 {
-  log_trace("call", "start");
-
-  JSAutoRealm ar(CX, GLOBAL);
-
-  if (LAST_FN_IDX != -1 || free_list_len != 0)
+  Runtime::CoreFn *fn = &R.fns[fn_idx];
+  R.cur_fn_idx = fn_idx;
+  if (DEBUG)
   {
-    log_error("call", "Unexpected call state, was post_call previously called?");
-    abort();
-  }
-  LAST_FN_IDX = fn;
-
-  JS::RootedVector<JS::Value> args(CX);
-  if (!args.resize(corearg_cnt + 1))
-  {
-    log_error("call", "Unable to allocate memory for array resize");
-    abort();
-  }
-
-  for (int i = 0; i < corearg_cnt; i++)
-  {
-    switch (coreargs[i].tag)
+    fprintf(stderr, "(call) Function [%d] - ", fn_idx);
+    fprintf(stderr, "(");
+    if (fn->paramptr)
     {
-    case COMPONENT_RUNTIME_COREVAL_I32:
-      args[i].setInt32(coreargs[i].val.i32);
+      fprintf(stderr, "*");
+    }
+    bool first = true;
+    for (int i = 0; i < fn->args.size(); i++)
+    {
+      if (first)
+      {
+        first = false;
+      }
+      else
+      {
+        fprintf(stderr, ", ");
+      }
+      switch (fn->args[i])
+      {
+      case CoreVal::I32:
+        fprintf(stderr, "i32");
+        break;
+      case CoreVal::I64:
+        fprintf(stderr, "i64");
+        break;
+      case CoreVal::F32:
+        fprintf(stderr, "f32");
+        break;
+      case CoreVal::F64:
+        fprintf(stderr, "f64");
+        break;
+      }
+    }
+    fprintf(stderr, ")");
+    if (fn->ret.has_value())
+    {
+      fprintf(stderr, " -> ");
+      if (fn->retptr)
+      {
+        fprintf(stderr, "*");
+      }
+      switch (fn->ret.value())
+      {
+      case CoreVal::I32:
+        fprintf(stderr, "i32");
+        break;
+      case CoreVal::I64:
+        fprintf(stderr, "i64");
+        break;
+      case CoreVal::F32:
+        fprintf(stderr, "f32");
+        break;
+      case CoreVal::F64:
+        fprintf(stderr, "f64");
+        break;
+      }
+    }
+    fprintf(stderr, "\n");
+  }
+
+  JSAutoRealm ar(R.cx, R.global);
+
+  js::ResetMathRandomSeed(R.cx);
+
+  // TODO: fixup post-calls for non post-calling functions
+  if ((R.cur_fn_idx != -1 || R.free_list.size() != 0) && false)
+  {
+    log("(call) unexpected call state, was post_call previously called?");
+    abort();
+  }
+  R.cur_fn_idx = fn_idx;
+
+  JS::RootedVector<JS::Value> args(R.cx);
+  if (!args.resize(fn->args.size() + (fn->retptr ? 1 : 0)))
+  {
+    log("(call) unable to allocate memory for array resize");
+    abort();
+  }
+
+  log("(call) setting args");
+  int argcnt = 0;
+  if (fn->paramptr)
+  {
+    args[0].setInt32((uint32_t)argptr);
+    argcnt = 1;
+  }
+  else if (fn->args.size() > 0)
+  {
+    uint32_t *curptr = static_cast<uint32_t *>(argptr);
+    argcnt = fn->args.size();
+    for (int i = 0; i < argcnt; i++)
+    {
+      switch (fn->args[i])
+      {
+      case CoreVal::I32:
+        args[i].setInt32(*curptr);
+        curptr += 1;
+        break;
+      case CoreVal::I64:
+        args[i].setBigInt(JS::detail::BigIntFromUint64(R.cx, *(uint64_t *)(curptr)));
+        curptr += 2;
+        break;
+      case CoreVal::F32:
+        args[i].setNumber(*((float *)curptr));
+        curptr += 1;
+        break;
+      case CoreVal::F64:
+        args[i].setNumber(*((double *)curptr));
+        curptr += 2;
+        break;
+      }
+    }
+  }
+
+  void *retptr = nullptr;
+  if (fn->retptr)
+  {
+    if (DEBUG)
+    {
+      fprintf(stderr, "(call) setting retptr at arg %d\n", argcnt);
+    }
+    retptr = cabi_realloc(0, 0, 4, fn->retsize);
+    args[argcnt].setInt32((uint32_t)retptr);
+  }
+
+  log("(call) JS lowering call");
+  JS::RootedValue r(R.cx);
+  if (!JS_CallFunctionValue(R.cx, nullptr, fn->func, args, &r))
+  {
+    log("(call) runtime JS Error");
+    ReportAndClearException(R.cx);
+    abort();
+  }
+
+  // Handle singular returns
+  if (!fn->retptr && fn->ret.has_value())
+  {
+    log("(call) singular return");
+    retptr = cabi_realloc(0, 0, 4, fn->retsize);
+    switch (fn->ret.value())
+    {
+    case CoreVal::I32:
+      *((uint32_t *)retptr) = get_int32(&r);
       break;
-    case COMPONENT_RUNTIME_COREVAL_I64:
-      args[i].setBigInt(JS::detail::BigIntFromUint64(CX, coreargs[i].val.i64));
+    case CoreVal::I64:
+      *((uint64_t *)retptr) = get_int64(&r);
       break;
-    case COMPONENT_RUNTIME_COREVAL_F32:
-      args[i].setNumber(coreargs[i].val.f32);
+    case CoreVal::F32:
+      *((float *)retptr) = get_float32(&r);
       break;
-    case COMPONENT_RUNTIME_COREVAL_F64:
-      args[i].setNumber(coreargs[i].val.f64);
+    case CoreVal::F64:
+      *((double *)retptr) = get_float64(&r);
       break;
     }
   }
 
-  args[corearg_cnt].setInt32(retptr);
+  log("(call) end");
 
-  JS::RootedValue r(CX);
-  if (!JS_CallFunctionValue(CX, nullptr, FN[fn], args, &r))
-  {
-    log_error("call", "Runtime JS Error");
-    ReportAndClearException(CX);
-    // TODO error synthesis for errorable
-    // basically runtime errors are aborts
-    // unless you have an explicit result return
-    // in which case the runtime error is recreated fully!
-    abort();
-  }
-
-  log_trace("call", "end");
+  // we always return a retptr (even if null)
+  // the wrapper will drop it if not needed
+  return (uint32_t)retptr;
 }
 
-__attribute__((export_name("post_call"))) void post_call(uint32_t fn)
+__attribute__((export_name("post_call"))) void post_call(uint32_t fn_idx)
 {
-  log_trace("post_call", "start");
-  if (LAST_FN_IDX != fn)
+  if (DEBUG)
   {
-    log_error("post_call", "Unexpected call state, was call definitely called last?");
+    fprintf(stderr, "(post_call) Function [%d]\n", fn_idx);
+  }
+  if (R.cur_fn_idx != fn_idx)
+  {
+    log("(post_call) Unexpected call state, was call definitely called last?");
     abort();
   }
-  LAST_FN_IDX = -1;
-  for (size_t i = 0; i < free_list_len; i++)
+  R.cur_fn_idx = -1;
+  for (void *ptr : R.free_list)
   {
-    JS_free(CX, free_list[i]);
+    cabi_free(ptr);
   }
-  free_list_len = 0;
-  log_trace("post_call", "jobs");
-  js::RunJobs(CX);
-  log_trace("post_call", "maybe gc");
-  JS_MaybeGC(CX);
-  log_trace("post_call", "end");
+  R.free_list.clear();
+  log("(post_call) jobs");
+  js::RunJobs(R.cx);
+  log("(post_call) maybe gc");
+  JS_MaybeGC(R.cx);
+  log("(post_call) end");
 }

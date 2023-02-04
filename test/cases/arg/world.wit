@@ -1,0 +1,5 @@
+default world count {
+  export exports: interface {
+    count-a: func(str: string) -> u32
+  }
+}

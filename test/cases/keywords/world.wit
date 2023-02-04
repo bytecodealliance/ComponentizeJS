@@ -1,0 +1,8 @@
+interface keywords {
+    %type: func(%type: u32) -> (%type: u32, %flags: s32)
+}
+
+default world the-world {
+  import imports: self.keywords
+  export exports: self.keywords
+}

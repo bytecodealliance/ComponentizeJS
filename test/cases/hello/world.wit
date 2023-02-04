@@ -1,0 +1,9 @@
+default world hello {
+  import get-num: interface {
+    get-num: func(text: string) -> string
+  }
+
+  export exports: interface {
+    hello: func(name: string) -> string
+  }
+}

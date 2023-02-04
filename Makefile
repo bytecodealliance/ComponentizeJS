@@ -3,15 +3,15 @@ WASI_CXX ?= $(WASI_SDK)/bin/clang++
 WASI_CC ?= $(WASI_SDK)/bin/clang
 WASM_TOOLS ?= $(shell which wasm-tools)
 WASM_OPT ?= ../binaryen/bin/wasm-opt
-JSCT ?= ../js-component-tools/src/jsct.js
+JCO ?= ./node_modules/.bin/jco
 WIT_BINDGEN := $(shell which wit-bindgen)
 
 ifndef WIT_BINDGEN
 	WIT_BINDGEN = $(error No wit-bindgen in PATH, consider doing cargo install --git https://github.com/bytecodealliance/wit-bindgen wit-bindgen-cli)
 endif
 
-ifndef JSCT
-	JSCT = $(error No JSCT in PATH. Run npm install -g jsct)
+ifndef JCO
+	JCO = $(error No jco in PATH. Run npm install -g @bytecodealliance/jco)
 endif
 
 ifndef WASM_OPT
@@ -46,9 +46,9 @@ OBJS := $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_
 
 all: dist/spidermonkey-embedding-splicer.js dist/spidermonkey_embedding.wasm
 
-dist/spidermonkey-embedding-splicer.js: target/wasm32-unknown-unknown/debug/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/spidermonkey-embedding-splicer.wit | obj
-	$(JSCT) new target/wasm32-unknown-unknown/debug/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm
-	$(JSCT) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o dist --map console=../console.js
+dist/spidermonkey-embedding-splicer.js: target/wasm32-unknown-unknown/debug/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj
+	$(JCO) new target/wasm32-unknown-unknown/debug/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm
+	$(JCO) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o dist --map console=../console.js
 
 target/wasm32-unknown-unknown/debug/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs
 	cargo build

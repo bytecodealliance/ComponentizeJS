@@ -1,5 +1,5 @@
-#ifndef component_runtime_builtins_h
-#define component_runtime_builtins_h
+#ifndef COMPONENTIZE_BUILTINS_H
+#define COMPONENTIZE_BUILTINS_H
 
 #include <cstdio>
 #include <assert.h>
@@ -10,6 +10,7 @@
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
 #pragma clang diagnostic ignored "-Wdeprecated-enum-enum-conversion"
 #include <jsapi.h>
+#include <js/Promise.h>
 #include <js/experimental/TypedData.h>
 
 const JSErrorFormatString *GetErrorMessage(void *userRef, unsigned errorNumber);
@@ -101,4 +102,73 @@ JS::UniqueChars encode(JSContext *cx, JS::HandleValue val, size_t *encoded_len);
     return false;                                                   \
   }
 
-#endif // component_runtime_builtins_h
+template <typename Impl> class BuiltinImpl {
+private:
+  static constexpr const JSClassOps class_ops{};
+  static constexpr const uint32_t class_flags = 0;
+
+public:
+  static constexpr JSClass class_{
+      Impl::class_name,
+      JSCLASS_HAS_RESERVED_SLOTS(Impl::Slots::Count) | class_flags,
+      &class_ops,
+  };
+
+  static inline JS::Result<std::tuple<JS::CallArgs, JS::Rooted<JSObject *> *>>
+  MethodHeaderWithName(int required_argc, JSContext *cx, unsigned argc, JS::Value *vp,
+                       const char *name) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    if (!check_receiver(cx, args.thisv(), name)) {
+      return JS::Result<std::tuple<JS::CallArgs, JS::Rooted<JSObject *> *>>(JS::Error());
+    }
+    JS::Rooted<JSObject *> self(cx, &args.thisv().toObject());
+    if (!args.requireAtLeast(cx, name, required_argc)) {
+      return JS::Result<std::tuple<JS::CallArgs, JS::Rooted<JSObject *> *>>(JS::Error());
+    }
+
+    return JS::Result<std::tuple<JS::CallArgs, JS::Rooted<JSObject *> *>>(
+        std::make_tuple(args, &self));
+  }
+
+  static JS::PersistentRooted<JSObject *> proto_obj;
+
+  static bool is_instance(JSObject *obj) { return obj != nullptr && JS::GetClass(obj) == &class_; }
+
+  static bool is_instance(JS::Value val) { return val.isObject() && is_instance(&val.toObject()); }
+
+  static bool check_receiver(JSContext *cx, JS::HandleValue receiver, const char *method_name) {
+    if (!Impl::is_instance(receiver)) {
+      // JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INCOMPATIBLE_INSTANCE,
+      //                           method_name, Impl::class_.name);
+      return false;
+    }
+
+    return true;
+  }
+
+  static bool init_class_impl(JSContext *cx, JS::HandleObject global,
+                              JS::HandleObject parent_proto = nullptr) {
+    proto_obj.init(cx, JS_InitClass(cx, global, parent_proto, &class_, Impl::constructor,
+                                    Impl::ctor_length, Impl::properties, Impl::methods, nullptr,
+                                    nullptr));
+
+    return proto_obj != nullptr;
+  }
+};
+
+template <typename Impl> class BuiltinNoConstructor : public BuiltinImpl<Impl> {
+public:
+  static const int ctor_length = 1;
+
+  static bool constructor(JSContext *cx, unsigned argc, JS::Value *vp) {
+    JS_ReportErrorUTF8(cx, "%s can't be instantiated directly", Impl::class_name);
+    return false;
+  }
+
+  static bool init_class(JSContext *cx, JS::HandleObject global) {
+    return BuiltinImpl<Impl>::init_class_impl(cx, global) &&
+           JS_DeleteProperty(cx, global, BuiltinImpl<Impl>::class_.name);
+  }
+};
+
+#endif // COMPONENTIZE_BUILTINS_H

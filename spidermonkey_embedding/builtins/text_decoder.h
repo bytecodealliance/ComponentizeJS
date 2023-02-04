@@ -1,3 +1,6 @@
+#ifndef COMPONENTIZE_BUILTIN_TEXT_DECODER_H
+#define COMPONENTIZE_BUILTIN_TEXT_DECODER_H
+
 #include "builtins.h"
 
 namespace TextDecoder
@@ -20,3 +23,5 @@ namespace TextDecoder
 
   bool constructor(JSContext *cx, unsigned argc, JS::Value *vp);
 } // namespace TextDecoder
+
+#endif
