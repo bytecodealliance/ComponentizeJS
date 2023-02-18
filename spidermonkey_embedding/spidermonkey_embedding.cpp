@@ -27,33 +27,6 @@
 #include "builtins/text_decoder.h"
 #include "builtins/console.h"
 
-// WASI Adapter Memory Override Fix
-// Pending upstreaming via https://github.com/WebAssembly/wasi-libc/pull/377
-
-static bool used = false;
-extern char __heap_base;
-
-#define PAGESIZE_2 (64 * 1024)
-
-extern "C" void *sbrk(intptr_t increment)
-{
-  if (increment == 0)
-  {
-    if (!used)
-    {
-      used = true;
-      size_t base = (size_t)&__heap_base;
-      return (void *)((base + PAGESIZE_2 - 1) & ~(PAGESIZE_2 - 1));
-    }
-    return (void *)(__builtin_wasm_memory_grow(0, 0) * PAGESIZE_2);
-  }
-  if (increment < 0)
-  {
-    abort();
-  }
-  return (void *)(__builtin_wasm_memory_grow(0, increment / PAGESIZE_2) * PAGESIZE_2);
-}
-
 // Logging
 
 static bool DEBUG = false;
@@ -149,7 +122,8 @@ struct Runtime
   int cur_fn_idx = -1;
   std::vector<void *> free_list;
 
-  void free_list_remove (void* ptr) {
+  void free_list_remove(void *ptr)
+  {
     free_list.erase(std::remove(free_list.begin(), free_list.end(), ptr), free_list.end());
   }
 
@@ -211,14 +185,6 @@ static void rejection_tracker(JSContext *cx, bool mutedErrors, JS::HandleObject 
 }
 
 // Import Splicing Functions
-
-__attribute__((noinline))
-int32_t
-get_int32(JS::MutableHandleValue val)
-{
-  return val.toInt32();
-}
-
 __attribute__((noinline))
 int64_t
 get_int64(JS::MutableHandleValue val)
@@ -233,39 +199,10 @@ get_int64(JS::MutableHandleValue val)
   return arg0_uint64;
 }
 
-__attribute__((noinline)) float get_float32(JS::MutableHandleValue val)
-{
-  return val.toDouble();
-}
-
-__attribute__((noinline)) double get_float64(JS::MutableHandleValue val)
-{
-  return val.toDouble();
-}
-
-__attribute__((noinline)) void set_int32(JS::MutableHandleValue val, int32_t num)
-{
-  val.setInt32(num);
-}
-
-__attribute__((noinline)) void set_int64(JS::MutableHandleValue val, int64_t num)
-{
-  val.setBigInt(JS::detail::BigIntFromUint64(R.cx, num));
-}
-
-__attribute__((noinline)) void set_float32(JS::MutableHandleValue val, float num)
-{
-  val.setDouble(num);
-}
-
-__attribute__((noinline)) void set_float64(JS::MutableHandleValue val, double num)
-{
-  val.setDouble(num);
-}
-
 /*
  * These 4 "sample" functions are deconstructed after compilation and fully
- * removed. The generated code is then used to build a template for constructing
+ * removed. The prime number separates the get from the set in this deconstruction.
+ * The generated code is then used to build a template for constructing
  * the generic binding functions from it. By always keeping these samples around we
  * can ensure this approach is resiliant to some degree of compiled output changes,
  * or at least throw a vaguely useful error when that is no longer the case.
@@ -273,8 +210,8 @@ __attribute__((noinline)) void set_float64(JS::MutableHandleValue val, double nu
 __attribute__((export_name("coreabi_sample_i32"))) bool CoreAbiSampleI32(JSContext *cx, unsigned argc, JS::Value *vp)
 {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  int32_t arg0 = get_int32(args[0]);
-  args.rval().setInt32(arg0);
+  int32_t arg0 = static_cast<int32_t>(args[0].toInt32());
+  args.rval().setInt32(arg0 * 32771);
   return true;
 }
 
@@ -289,7 +226,7 @@ __attribute__((export_name("coreabi_sample_i64"))) bool CoreAbiSampleI64(JSConte
 __attribute__((export_name("coreabi_sample_f32"))) bool CoreAbiSampleF32(JSContext *cx, unsigned argc, JS::Value *vp)
 {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  float arg2 = get_float32(args[2]);
+  float arg2 = static_cast<float>(args[2].toDouble());
   args.rval().setDouble(arg2);
   return true;
 }
@@ -297,7 +234,7 @@ __attribute__((export_name("coreabi_sample_f32"))) bool CoreAbiSampleF32(JSConte
 __attribute__((export_name("coreabi_sample_f64"))) bool CoreAbiSampleF64(JSContext *cx, unsigned argc, JS::Value *vp)
 {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  double arg3 = get_float64(args[3]);
+  double arg3 = args[3].toDouble();
   args.rval().setDouble(arg3);
   return true;
 }
@@ -314,6 +251,12 @@ coreabi_get_import(int32_t idx, const char *name)
   {
   case 0:
     return JS_NewFunction(R.cx, CoreAbiSampleI32, 1, 0, name);
+  case 1:
+    return JS_NewFunction(R.cx, CoreAbiSampleI32, 2, 0, name);
+  case 2:
+    return JS_NewFunction(R.cx, CoreAbiSampleI32, 3, 0, name);
+  case 3:
+    return JS_NewFunction(R.cx, CoreAbiSampleI32, 4, 0, name);
   }
   // log("(coreabi_get_import) Unable to find import function");
   abort();
@@ -338,8 +281,10 @@ __attribute__((export_name("cabi_realloc"))) void *cabi_realloc(void *ptr, size_
   return ret;
 }
 
-void cabi_free (void* ptr) {
-  if (DEBUG) {
+void cabi_free(void *ptr)
+{
+  if (DEBUG)
+  {
     fprintf(stderr, "(cabi_free) %d\n", (uint32_t)ptr);
   }
   JS_free(R.cx, ptr);
@@ -1019,16 +964,19 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx, void *argptr
     switch (fn->ret.value())
     {
     case CoreVal::I32:
-      *((uint32_t *)retptr) = get_int32(&r);
+      *((uint32_t *)retptr) = r.toInt32();
       break;
     case CoreVal::I64:
-      *((uint64_t *)retptr) = get_int64(&r);
+      if (!JS::detail::BigIntIsUint64(r.toBigInt(), (uint64_t *)retptr))
+      {
+        abort();
+      }
       break;
     case CoreVal::F32:
-      *((float *)retptr) = get_float32(&r);
+      *((float *)retptr) = static_cast<float>(r.toDouble());
       break;
     case CoreVal::F64:
-      *((double *)retptr) = get_float64(&r);
+      *((double *)retptr) = r.toDouble();
       break;
     }
   }
@@ -1046,11 +994,12 @@ __attribute__((export_name("post_call"))) void post_call(uint32_t fn_idx)
   {
     fprintf(stderr, "(post_call) Function [%d]\n", fn_idx);
   }
-  if (R.cur_fn_idx != fn_idx)
-  {
-    log("(post_call) Unexpected call state, was call definitely called last?");
-    abort();
-  }
+  // disabled pending ensuring post_calls
+  // if (R.cur_fn_idx != fn_idx)
+  // {
+  //   log("(post_call) Unexpected call state, was call definitely called last?");
+  //   abort();
+  // }
   R.cur_fn_idx = -1;
   for (void *ptr : R.free_list)
   {

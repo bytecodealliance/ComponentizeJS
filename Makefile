@@ -2,7 +2,7 @@ WASI_SDK ?= /opt/wasi-sdk
 WASI_CXX ?= $(WASI_SDK)/bin/clang++
 WASI_CC ?= $(WASI_SDK)/bin/clang
 WASM_TOOLS ?= $(shell which wasm-tools)
-WASM_OPT ?= ../binaryen/bin/wasm-opt
+WASM_OPT ?= $(shell which wasm-opt-manual)
 JCO ?= ./node_modules/.bin/jco
 WIT_BINDGEN := $(shell which wit-bindgen)
 
@@ -38,23 +38,20 @@ LD_FLAGS := -Wl,-z,stack-size=1048576 -Wl,--stack-first -lwasi-emulated-getpid# 
 
 DEFINES ?=
 
-# This is required when using spidermonkey headers, as it allows us to enable
-# the streams library when setting up the js context.
-DEFINES += -DMOZ_JS_STREAMS
-
 OBJS := $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/**/*.cpp)) $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/*.cpp))
 
 all: dist/spidermonkey-embedding-splicer.js dist/spidermonkey_embedding.wasm
 
-dist/spidermonkey-embedding-splicer.js: target/wasm32-unknown-unknown/debug/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj
-	$(JCO) new target/wasm32-unknown-unknown/debug/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm
-	$(JCO) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o dist --map console=../console.js
+dist/spidermonkey-embedding-splicer.js: target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj
+	$(JCO) new target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm
+	$(JCO) transpile -q --minify --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o dist --map console=../console.js -- -O1
 
-target/wasm32-unknown-unknown/debug/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs
-	cargo build
+target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs
+	cargo build --release
 
 dist/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC) dist
 	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ $(SM_SRC)/lib/*.o $(SM_SRC)/lib/*.a
+	$(WASM_OPT) --strip-debug $@ -o $@ -O1
 
 obj/%.o: spidermonkey_embedding/%.cpp Makefile | $(SM_SRC) obj obj/builtins
 	$(WASI_CXX) $(CXX_FLAGS) -O2 $(DEFINES) -I $(SM_SRC)/include -MMD -MP -c -o $@ $<

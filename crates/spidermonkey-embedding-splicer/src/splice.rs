@@ -144,8 +144,44 @@ pub fn splice(
 
     // (3) coreabi template instructions
     // read out as first Block..End part
+    // this is the common native function preload for a function of the form:
+    //
+    // bool NativeFn(JSContext *cx, unsigned argc, JS::Value *vp) {
+    //   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    //   ...
+    //   return true;
+    // }
+    //
     let mut instructions_shared_prelude: Vec<Instruction> = Vec::new();
-    // verified as post call store on i32 return
+
+    // These functions retrieve the corresponding type
+    // from a JS::HandleValue
+    // All except for the BigInt one are trivial and thus
+    // do not require regular explicit template extraction
+    // unless there are major ABI changes in Spidermonkey
+    let instructions_get_i32: Vec<Instruction> = vec![
+        Instruction::I64Load(MemArg {
+            align: 3,
+            offset: 0,
+            memory_index: 0,
+        }),
+        Instruction::I32WrapI64,
+    ];
+    // BitInt i64 extraction instructions will be populated from template
+    let mut instructions_get_i64: Vec<Instruction> = vec![];
+    let instructions_get_f32: Vec<Instruction> = vec![
+        Instruction::F64Load(MemArg {
+            align: 3,
+            offset: 0,
+            memory_index: 0,
+        }),
+        Instruction::F32DemoteF64,
+    ];
+    let instructions_get_f64: Vec<Instruction> = vec![Instruction::F64Load(MemArg {
+        align: 3,
+        offset: 0,
+        memory_index: 0,
+    })];
     let instructions_ret_i32: Vec<Instruction> = vec![
         Instruction::I64ExtendI32U,
         Instruction::I64Const(-545460846592),
@@ -156,7 +192,6 @@ pub fn splice(
             memory_index: 0,
         }),
     ];
-    // verified as post call store on i64 return
     let instructions_ret_i64: Vec<Instruction> = vec![
         Instruction::I64ExtendI32U,
         Instruction::I64Const(-511101108224),
@@ -167,7 +202,6 @@ pub fn splice(
             memory_index: 0,
         }),
     ];
-    // verified as post call store on f32 return
     let instructions_ret_f32: Vec<Instruction> = vec![
         Instruction::F64PromoteF32,
         Instruction::F64Store(MemArg {
@@ -176,7 +210,6 @@ pub fn splice(
             memory_index: 0,
         }),
     ];
-    // verified as post call store on f64 return
     let instructions_ret_f64: Vec<Instruction> = vec![Instruction::F64Store(MemArg {
         align: 3,
         offset: 0,
@@ -466,15 +499,25 @@ pub fn splice(
                     locals.push((cnt, val_map(&val_type)));
                 }
 
-                // (3) deconstruct the sample import to create an import function template
+                // (3) deconstruct the sample import against the import function template
                 if processed_coreabi_sample_code_cnt < 5
                     && (code.len() + import_fn_cnt == coreabi_sample_fn_idx.unwrap() as u32)
                 {
+                    // for op in parse_func
+                    //     .get_operators_reader()
+                    //     .map_err(|e| format!("Splice error:\n{:?}", e))?
+                    // {
+                    //     console::log(&format!("OP: {:?}", op.unwrap()));
+                    // }
                     // first four functions are the 4 sample functions
                     // these are processed to extract the template and removed
                     if processed_coreabi_sample_code_cnt < 4 {
                         if locals.len() != 1 {
-                            return Err("Unexpected abi template".into());
+                            return Err(format!(
+                                "Unexpected abi template local length {} for function {}",
+                                locals.len(),
+                                processed_coreabi_sample_code_cnt
+                            ));
                         }
 
                         let mut op_reader = parse_func
@@ -500,24 +543,44 @@ pub fn splice(
                             return Err("Unexpected abi template prelude length".into());
                         }
 
-                        let op = op_reader
-                            .read()
-                            .map_err(|e| format!("Splice error:\n{:?}", e))?;
-                        if !matches!(op, wasmparser::Operator::LocalGet { .. }) {
-                            return Err("Unexpected abi template instruction".into());
-                        }
-
-                        // skip ahead until the end of the main argument call
-                        // to check the return block
-                        while !op_reader.eof() {
+                        // BigInt instructions are a little more involved as we need to extract
+                        // the separate ToBigInt call
+                        if processed_coreabi_sample_code_cnt == 1 {
+                            // for op in parse_func
+                            //     .get_operators_reader()
+                            //     .map_err(|e| format!("Splice error:\n{:?}", e))?
+                            // {
+                            //     console::log(&format!(":OP: {:?}", op.unwrap()));
+                            // }
                             let op = op_reader
                                 .read()
                                 .map_err(|e| format!("Splice error:\n{:?}", e))?;
-                            if matches!(op, wasmparser::Operator::Call { .. }) {
-                                break;
+                            if !matches!(op, wasmparser::Operator::LocalGet { .. }) {
+                                return Err("Unexpected abi template instruction".into());
                             }
-                        }
-                        if processed_coreabi_sample_code_cnt == 1 {
+
+                            // skip ahead until the end of the main argument call
+                            // to check the return block
+                            while !op_reader.eof() {
+                                let op = op_reader
+                                    .read()
+                                    .map_err(|e| format!("Splice error:\n{:?}", e))?;
+                                if let wasmparser::Operator::Call { function_index } = op {
+                                    // first call is the ToBigInt
+                                    instructions_get_i64.push(Instruction::Call(
+                                        remap_fn_idx(
+                                            function_index,
+                                            import_fn_cnt,
+                                            imports_offset,
+                                            coreabi_sample_fn_idx.unwrap(),
+                                            fn_splice_offset,
+                                        )
+                                        .unwrap(),
+                                    ));
+                                    break;
+                                }
+                            }
+
                             while !op_reader.eof() {
                                 let op = op_reader
                                     .read()
@@ -529,29 +592,9 @@ pub fn splice(
                             }
                         }
 
-                        // iterate and verify the remaining instruction length
-                        // against the template expectation as a simple checksum
-                        idx = 0;
-                        while !op_reader.eof() {
-                            op_reader
-                                .read()
-                                .map_err(|e| format!("Splice error:\n{:?}", e))?;
-                            idx += 1;
-                        }
-                        if idx - 2
-                            != match processed_coreabi_sample_code_cnt {
-                                0 => instructions_ret_i32.len(),
-                                1 => instructions_ret_i64.len(),
-                                2 => instructions_ret_f32.len(),
-                                3 => instructions_ret_f64.len(),
-                                _ => return Err("internal error".into()),
-                            }
-                        {
-                            return Err("Unexpected abi template len".into());
-                        }
-                    // 5th function is the main coreabi_import function
-                    // which then branches into a specific import functions
-                    // this function remains, with its internal branching populated here
+                        // 5th function is the main coreabi_import function
+                        // which then branches into a specific import functions
+                        // this function remains, with its internal branching populated here
                     } else {
                         if locals.len() != 0 {
                             return Err("Unexpected abi template locals".into());
@@ -562,80 +605,90 @@ pub fn splice(
                             .map_err(|e| format!("Splice error:\n{:?}", e))?;
 
                         // Template Extraction
-                        // parse through the get_import function to verify the sample
-                        // and extract the key template info
-                        let load_memarg: MemArg;
-                        let new_fn_call_idx: u32;
-                        let mut fallback_instructions: Vec<Instruction> = Vec::new();
+                        let mut load_memarg: Option<MemArg> = None;
+                        let mut new_fn_call_idx: Option<u32> = None;
+                        let mut fallback_call_idx: Option<u32> = None;
 
-                        assert!(matches!(read_op(&mut op_reader)?, Instruction::Block(_)));
-                        assert!(matches!(read_op(&mut op_reader)?, Instruction::LocalGet(0)));
-                        assert!(matches!(read_op(&mut op_reader)?, Instruction::BrIf(_)));
-                        assert!(matches!(read_op(&mut op_reader)?, Instruction::I32Const(0)));
-                        match read_op(&mut op_reader)? {
-                            Instruction::I32Load(memarg) => {
-                                load_memarg = memarg;
-                            }
-                            _ => return Err("Unexpected op in import abi sample".into()),
-                        };
-                        match read_op(&mut op_reader)? {
-                            Instruction::I32Const(tidx) => {
-                                assert_eq!(tidx, coreabi_sample_table_idx.unwrap() + 1);
-                            }
-                            _ => {
-                                return Err(
-                                    "Unexpected function reference id in import abi sample".into()
-                                )
-                            }
-                        };
-                        assert!(matches!(read_op(&mut op_reader)?, Instruction::I32Const(1)));
-                        assert!(matches!(read_op(&mut op_reader)?, Instruction::I32Const(0)));
-                        assert!(matches!(read_op(&mut op_reader)?, Instruction::LocalGet(1)));
-                        match read_op(&mut op_reader)? {
-                            Instruction::Call(fidx) => {
-                                new_fn_call_idx = remap_fn_idx(
-                                    fidx,
-                                    import_fn_cnt,
-                                    imports_offset,
-                                    coreabi_sample_fn_idx.unwrap(),
-                                    fn_splice_offset,
-                                )
-                                .unwrap();
-                            }
-                            _ => {
-                                return Err(
-                                    "Unexpected function reference id in import abi sample".into()
-                                )
-                            }
-                        };
-                        assert!(matches!(read_op(&mut op_reader)?, Instruction::Return));
-                        assert!(matches!(read_op(&mut op_reader)?, Instruction::End));
+                        // for op in parse_func
+                        //     .get_operators_reader()
+                        //     .map_err(|e| format!("Splice error:\n{:?}", e))?
+                        // {
+                        //     console::log(&format!("OP: {:?}", op.unwrap()));
+                        // }
 
-                        // the remaining instructions to the function end are the fallback instructions
+                        // abort is the first call
                         while !op_reader.eof() {
-                            let mut instruction = read_op(&mut op_reader)?;
-                            match instruction {
-                                Instruction::Call(idx) => {
-                                    instruction = Instruction::Call(
-                                        remap_fn_idx(
-                                            idx,
-                                            import_fn_cnt,
-                                            imports_offset,
-                                            coreabi_sample_fn_idx.unwrap(),
-                                            fn_splice_offset,
-                                        )
-                                        .unwrap(),
-                                    );
-                                }
-                                _ => {}
-                            };
-                            fallback_instructions.push(instruction);
+                            let op = read_op(&mut op_reader)?;
+                            if let Instruction::Call(fidx) = op {
+                                fallback_call_idx = Some(
+                                    remap_fn_idx(
+                                        fidx,
+                                        import_fn_cnt,
+                                        imports_offset,
+                                        coreabi_sample_fn_idx.unwrap(),
+                                        fn_splice_offset,
+                                    )
+                                    .unwrap(),
+                                );
+                                break;
+                            }
                         }
-                        assert_eq!(fallback_instructions.len(), 3);
-                        assert!(matches!(
-                            fallback_instructions[fallback_instructions.len() - 1],
-                            Instruction::End
-                        ));
+                        if fallback_call_idx.is_none() {
+                            return Err("Unexpected op in import abi sample".into());
+                        }
+
+                        // then we pick up the load instruction
+                        // as the context load for the JS new function call
+                        let mut last_op: Option<Instruction> = None;
+                        while !op_reader.eof() {
+                            let op = read_op(&mut op_reader)?;
+                            if let Instruction::I32Load(memarg) = op {
+                                if memarg.offset == 0 {
+                                    match last_op {
+                                        Some(Instruction::I32Const(offset)) => {
+                                            load_memarg = Some(MemArg {
+                                                memory_index: 0,
+                                                align: 2,
+                                                offset: offset as u64,
+                                            })
+                                        }
+                                        _ => {
+                                            return Err("Unexpected op in import abi sample".into());
+                                        }
+                                    }
+                                } else {
+                                    load_memarg = Some(memarg);
+                                }
+                                break;
+                            }
+                            last_op = Some(op);
+                        }
+                        if load_memarg.is_none() {
+                            return Err("Unexpected op in import abi sample".into());
+                        }
+
+                        // table index of cabi_i32 (start of template functions)
+                        // is the next constant
+                        // // next call is the JS_NewFunction call
+                        while !op_reader.eof() {
+                            let op = read_op(&mut op_reader)?;
+                            if let Instruction::Call(fidx) = op {
+                                new_fn_call_idx = Some(
+                                    remap_fn_idx(
+                                        fidx,
+                                        import_fn_cnt,
+                                        imports_offset,
+                                        coreabi_sample_fn_idx.unwrap(),
+                                        fn_splice_offset,
+                                    )
+                                    .unwrap(),
+                                );
+                                break;
+                            }
+                        }
+                        if new_fn_call_idx.is_none() {
+                            return Err("Unexpected op in import abi sample".into());
+                        }
 
                         // Generation
                         // - Block for each import function + block for fallback
@@ -643,11 +696,11 @@ pub fn splice(
                         // - each block of the basic call form for new function
                         let mut func = Function::new(locals);
 
-                        if imports.len() > 0 {
-                            if DEBUG {
-                                console::log("> COREABI IMPORT GATE FN");
-                            }
+                        if DEBUG {
+                            console::log("> COREABI IMPORT GATE FN");
+                        }
 
+                        if imports.len() > 0 {
                             for _ in 0..imports.len() {
                                 add_instruction(&mut func, &Instruction::Block(BlockType::Empty));
                             }
@@ -665,7 +718,10 @@ pub fn splice(
                             // "NewFunction" call block for each import
                             for (idx, (_, _, impt_sig, _)) in imports.iter().enumerate().rev() {
                                 add_instruction(&mut func, &Instruction::I32Const(0));
-                                add_instruction(&mut func, &Instruction::I32Load(load_memarg));
+                                add_instruction(
+                                    &mut func,
+                                    &Instruction::I32Load(load_memarg.unwrap()),
+                                );
                                 // function pointer
                                 add_instruction(
                                     &mut func,
@@ -677,7 +733,10 @@ pub fn splice(
                                 );
                                 add_instruction(&mut func, &Instruction::I32Const(0));
                                 add_instruction(&mut func, &Instruction::LocalGet(1));
-                                add_instruction(&mut func, &Instruction::Call(new_fn_call_idx));
+                                add_instruction(
+                                    &mut func,
+                                    &Instruction::Call(new_fn_call_idx.unwrap()),
+                                );
 
                                 add_instruction(&mut func, &Instruction::Return);
 
@@ -685,22 +744,15 @@ pub fn splice(
                             }
                         }
 
-                        for instruction in fallback_instructions {
-                            add_instruction(&mut func, &instruction);
-                        }
+                        add_instruction(&mut func, &Instruction::Call(fallback_call_idx.unwrap()));
+                        add_instruction(&mut func, &Instruction::Unreachable);
+                        add_instruction(&mut func, &Instruction::End);
 
                         if DEBUG {
                             console::log("< COREABI IMPORT GATE FN");
                         }
 
                         code.function(&func);
-
-                        // for op in parse_func
-                        //     .get_operators_reader()
-                        //     .map_err(|e| format!("Splice error:\n{:?}", e))?
-                        // {
-                        //     console::log(&format!("OP: {:?}", op.unwrap()));
-                        // }
                     }
 
                     processed_coreabi_sample_code_cnt += 1;
@@ -895,9 +947,9 @@ pub fn splice(
 
                 let mut offset: u64 = 0;
                 for (idx, param) in expt_sig.params.iter().enumerate() {
+                    add_instruction(&mut func, &Instruction::LocalGet(idx as u32));
                     match param {
                         wit_parser::abi::WasmType::I32 => {
-                            add_instruction(&mut func, &Instruction::LocalGet(idx as u32));
                             add_instruction(
                                 &mut func,
                                 &Instruction::I32Store(MemArg {
@@ -909,7 +961,6 @@ pub fn splice(
                             offset += 4;
                         }
                         wit_parser::abi::WasmType::I64 => {
-                            add_instruction(&mut func, &Instruction::LocalGet(idx as u32));
                             add_instruction(
                                 &mut func,
                                 &Instruction::I64Store(MemArg {
@@ -921,7 +972,6 @@ pub fn splice(
                             offset += 8;
                         }
                         wit_parser::abi::WasmType::F32 => {
-                            add_instruction(&mut func, &Instruction::LocalGet(idx as u32));
                             add_instruction(
                                 &mut func,
                                 &Instruction::F32Store(MemArg {
@@ -933,7 +983,6 @@ pub fn splice(
                             offset += 4;
                         }
                         wit_parser::abi::WasmType::F64 => {
-                            add_instruction(&mut func, &Instruction::LocalGet(idx as u32));
                             add_instruction(
                                 &mut func,
                                 &Instruction::F64Store(MemArg {
@@ -975,17 +1024,13 @@ pub fn splice(
                 // Tee retptr into its local var
                 add_instruction(
                     &mut func,
-                    &Instruction::LocalSet(expt_sig.params.len() as u32 + 1),
+                    &Instruction::LocalTee(expt_sig.params.len() as u32 + 1),
                 );
 
                 // if it's a direct return, we must read the return
                 // value type from the retptr
                 match expt_sig.results[0] {
                     wit_parser::abi::WasmType::I32 => {
-                        add_instruction(
-                            &mut func,
-                            &Instruction::LocalGet(expt_sig.params.len() as u32 + 1),
-                        );
                         add_instruction(
                             &mut func,
                             &Instruction::I32Load(MemArg {
@@ -998,10 +1043,6 @@ pub fn splice(
                     wit_parser::abi::WasmType::I64 => {
                         add_instruction(
                             &mut func,
-                            &Instruction::LocalGet(expt_sig.params.len() as u32 + 1),
-                        );
-                        add_instruction(
-                            &mut func,
                             &Instruction::I64Load(MemArg {
                                 align: 3,
                                 offset: 0,
@@ -1012,10 +1053,6 @@ pub fn splice(
                     wit_parser::abi::WasmType::F32 => {
                         add_instruction(
                             &mut func,
-                            &Instruction::LocalGet(expt_sig.params.len() as u32 + 1),
-                        );
-                        add_instruction(
-                            &mut func,
                             &Instruction::F32Load(MemArg {
                                 align: 2,
                                 offset: 0,
@@ -1024,10 +1061,6 @@ pub fn splice(
                         );
                     }
                     wit_parser::abi::WasmType::F64 => {
-                        add_instruction(
-                            &mut func,
-                            &Instruction::LocalGet(expt_sig.params.len() as u32 + 1),
-                        );
                         add_instruction(
                             &mut func,
                             &Instruction::F64Load(MemArg {
@@ -1182,69 +1215,31 @@ pub fn splice(
                 if impt_sig.retptr && idx == impt_sig.params.len() - 1 {
                     break;
                 }
+                // JS args
                 add_instruction(&mut func, &Instruction::LocalGet(2));
+                // JS args offset
                 add_instruction(&mut func, &Instruction::I32Const(16 + 8 * idx as i32));
                 add_instruction(&mut func, &Instruction::I32Add);
                 match arg {
                     wit_parser::abi::WasmType::I32 => {
-                        add_instruction(
-                            &mut func,
-                            &Instruction::Call(
-                                remap_fn_idx(
-                                    coreabi_sample_fn_idx.unwrap() - 4,
-                                    import_fn_cnt,
-                                    imports_offset,
-                                    coreabi_sample_fn_idx.unwrap(),
-                                    fn_splice_offset,
-                                )
-                                .unwrap(),
-                            ),
-                        );
+                        for instruction in &instructions_get_i32 {
+                            add_instruction(&mut func, instruction);
+                        }
                     }
                     wit_parser::abi::WasmType::I64 => {
-                        add_instruction(
-                            &mut func,
-                            &Instruction::Call(
-                                remap_fn_idx(
-                                    coreabi_sample_fn_idx.unwrap() - 3,
-                                    import_fn_cnt,
-                                    imports_offset,
-                                    coreabi_sample_fn_idx.unwrap(),
-                                    fn_splice_offset,
-                                )
-                                .unwrap(),
-                            ),
-                        );
+                        for instruction in &instructions_get_i64 {
+                            add_instruction(&mut func, instruction);
+                        }
                     }
                     wit_parser::abi::WasmType::F32 => {
-                        add_instruction(
-                            &mut func,
-                            &Instruction::Call(
-                                remap_fn_idx(
-                                    coreabi_sample_fn_idx.unwrap() - 2,
-                                    import_fn_cnt,
-                                    imports_offset,
-                                    coreabi_sample_fn_idx.unwrap(),
-                                    fn_splice_offset,
-                                )
-                                .unwrap(),
-                            ),
-                        );
+                        for instruction in &instructions_get_f32 {
+                            add_instruction(&mut func, instruction);
+                        }
                     }
                     wit_parser::abi::WasmType::F64 => {
-                        add_instruction(
-                            &mut func,
-                            &Instruction::Call(
-                                remap_fn_idx(
-                                    coreabi_sample_fn_idx.unwrap() - 1,
-                                    import_fn_cnt,
-                                    imports_offset,
-                                    coreabi_sample_fn_idx.unwrap(),
-                                    fn_splice_offset,
-                                )
-                                .unwrap(),
-                            ),
-                        );
+                        for instruction in &instructions_get_f64 {
+                            add_instruction(&mut func, instruction);
+                        }
                     }
                 }
             }
@@ -1594,7 +1589,9 @@ fn op_map<'a>(op: &wasmparser::Operator) -> Instruction<'a> {
         wasmparser::Operator::I64Store8 { memarg } => Instruction::I64Store8(memarg_map(memarg)),
         wasmparser::Operator::I64Store16 { memarg } => Instruction::I64Store16(memarg_map(memarg)),
         wasmparser::Operator::I64Store32 { memarg } => Instruction::I64Store32(memarg_map(memarg)),
-        wasmparser::Operator::MemorySize { mem: _, mem_byte } => Instruction::MemorySize(*mem_byte as u32),
+        wasmparser::Operator::MemorySize { mem: _, mem_byte } => {
+            Instruction::MemorySize(*mem_byte as u32)
+        }
         wasmparser::Operator::MemoryGrow { mem_byte, .. } => {
             Instruction::MemoryGrow(*mem_byte as u32)
         }
