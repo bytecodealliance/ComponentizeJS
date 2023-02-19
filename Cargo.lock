@@ -46,7 +46,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "cranelift-entity"
 version = "0.94.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#1efee4abdfdb48b694828f0dc2ead394ba42a234"
+source = "git+https://github.com/bytecodealliance/wasmtime#c26a65a854733735207f641bb7ff23ba574a1f6f"
 dependencies = [
  "serde",
 ]
@@ -139,7 +139,7 @@ dependencies = [
 [[package]]
 name = "js-component-bindgen"
 version = "0.1.0"
-source = "git+https://github.com/bytecodealliance/jco#bc767da6db19d4632ae84994d5d103d02dd397c2"
+source = "git+https://github.com/bytecodealliance/jco#674e09d7a7ed7450634cd8baf3cac8f50eae20d9"
 dependencies = [
  "anyhow",
  "base64",
@@ -447,12 +447,12 @@ dependencies = [
 [[package]]
 name = "wasmtime-component-util"
 version = "7.0.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#1efee4abdfdb48b694828f0dc2ead394ba42a234"
+source = "git+https://github.com/bytecodealliance/wasmtime#c26a65a854733735207f641bb7ff23ba574a1f6f"
 
 [[package]]
 name = "wasmtime-environ"
 version = "7.0.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#1efee4abdfdb48b694828f0dc2ead394ba42a234"
+source = "git+https://github.com/bytecodealliance/wasmtime#c26a65a854733735207f641bb7ff23ba574a1f6f"
 dependencies = [
  "anyhow",
  "cranelift-entity",
@@ -473,7 +473,7 @@ dependencies = [
 [[package]]
 name = "wasmtime-types"
 version = "7.0.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#1efee4abdfdb48b694828f0dc2ead394ba42a234"
+source = "git+https://github.com/bytecodealliance/wasmtime#c26a65a854733735207f641bb7ff23ba574a1f6f"
 dependencies = [
  "cranelift-entity",
  "serde",
@@ -505,7 +505,7 @@ dependencies = [
 [[package]]
 name = "wit-bindgen"
 version = "0.3.0"
-source = "git+https://github.com/bytecodealliance/wit-bindgen#16994da9d568a4392ee846d1ed7c2a5d1d2086c2"
+source = "git+https://github.com/bytecodealliance/wit-bindgen#462527127f0d9de935f01e298a7e1c975e124a62"
 dependencies = [
  "bitflags",
  "wit-bindgen-guest-rust-macro",
@@ -514,7 +514,7 @@ dependencies = [
 [[package]]
 name = "wit-bindgen-core"
 version = "0.3.0"
-source = "git+https://github.com/bytecodealliance/wit-bindgen#16994da9d568a4392ee846d1ed7c2a5d1d2086c2"
+source = "git+https://github.com/bytecodealliance/wit-bindgen#462527127f0d9de935f01e298a7e1c975e124a62"
 dependencies = [
  "anyhow",
  "wit-component",
@@ -524,7 +524,7 @@ dependencies = [
 [[package]]
 name = "wit-bindgen-gen-guest-rust"
 version = "0.3.0"
-source = "git+https://github.com/bytecodealliance/wit-bindgen#16994da9d568a4392ee846d1ed7c2a5d1d2086c2"
+source = "git+https://github.com/bytecodealliance/wit-bindgen#462527127f0d9de935f01e298a7e1c975e124a62"
 dependencies = [
  "heck",
  "wasm-metadata",
@@ -536,7 +536,7 @@ dependencies = [
 [[package]]
 name = "wit-bindgen-gen-rust-lib"
 version = "0.3.0"
-source = "git+https://github.com/bytecodealliance/wit-bindgen#16994da9d568a4392ee846d1ed7c2a5d1d2086c2"
+source = "git+https://github.com/bytecodealliance/wit-bindgen#462527127f0d9de935f01e298a7e1c975e124a62"
 dependencies = [
  "heck",
  "wit-bindgen-core",
@@ -545,7 +545,7 @@ dependencies = [
 [[package]]
 name = "wit-bindgen-guest-rust-macro"
 version = "0.3.0"
-source = "git+https://github.com/bytecodealliance/wit-bindgen#16994da9d568a4392ee846d1ed7c2a5d1d2086c2"
+source = "git+https://github.com/bytecodealliance/wit-bindgen#462527127f0d9de935f01e298a7e1c975e124a62"
 dependencies = [
  "anyhow",
  "proc-macro2",

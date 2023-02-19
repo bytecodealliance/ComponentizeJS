@@ -1,6 +1,9 @@
 /obj/
 /deps/
-/dist/
 /test/output/
 /node_modules/
 /target/
+/lib/
+/crates/wasmtime-test
+/hello.*
+/test.js

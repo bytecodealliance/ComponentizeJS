@@ -40,27 +40,27 @@ DEFINES ?=
 
 OBJS := $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/**/*.cpp)) $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/*.cpp))
 
-all: dist/spidermonkey-embedding-splicer.js dist/spidermonkey_embedding.wasm
+all: lib/spidermonkey-embedding-splicer.js lib/spidermonkey_embedding.wasm lib/wasi_snapshot_preview1.wasm
 
-dist/spidermonkey-embedding-splicer.js: target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj
+lib/spidermonkey-embedding-splicer.js: target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj
 	$(JCO) new target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm
-	$(JCO) transpile -q --minify --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o dist --map console=../console.js -- -O1
+	$(JCO) transpile -q --minify --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o lib --map console=../console.js -- -O1
 
 target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs
-	cargo build --release
+	cargo build --release --target wasm32-unknown-unknown
 
-dist/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC) dist
+lib/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC)
 	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ $(SM_SRC)/lib/*.o $(SM_SRC)/lib/*.a
 	$(WASM_OPT) --strip-debug $@ -o $@ -O1
 
 obj/%.o: spidermonkey_embedding/%.cpp Makefile | $(SM_SRC) obj obj/builtins
 	$(WASI_CXX) $(CXX_FLAGS) -O2 $(DEFINES) -I $(SM_SRC)/include -MMD -MP -c -o $@ $<
 
-dist:
-	mkdir -p dist
-
 obj:
 	mkdir -p obj
+
+lib:
+	mkdir -p lib
 
 obj/builtins:
 	mkdir -p obj/builtins
@@ -68,7 +68,7 @@ obj/builtins:
 $(SM_SRC):
 	cd deps/spidermonkey-wasi-embedding && ./download-engine.sh
 
-deps/wasi_snapshot_preview1.wasm:
+lib/wasi_snapshot_preview1.wasm: | lib
 	curl -L https://github.com/bytecodealliance/preview2-prototyping/releases/download/latest/wasi_snapshot_preview1.wasm -o $@
 
 clean:

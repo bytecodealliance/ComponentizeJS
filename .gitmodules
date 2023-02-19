@@ -1,3 +1,3 @@
 [submodule "deps/spidermonkey-wasi-embedding"]
 	path = deps/spidermonkey-wasi-embedding
-	url = git@github.com:fastly/spidermonkey-wasi-embedding
+	url = https://github.com/fastly/spidermonkey-wasi-embedding.git

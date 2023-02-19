@@ -25,7 +25,7 @@ suite('Bindings', async () => {
           sourceName: `${name}.js`,
         });
 
-        const map = { 'wasi-*': '../../wasi/*.js' };
+        const map = { 'wasi-*': '@bytecodealliance/preview2-shim/*' };
         for (const [impt] of imports) {
           map[impt] = `../../cases/${name}/${impt}.js`;
         }
@@ -34,6 +34,8 @@ suite('Bindings', async () => {
 
         await mkdir(new URL(`./output/${name}/imports`, import.meta.url), { recursive: true });
         await mkdir(new URL(`./output/${name}/exports`, import.meta.url), { recursive: true });
+
+        await writeFile(new URL(`./output/${name}.component.wasm`, import.meta.url), component);
 
         for (const file of Object.keys(files)) {
           await writeFile(new URL(`./output/${name}/${file}`, import.meta.url), files[file]);

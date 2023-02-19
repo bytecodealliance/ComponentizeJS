@@ -9,6 +9,6 @@ export function simpleList2 () {
 }
 
 export function simpleList4 (list) {
-  list[0] = [0];
+  list[0] = new Uint32Array([0]);
   return list;
 }

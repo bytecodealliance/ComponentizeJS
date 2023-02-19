@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+defaults:
+  run:
+    shell: bash
+
+# Cancel any in-flight jobs for the same PR/branch so there's only one active
+# at a time
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Install Rust
+      run: rustup update stable --no-self-update && rustup default stable
+    - name: Install wasm32-unknown-unknown target
+      run: rustup target add wasm32-unknown-unknown
+    - name: Install wasm32-wasi target
+      run: rustup target add wasm32-wasi
+
+    - run: |
+        curl https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-16/wasi-sdk-16.0-linux.tar.gz -L | tar xzvf -
+        echo "WASI_SDK_PATH=`pwd`/wasi-sdk-16.0" >> $GITHUB_ENV
+      if : matrix.os == 'ubuntu-latest'
+    - run: |
+        curl https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-16/wasi-sdk-16.0-macos.tar.gz -L | tar xzvf -
+        echo "WASI_SDK_PATH=`pwd`/wasi-sdk-16.0" >> $GITHUB_ENV
+      if : matrix.os == 'macos-latest'
+    - run: |
+        curl https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-16/wasi-sdk-16.0-mingw.tar.gz -L | tar xzvf -
+        echo "WASI_SDK_PATH=`pwd`/wasi-sdk-16.0" >> $GITHUB_ENV
+      if : matrix.os == 'windows-latest'
+
+    - name: "Install Binaryen (linux)"
+      run: |
+        set -x
+        export BINARYEN_VERSION=105
+        curl -sS -L "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz" | tar xzf - &&
+        mv "$PWD/binaryen-version_${BINARYEN_VERSION}/bin/wasm-opt" "$PWD/binaryen-version_${BINARYEN_VERSION}/bin/wasm-opt-manual"
+        echo "$PWD/binaryen-version_${BINARYEN_VERSION}/bin" >> $GITHUB_PATH
+
+    - name: "Install wasi-sdk-19 (linux)"
+      run: |
+        set -x
+        curl -sS -L -O https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-19/wasi-sdk-19.0-linux.tar.gz
+        tar xf wasi-sdk-19.0-linux.tar.gz
+        sudo mkdir -p /opt/wasi-sdk
+        sudo mv wasi-sdk-19.0/* /opt/wasi-sdk/
+
+    - uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+    - name: Install NPM packages
+      run: npm install
+
+    - name: Build
+      run: npm run build
+
+    - name: Test
+      run: npm run test
+
+  rustfmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Rust
+      run: rustup update stable && rustup default stable && rustup component add rustfmt
+    - name: Format source code
+      run: cargo fmt -- --check
