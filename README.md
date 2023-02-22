@@ -33,8 +33,7 @@ The goal of this project specifically is to provide a comprehensive dynamic bind
 
 Adaption follows the standard [Wizer technique](https://github.com/bytecodealliance/wizer) in pre-initializing a snapshot of the runtime against the source and bindings.
 
-The snapshotting process executes the JS engine initialization, globals and parsing and compiling of the source code. Currently we also evaluate the top-level of the
-source so that the executed exports of the top-level ES module are provided already initialized.
+The snapshotting process executes the JS engine initialization, globals and parsing and compiling of the source code. Currently we also evaluate the top-level of the source so that the executed exports of the top-level ES module are provided already initialized.
 
 As a result, at runtime - only the  bytecode is being executed, without any initialization costs. _This makes on-demand Wasm execution of JS incredibly fast._
 
@@ -44,8 +43,7 @@ As a dynamic language with quirks, JavaScript cannot be compiled directly into b
 
 SpiderMonkey is chosen here as a JS engine with first-class WASI build support. The total embedding size is around 5MB.
 
-One of the security benefits of the component model is complete code isolation apart from the shared-nothing code boundaries between components. By fully encapsulating
-the engine embedding for each individual component, this maintains comprehensive per-component isolation.
+One of the security benefits of the component model is complete code isolation apart from the shared-nothing code boundaries between components. By fully encapsulating the engine embedding for each individual component, this maintains comprehensive per-component isolation.
 
 As more components are written in JavaScript, and there exist scenarios where multiple JS components are communicating in the same application, the plan for optimization here is to share the SpiderMonkey engine embedding between them. This can be done without breaking the shared-nothing semantics by having the engine itself loaded as a shared library of the components. Sharing functions via same SpiderMonkey build, not memory.
 
@@ -79,6 +77,8 @@ const { component } = await componentize(`
 
 await writeFile('test.component.wasm', component);
 ```
+
+The component iself can be executed in any component runtime, see the [example](EXAMPLE.md) for a full workflow.
 
 ## API
 
