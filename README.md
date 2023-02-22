@@ -42,9 +42,9 @@ As a result, at runtime - only the  bytecode is being executed, without any init
 
 As a dynamic language with quirks, JavaScript cannot be compiled directly into bytecode without including a comprehensive ECMA-262 spec-compliant runtime engine. Componentization of JavaScript thus involves embedding the JS runtime engine into the component itself.
 
-SpiderMonkey is chosen here as a the only JS engine with first-class WASI build support. The total embedding size is around 5MB.
+SpiderMonkey is chosen here as a JS engine with first-class WASI build support. The total embedding size is around 5MB.
 
-One of the benefits of the component model is complete code isolation apart from the shared-nothing code boundaries between components. By fully encapsulating
+One of the security benefits of the component model is complete code isolation apart from the shared-nothing code boundaries between components. By fully encapsulating
 the engine embedding for each individual component, this maintains comprehensive per-component isolation.
 
 As more components are written in JavaScript, and there exist scenarios where multiple JS components are communicating in the same application, the plan for optimization here is to share the SpiderMonkey engine embedding between them. This can be done without breaking the shared-nothing semantics by having the engine itself loaded as a shared library of the components. Sharing functions via same SpiderMonkey build, not memory.
