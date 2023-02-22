@@ -1,11 +1,12 @@
 import wizer from "@jakechampion/wizer";
-import { componentNew } from "@bytecodealliance/jco";
+import { componentNew, metadataAdd } from "@bytecodealliance/jco";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { exports } from "../lib/spidermonkey-embedding-splicer.js";
 import { fileURLToPath } from "node:url";
+const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
 const { spliceBindings } = exports;
 
@@ -282,9 +283,12 @@ export async function componentize(
     process.exit(1);
   }
 
-  const component = componentNew(bin, [
-    ["wasi_snapshot_preview1", await readFile(preview2Adapter)],
-  ]);
+  const component = await metadataAdd(await componentNew(bin, Object.entries({
+    wasi_snapshot_preview1: await readFile(preview2Adapter)
+  })), Object.entries({
+    language: [['JavaScript', '']],
+    'processed-by': [['ComponentizeJS', version]],
+  }));
 
   return {
     component,
