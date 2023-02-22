@@ -8,7 +8,7 @@
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "^0.4.0",
+    "@bytecodealliance/jco": "^0.4.1",
     "@jakechampion/wizer": "^1.6.0"
   },
   "scripts": {
