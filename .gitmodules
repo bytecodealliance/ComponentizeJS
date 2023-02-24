@@ -1,3 +1,6 @@
 [submodule "deps/spidermonkey-wasi-embedding"]
 	path = deps/spidermonkey-wasi-embedding
 	url = https://github.com/fastly/spidermonkey-wasi-embedding.git
+[submodule "js-compute-runtime"]
+	path = deps/js-compute-runtime/js-compute-runtime
+	url = git@github.com:fastly/js-compute-runtime

@@ -1,4 +1,30 @@
-#include "builtins.h"
+#include "text_decoder.h"
+
+uint8_t *value_to_buffer(JSContext *cx, JS::HandleValue val, const char *val_desc, size_t *len)
+{
+  if (!val.isObject() ||
+      !(JS_IsArrayBufferViewObject(&val.toObject()) || JS::IsArrayBufferObject(&val.toObject())))
+  {
+    // JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr, JSMSG_INVALID_BUFFER_ARG, val_desc,
+    //                          val.type());
+    return nullptr;
+  }
+
+  JS::RootedObject input(cx, &val.toObject());
+  uint8_t *data;
+  bool is_shared;
+
+  if (JS_IsArrayBufferViewObject(input))
+  {
+    js::GetArrayBufferViewLengthAndData(input, len, &is_shared, &data);
+  }
+  else
+  {
+    JS::GetArrayBufferLengthAndData(input, len, &is_shared, &data);
+  }
+
+  return data;
+}
 
 namespace TextDecoder
 {

@@ -1,6 +1,31 @@
-#include "builtins.h"
+#include "text_encoder.h"
 
-#include <js/ArrayBuffer.h>
+#include "builtin.h"
+
+// // TODO(performance): introduce a version that writes into an existing buffer, and use that
+// // with the hostcall buffer where possible.
+// // https://github.com/fastly/js-compute-runtime/issues/215
+// JS::UniqueChars encode(JSContext *cx, JS::HandleString str, size_t *encoded_len)
+// {
+//   JS::UniqueChars text = JS_EncodeStringToUTF8(cx, str);
+//   if (!text)
+//     return nullptr;
+
+//   // This shouldn't fail, since the encode operation ensured `str` is linear.
+//   JSLinearString *linear = JS_EnsureLinearString(cx, str);
+//   *encoded_len = JS::GetDeflatedUTF8StringLength(linear);
+//   return text;
+// }
+
+// JS::UniqueChars encode(JSContext *cx, JS::HandleValue val, size_t *encoded_len)
+// {
+//   JS::RootedString str(cx, JS::ToString(cx, val));
+//   if (!str)
+//     return nullptr;
+
+//   return encode(cx, str, encoded_len);
+// }
+
 
 namespace TextEncoder
 {
