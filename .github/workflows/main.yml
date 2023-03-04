@@ -26,7 +26,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        submodules: true
+        submodules: recursive
     - name: Install Rust
       run: rustup update stable --no-self-update && rustup default stable
     - name: Install wasm32-unknown-unknown target
