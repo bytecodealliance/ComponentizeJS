@@ -1,5 +1,4 @@
 /obj/
-/deps/
 /test/output/
 /node_modules/
 /target/
