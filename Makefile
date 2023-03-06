@@ -22,7 +22,7 @@ ifndef WASM_TOOLS
 	WASM_TOOLS = $(error No wasm-tools in PATH. First run "cargo install wasm-tools")
 endif
 
-SM_SRC := deps/spidermonkey-wasi-embedding/release
+SM_SRC := deps/js-compute-runtime/c-dependencies/spidermonkey/release
 
 CXX_FLAGS := -std=gnu++20 -Wall -Werror -Qunused-arguments
 CXX_FLAGS += -fno-sized-deallocation -fno-aligned-new -mthread-model single
@@ -36,7 +36,9 @@ CFLAGS := -Wall -Werror -Wno-unknown-attributes -Wno-pointer-to-int-cast -Wno-in
 
 LD_FLAGS := -Wl,-z,stack-size=1048576 -Wl,--stack-first -lwasi-emulated-getpid# -Wl,--export-table
 
-DEFINES ?=
+DEFINES ?= 
+
+INCLUDES := -I deps/js-compute-runtime/c-dependencies/js-compute-runtime
 
 OBJS := $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/**/*.cpp)) $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/*.cpp))
 
@@ -49,12 +51,12 @@ lib/spidermonkey-embedding-splicer.js: target/wasm32-unknown-unknown/release/spi
 target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs
 	cargo build --release --target wasm32-unknown-unknown
 
-lib/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC)
-	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ $(SM_SRC)/lib/*.o $(SM_SRC)/lib/*.a
+lib/spidermonkey_embedding.wasm: $(OBJS) obj/shared-builtins.a $(SM_SRC)/lib/*.a $(SM_SRC)/lib/*.o
+	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^
 	$(WASM_OPT) --strip-debug $@ -o $@ -O1
 
 obj/%.o: spidermonkey_embedding/%.cpp Makefile | $(SM_SRC) obj obj/builtins
-	$(WASI_CXX) $(CXX_FLAGS) -O2 $(DEFINES) -I $(SM_SRC)/include -MMD -MP -c -o $@ $<
+	$(WASI_CXX) $(CXX_FLAGS) -O2 $(DEFINES) $(INCLUDES) -I $(SM_SRC)/include -MMD -MP -c -o $@ $<
 
 obj:
 	mkdir -p obj
@@ -62,11 +64,18 @@ obj:
 lib:
 	mkdir -p lib
 
+$(SM_SRC)/lib/*.a: $(SM_SRC)
+$(SM_SRC)/lib/*.o: $(SM_SRC)
+
+$(SM_SRC):
+	cd deps/js-compute-runtime/c-dependencies/spidermonkey && ./download-engine.sh
+
 obj/builtins:
 	mkdir -p obj/builtins
 
-$(SM_SRC):
-	cd deps/spidermonkey-wasi-embedding && ./download-engine.sh
+obj/shared-builtins.a: deps/js-compute-runtime $(SM_SRC) deps/js-compute-runtime/c-dependencies/js-compute-runtime/builtins/shared/*
+	make --makefile=deps/js-compute-runtime/c-dependencies/js-compute-runtime/Makefile -I deps/js-compute-runtime/c-dependencies/js-compute-runtime shared-builtins.a -j16
+	mv shared-builtins.a obj/shared-builtins.a
 
 lib/wasi_snapshot_preview1.wasm: | lib
 	curl -L https://github.com/bytecodealliance/preview2-prototyping/releases/download/latest/wasi_snapshot_preview1.wasm -o $@
