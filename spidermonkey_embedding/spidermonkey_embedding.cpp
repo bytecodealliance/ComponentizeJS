@@ -1,9 +1,10 @@
 #include "spidermonkey_embedding.h"
 
 // builtins
-#include "builtins/text_encoder.h"
-#include "builtins/text_decoder.h"
+#include "builtins/shared/text-encoder.h"
+#include "builtins/shared/text-decoder.h"
 #include "builtins/shared/console.h"
+#include "builtins/shared/url.h"
 
 using builtins::Console;
 
@@ -416,18 +417,23 @@ __attribute__((export_name("wizer.initialize"))) void init()
     return;
   }
 
-  log("(wizer) init custom intrinsics");
+  log("(wizer) init builtins");
   if (!builtins::Console::create(R.cx, R.global))
   {
     R.init_err = Runtime::InitError::CustomIntrinsics;
     return;
   }
-  if (!TextEncoder::init_class(R.cx, R.global))
+  if (!builtins::TextEncoder::init_class(R.cx, R.global))
   {
     R.init_err = Runtime::InitError::CustomIntrinsics;
     return;
   }
-  if (!TextDecoder::init_class(R.cx, R.global))
+  if (!builtins::TextDecoder::init_class(R.cx, R.global))
+  {
+    R.init_err = Runtime::InitError::CustomIntrinsics;
+    return;
+  }
+  if (!builtins::URL::init_class(R.cx, R.global))
   {
     R.init_err = Runtime::InitError::CustomIntrinsics;
     return;
