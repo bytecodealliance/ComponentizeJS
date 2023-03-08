@@ -51,8 +51,10 @@ lib/spidermonkey-embedding-splicer.js: target/wasm32-unknown-unknown/release/spi
 target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs
 	cargo build --release --target wasm32-unknown-unknown
 
-lib/spidermonkey_embedding.wasm: $(OBJS) $(SM_SRC)
-	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^
+lib/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC)
+	make --makefile=deps/js-compute-runtime/c-dependencies/js-compute-runtime/Makefile -I deps/js-compute-runtime/c-dependencies/js-compute-runtime -j16
+	make --makefile=deps/js-compute-runtime/c-dependencies/js-compute-runtime/Makefile -I deps/js-compute-runtime/c-dependencies/js-compute-runtime shared-builtins -j16
+	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ $(wildcard deps/js-compute-runtime/c-dependencies/js-compute-runtime/shared/*.a) $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
 	$(WASM_OPT) --strip-debug $@ -o $@ -O1
 
 obj/%.o: spidermonkey_embedding/%.cpp Makefile | $(SM_SRC) obj obj/builtins
@@ -69,11 +71,6 @@ $(SM_SRC):
 
 obj/builtins:
 	mkdir -p obj/builtins
-
-obj/shared-builtins.a: deps/js-compute-runtime $(SM_SRC) deps/js-compute-runtime/c-dependencies/js-compute-runtime/Makefile
-	make --makefile=deps/js-compute-runtime/c-dependencies/js-compute-runtime/Makefile -I deps/js-compute-runtime/c-dependencies/js-compute-runtime -j16
-	make --makefile=deps/js-compute-runtime/c-dependencies/js-compute-runtime/Makefile -I deps/js-compute-runtime/c-dependencies/js-compute-runtime shared-builtins -j16
-	mv shared/*.a obj/
 
 lib/wasi_snapshot_preview1.wasm: | lib
 	curl -L https://github.com/bytecodealliance/preview2-prototyping/releases/download/latest/wasi_snapshot_preview1.wasm -o $@
