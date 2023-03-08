@@ -23,6 +23,7 @@ ifndef WASM_TOOLS
 endif
 
 SM_SRC := deps/js-compute-runtime/c-dependencies/spidermonkey/release
+JSCR_SRC := deps/js-compute-runtime/c-dependencies/js-compute-runtime
 
 CXX_FLAGS := -std=gnu++20 -Wall -Werror -Qunused-arguments
 CXX_FLAGS += -fno-sized-deallocation -fno-aligned-new -mthread-model single
@@ -38,7 +39,7 @@ LD_FLAGS := -Wl,-z,stack-size=1048576 -Wl,--stack-first -lwasi-emulated-getpid# 
 
 DEFINES ?= 
 
-INCLUDES := -I deps/js-compute-runtime/c-dependencies/js-compute-runtime
+INCLUDES := -I $(JSCR_SRC)
 
 OBJS := $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/**/*.cpp)) $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/*.cpp))
 
@@ -51,8 +52,10 @@ lib/spidermonkey-embedding-splicer.js: target/wasm32-unknown-unknown/release/spi
 target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs
 	cargo build --release --target wasm32-unknown-unknown
 
-lib/spidermonkey_embedding.wasm: $(OBJS) obj/shared-builtins.a $(SM_SRC)/lib/*.a $(SM_SRC)/lib/*.o
-	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^
+lib/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC)
+	-make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) $(abspath $(JSCR_SRC)/js-compute-runtime.wasm) $(abspath $(JSCR_SRC)/js-compute-runtime-component.wasm) -j16
+	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) shared-builtins -j16
+	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ shared/*.a $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
 	$(WASM_OPT) --strip-debug $@ -o $@ -O1
 
 obj/%.o: spidermonkey_embedding/%.cpp Makefile | $(SM_SRC) obj obj/builtins
@@ -64,18 +67,11 @@ obj:
 lib:
 	mkdir -p lib
 
-$(SM_SRC)/lib/*.a: $(SM_SRC)
-$(SM_SRC)/lib/*.o: $(SM_SRC)
-
 $(SM_SRC):
 	cd deps/js-compute-runtime/c-dependencies/spidermonkey && ./download-engine.sh
 
 obj/builtins:
 	mkdir -p obj/builtins
-
-obj/shared-builtins.a: deps/js-compute-runtime $(SM_SRC) deps/js-compute-runtime/c-dependencies/js-compute-runtime/builtins/shared/*
-	make --makefile=deps/js-compute-runtime/c-dependencies/js-compute-runtime/Makefile -I deps/js-compute-runtime/c-dependencies/js-compute-runtime shared-builtins.a -j16
-	mv shared-builtins.a obj/shared-builtins.a
 
 lib/wasi_snapshot_preview1.wasm: | lib
 	curl -L https://github.com/bytecodealliance/preview2-prototyping/releases/download/latest/wasi_snapshot_preview1.wasm -o $@

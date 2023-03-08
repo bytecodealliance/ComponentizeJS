@@ -51,7 +51,14 @@ Establishing this initial prototype as a singular flexible engine foundation tha
 
 ## Native Functions
 
-Currently only the `console`, `TextDecoder` and `TextEncoder` native APIs are implemented. The goal is to develop a sensible native baseline here.
+In addition to the spec-compliant JS engine intrinsics, the following non-JS global APIs are also available:
+
+* `console`
+* `TextEncoder`
+* `TextDecoder`
+* `URL`
+
+Extending support for standard globals is a work-in-progress.
 
 Custom globals can be custom implemented via a JS prelude script to set up any custom globals as part of the JS code being componentized. These global functions can in turn call component imports if underlying host-native functions are needed. Since JS code is pre-initialized any top-level prelude scripts will be preinitialized as part of the initial component build so that this does not result in any runtime work.
 
