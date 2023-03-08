@@ -6,3 +6,4 @@
 /crates/wasmtime-test
 /hello.*
 /test.js
+/shared

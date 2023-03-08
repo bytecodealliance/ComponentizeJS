@@ -55,7 +55,7 @@ target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm: crate
 lib/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC)
 	-make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) $(abspath $(JSCR_SRC)/js-compute-runtime.wasm) $(abspath $(JSCR_SRC)/js-compute-runtime-component.wasm) -j16
 	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) shared-builtins -j16
-	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ $(wildcard $(JSCR_SRC)/shared/*.a) $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
+	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ shared/*.a $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
 	$(WASM_OPT) --strip-debug $@ -o $@ -O1
 
 obj/%.o: spidermonkey_embedding/%.cpp Makefile | $(SM_SRC) obj obj/builtins
