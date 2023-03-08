@@ -23,6 +23,7 @@ ifndef WASM_TOOLS
 endif
 
 SM_SRC := deps/js-compute-runtime/c-dependencies/spidermonkey/release
+JSCR_SRC := deps/js-compute-runtime/c-dependencies/js-compute-runtime
 
 CXX_FLAGS := -std=gnu++20 -Wall -Werror -Qunused-arguments
 CXX_FLAGS += -fno-sized-deallocation -fno-aligned-new -mthread-model single
@@ -38,7 +39,7 @@ LD_FLAGS := -Wl,-z,stack-size=1048576 -Wl,--stack-first -lwasi-emulated-getpid# 
 
 DEFINES ?= 
 
-INCLUDES := -I deps/js-compute-runtime/c-dependencies/js-compute-runtime
+INCLUDES := -I $(JSCR_SRC)
 
 OBJS := $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/**/*.cpp)) $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/*.cpp))
 
@@ -52,9 +53,9 @@ target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm: crate
 	cargo build --release --target wasm32-unknown-unknown
 
 lib/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC)
-	make --makefile=deps/js-compute-runtime/c-dependencies/js-compute-runtime/Makefile -I deps/js-compute-runtime/c-dependencies/js-compute-runtime -j16
-	make --makefile=deps/js-compute-runtime/c-dependencies/js-compute-runtime/Makefile -I deps/js-compute-runtime/c-dependencies/js-compute-runtime shared-builtins -j16
-	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ $(wildcard deps/js-compute-runtime/c-dependencies/js-compute-runtime/shared/*.a) $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
+	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) $(JSCR_SRC)/js-compute-runtime.wasm $(JSCR_SRC)/js-compute-runtime-component.wasm -j16
+	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) shared-builtins -j16
+	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ $(wildcard $(JSCR_SRC)/shared/*.a) $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
 	$(WASM_OPT) --strip-debug $@ -o $@ -O1
 
 obj/%.o: spidermonkey_embedding/%.cpp Makefile | $(SM_SRC) obj obj/builtins
