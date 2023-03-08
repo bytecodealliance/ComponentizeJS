@@ -51,7 +51,7 @@ lib/spidermonkey-embedding-splicer.js: target/wasm32-unknown-unknown/release/spi
 target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs
 	cargo build --release --target wasm32-unknown-unknown
 
-lib/spidermonkey_embedding.wasm: $(OBJS) obj/*.a $(SM_SRC)/lib/*.a $(SM_SRC)/lib/*.o
+lib/spidermonkey_embedding.wasm: $(OBJS) obj/*.a $(SM_SRC)
 	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^
 	$(WASM_OPT) --strip-debug $@ -o $@ -O1
 
@@ -63,9 +63,6 @@ obj:
 
 lib:
 	mkdir -p lib
-
-$(SM_SRC)/lib/*.a: $(SM_SRC)
-$(SM_SRC)/lib/*.o: $(SM_SRC)
 
 $(SM_SRC):
 	cd deps/js-compute-runtime/c-dependencies/spidermonkey && ./download-engine.sh
