@@ -7,6 +7,20 @@ import { fileURLToPath } from 'node:url';
 // import { setLevel } from './wasi/logging.js';
 // setLevel('debug');
 
+const preview2Map = {
+  'environment-preopens': '@bytecodealliance/preview2-shim/environment',
+  'instance-wall-clock': '@bytecodealliance/preview2-shim/wall-clock',
+  'instance-monotonic-clock': '@bytecodealliance/preview2-shim/monotonic-clock',
+  'streams': '@bytecodealliance/preview2-shim/streams',
+  'monotonic-clock': '@bytecodealliance/preview2-shim/monotonic-clock',
+  'filesystem': '@bytecodealliance/preview2-shim/filesystem',
+  'wall-clock': '@bytecodealliance/preview2-shim/wall-clock',
+  'environment': '@bytecodealliance/preview2-shim/environment',
+  'random': '@bytecodealliance/preview2-shim/random',
+  'exit': '@bytecodealliance/preview2-shim/exit',
+  'stderr': '@bytecodealliance/preview2-shim/stderr'
+};
+
 const builtinsCases = await readdir(new URL('./builtins', import.meta.url));
 suite('Builtins', () => {
   for (const filename of builtinsCases) {
@@ -23,9 +37,7 @@ suite('Builtins', () => {
         sourceName: `${name}.js`,
       });
     
-      const map = { 'wasi-*': '@bytecodealliance/preview2-shim/*' };
-    
-      const { files } = await transpile(component, { name, map });
+      const { files } = await transpile(component, { name, map: preview2Map });
     
       await mkdir(new URL(`./output/${name}/imports`, import.meta.url), { recursive: true });
       await mkdir(new URL(`./output/${name}/exports`, import.meta.url), { recursive: true });
@@ -80,10 +92,11 @@ suite('Bindings', () => {
           sourceName: `${name}.js`,
         });
 
-        const map = { 'wasi-*': '@bytecodealliance/preview2-shim/*' };
+        const map = {};
         for (const [impt] of imports) {
           map[impt] = `../../cases/${name}/${impt}.js`;
         }
+        Object.assign(map, preview2Map);
 
         const { files } = await transpile(component, { name, map });
 
