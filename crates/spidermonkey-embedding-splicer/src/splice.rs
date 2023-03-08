@@ -2229,13 +2229,19 @@ fn op_map<'a>(op: &wasmparser::Operator) -> Instruction<'a> {
         wasmparser::Operator::MemoryDiscard { .. } => todo!("memory discard"),
         wasmparser::Operator::I32x4RelaxedTruncF32x4S => Instruction::I32x4RelaxedTruncF32x4S,
         wasmparser::Operator::I32x4RelaxedTruncF32x4U => Instruction::I32x4RelaxedTruncF32x4U,
-        wasmparser::Operator::I32x4RelaxedTruncF64x2SZero => Instruction::I32x4RelaxedTruncF64x2SZero,
-        wasmparser::Operator::I32x4RelaxedTruncF64x2UZero => Instruction::I32x4RelaxedTruncF64x2UZero,
+        wasmparser::Operator::I32x4RelaxedTruncF64x2SZero => {
+            Instruction::I32x4RelaxedTruncF64x2SZero
+        }
+        wasmparser::Operator::I32x4RelaxedTruncF64x2UZero => {
+            Instruction::I32x4RelaxedTruncF64x2UZero
+        }
         wasmparser::Operator::F32x4RelaxedMadd => Instruction::F32x4RelaxedMadd,
         wasmparser::Operator::F32x4RelaxedNmadd => Instruction::F32x4RelaxedNmadd,
         wasmparser::Operator::F64x2RelaxedMadd => Instruction::F64x2RelaxedMadd,
         wasmparser::Operator::F64x2RelaxedNmadd => Instruction::F64x2RelaxedNmadd,
         wasmparser::Operator::I16x8RelaxedDotI8x16I7x16S => Instruction::I16x8RelaxedDotI8x16I7x16S,
-        wasmparser::Operator::I32x4RelaxedDotI8x16I7x16AddS => Instruction::I32x4RelaxedDotI8x16I7x16AddS,
+        wasmparser::Operator::I32x4RelaxedDotI8x16I7x16AddS => {
+            Instruction::I32x4RelaxedDotI8x16I7x16AddS
+        }
     }
 }
