@@ -2217,18 +2217,6 @@ fn op_map<'a>(op: &wasmparser::Operator) -> Instruction<'a> {
         wasmparser::Operator::F32x4DemoteF64x2Zero => Instruction::F32x4DemoteF64x2Zero,
         wasmparser::Operator::F64x2PromoteLowF32x4 => Instruction::F64x2PromoteLowF32x4,
         wasmparser::Operator::I8x16RelaxedSwizzle => Instruction::I8x16RelaxedSwizzle,
-        wasmparser::Operator::I32x4RelaxedTruncSatF32x4S => Instruction::I32x4RelaxedTruncSatF32x4S,
-        wasmparser::Operator::I32x4RelaxedTruncSatF32x4U => Instruction::I32x4RelaxedTruncSatF32x4U,
-        wasmparser::Operator::I32x4RelaxedTruncSatF64x2SZero => {
-            Instruction::I32x4RelaxedTruncSatF64x2SZero
-        }
-        wasmparser::Operator::I32x4RelaxedTruncSatF64x2UZero => {
-            Instruction::I32x4RelaxedTruncSatF64x2UZero
-        }
-        wasmparser::Operator::F32x4RelaxedFma => Instruction::F32x4RelaxedFma,
-        wasmparser::Operator::F32x4RelaxedFnma => Instruction::F32x4RelaxedFnma,
-        wasmparser::Operator::F64x2RelaxedFma => Instruction::F64x2RelaxedFma,
-        wasmparser::Operator::F64x2RelaxedFnma => Instruction::F64x2RelaxedFnma,
         wasmparser::Operator::I8x16RelaxedLaneselect => Instruction::I8x16RelaxedLaneselect,
         wasmparser::Operator::I16x8RelaxedLaneselect => Instruction::I16x8RelaxedLaneselect,
         wasmparser::Operator::I32x4RelaxedLaneselect => Instruction::I32x4RelaxedLaneselect,
@@ -2238,11 +2226,22 @@ fn op_map<'a>(op: &wasmparser::Operator) -> Instruction<'a> {
         wasmparser::Operator::F64x2RelaxedMin => Instruction::F64x2RelaxedMin,
         wasmparser::Operator::F64x2RelaxedMax => Instruction::F64x2RelaxedMax,
         wasmparser::Operator::I16x8RelaxedQ15mulrS => Instruction::I16x8RelaxedQ15mulrS,
-        wasmparser::Operator::I16x8DotI8x16I7x16S => Instruction::I16x8DotI8x16I7x16S,
-        wasmparser::Operator::I32x4DotI8x16I7x16AddS => Instruction::I32x4DotI8x16I7x16AddS,
-        wasmparser::Operator::F32x4RelaxedDotBf16x8AddF32x4 => {
-            Instruction::F32x4RelaxedDotBf16x8AddF32x4
-        }
         wasmparser::Operator::MemoryDiscard { .. } => todo!("memory discard"),
+        wasmparser::Operator::I32x4RelaxedTruncF32x4S => Instruction::I32x4RelaxedTruncF32x4S,
+        wasmparser::Operator::I32x4RelaxedTruncF32x4U => Instruction::I32x4RelaxedTruncF32x4U,
+        wasmparser::Operator::I32x4RelaxedTruncF64x2SZero => {
+            Instruction::I32x4RelaxedTruncF64x2SZero
+        }
+        wasmparser::Operator::I32x4RelaxedTruncF64x2UZero => {
+            Instruction::I32x4RelaxedTruncF64x2UZero
+        }
+        wasmparser::Operator::F32x4RelaxedMadd => Instruction::F32x4RelaxedMadd,
+        wasmparser::Operator::F32x4RelaxedNmadd => Instruction::F32x4RelaxedNmadd,
+        wasmparser::Operator::F64x2RelaxedMadd => Instruction::F64x2RelaxedMadd,
+        wasmparser::Operator::F64x2RelaxedNmadd => Instruction::F64x2RelaxedNmadd,
+        wasmparser::Operator::I16x8RelaxedDotI8x16I7x16S => Instruction::I16x8RelaxedDotI8x16I7x16S,
+        wasmparser::Operator::I32x4RelaxedDotI8x16I7x16AddS => {
+            Instruction::I32x4RelaxedDotI8x16I7x16AddS
+        }
     }
 }
