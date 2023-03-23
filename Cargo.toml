@@ -15,12 +15,12 @@ heck =  { version = "0.4", features = ["unicode"] }
 pulldown-cmark = { version = "0.8", default-features = false }
 env_logger = "0.10.0"
 js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", features = ["raw-bindgen"] }
-wasmtime = { git = 'https://github.com/bytecodealliance/wasmtime', features = ["component-model"] }
-wasmtime-environ = { git = 'https://github.com/bytecodealliance/wasmtime' }
-wasmprinter = "0.2.53"
+wasmtime = { version = "7.0.0", features = ["component-model"] }
+wasmtime-environ = "7.0.0"
+wasmprinter = "0.2.54"
 wasmparser = "0.102.0"
 wasm-encoder = "0.25.0"
 wat = "1.0.61"
 wit-bindgen = { git = 'https://github.com/bytecodealliance/wit-bindgen' }
-wit-component = { version = "0.7.3", features = ['dummy-module'] }
+wit-component = { version = "0.7.4", features = ['dummy-module'] }
 wit-parser = "0.6.4"

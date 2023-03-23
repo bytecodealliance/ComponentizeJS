@@ -73,8 +73,7 @@ $(SM_SRC):
 obj/builtins:
 	mkdir -p obj/builtins
 
-lib/wasi_snapshot_preview1.wasm: | lib
-	curl -L https://github.com/bytecodealliance/preview2-prototyping/releases/download/latest/wasi_snapshot_preview1.wasm -o $@
-
 clean:
-	rm -r obj && rm component-runtime.wasm
+	rm -r obj
+	rm lib/spidermonkey-embedding-splicer.js
+	rm lib/spidermonkey_embedding.wasm
