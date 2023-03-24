@@ -1,6 +1,6 @@
 {
   "name": "@bytecodealliance/componentize-js",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "exports": "./src/componentize.js",
   "devDependencies": {
@@ -8,7 +8,7 @@
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "^0.5.1",
+    "@bytecodealliance/jco": "^0.5.2",
     "@jakechampion/wizer": "^1.6.0"
   },
   "scripts": {
