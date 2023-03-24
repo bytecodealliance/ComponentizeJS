@@ -43,7 +43,7 @@ INCLUDES := -I $(JSCR_SRC)
 
 OBJS := $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/**/*.cpp)) $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/*.cpp))
 
-all: lib/spidermonkey-embedding-splicer.js lib/spidermonkey_embedding.wasm lib/wasi_snapshot_preview1.wasm
+all: lib/spidermonkey-embedding-splicer.js lib/spidermonkey_embedding.wasm
 
 lib/spidermonkey-embedding-splicer.js: target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj
 	$(JCO) new target/wasm32-unknown-unknown/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm

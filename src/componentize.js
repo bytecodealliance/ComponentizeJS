@@ -1,5 +1,5 @@
 import wizer from "@jakechampion/wizer";
-import { componentNew, metadataAdd } from "@bytecodealliance/jco";
+import { componentNew, metadataAdd, preview1AdapterReactorPath } from "@bytecodealliance/jco";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,9 +19,7 @@ export async function componentize(
     engine = fileURLToPath(
       new URL("../lib/spidermonkey_embedding.wasm", import.meta.url)
     ),
-    preview2Adapter = fileURLToPath(
-      new URL("../lib/wasi_snapshot_preview1.wasm", import.meta.url)
-    ),
+    preview2Adapter = preview1AdapterReactorPath()
   } = {}
 ) {
   let { wasm, jsBindings, importWrappers, exportCoreFns, imports } = spliceBindings(
