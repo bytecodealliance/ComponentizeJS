@@ -4,12 +4,12 @@
   "type": "module",
   "exports": "./src/componentize.js",
   "devDependencies": {
-    "@bytecodealliance/preview2-shim": "0.0.4",
+    "@bytecodealliance/preview2-shim": "0.0.6",
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "^0.5.2",
-    "@jakechampion/wizer": "^1.6.0"
+    "@bytecodealliance/jco": "^0.5.5",
+    "@bytecodealliance/wizer": "^1.6.1-beta.4"
   },
   "scripts": {
     "build": "cargo build --release --target wasm32-unknown-unknown && make -j",
