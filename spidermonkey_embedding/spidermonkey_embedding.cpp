@@ -274,7 +274,7 @@ __attribute__((export_name("cabi_realloc"))) void *cabi_realloc(void *ptr, size_
   }
   if (DEBUG)
   {
-    fprintf(stderr, "(cabi_realloc) [%zu] %d\n", new_size, (uint32_t)ret);
+    fprintf(stderr, "(cabi_realloc) [%d %zu %zu] %d\n", (uint32_t)ptr, orig_size, new_size, (uint32_t)ret);
   }
   return ret;
 }
@@ -819,8 +819,11 @@ check_init()
   return R.init_err;
 }
 
+bool first_call = true;
+
 __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx, void *argptr)
 {
+  R.free_list.clear();
   Runtime::CoreFn *fn = &R.fns[fn_idx];
   R.cur_fn_idx = fn_idx;
   if (DEBUG)

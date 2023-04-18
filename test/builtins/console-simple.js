@@ -8,6 +8,6 @@ export const source = `
 
 export async function test (run) {
   const { stdout, stderr } = await run();
-  strictEqual(stderr, 'test\n');
-  strictEqual(stdout, '');
+  strictEqual(stdout, 'test\n');
+  strictEqual(stderr, '');
 }

@@ -1,4 +1,4 @@
-import wizer from "@jakechampion/wizer";
+import wizer from "@bytecodealliance/wizer";
 import { componentNew, metadataAdd, preview1AdapterReactorPath } from "@bytecodealliance/jco";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";

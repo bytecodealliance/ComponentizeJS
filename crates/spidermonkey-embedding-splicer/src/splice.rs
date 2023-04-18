@@ -288,8 +288,8 @@ pub fn splice(
                     } = ty;
                     table_section.table(TableType {
                         element_type: RefType {
-                            nullable: element_type.nullable,
-                            heap_type: heap_ty_map(&element_type.heap_type),
+                            nullable: element_type.is_nullable(),
+                            heap_type: heap_ty_map(&element_type.heap_type()),
                         },
                         // (3) add space in the table for imports
                         minimum: initial + imports.len() as u32,
@@ -448,7 +448,7 @@ pub fn splice(
                             offset_expr,
                             table_index,
                         } => {
-                            if table_index != 0 {
+                            if table_index != None {
                                 todo!("multiple tables");
                             }
 
@@ -1432,12 +1432,10 @@ fn heap_ty_map(heap_type: &wasmparser::HeapType) -> HeapType {
 }
 
 fn ref_map(ty: &wasmparser::RefType) -> RefType {
-    let wasmparser::RefType {
-        nullable,
-        heap_type,
-    } = ty;
+    let nullable = ty.is_nullable();
+    let heap_type = &ty.heap_type();
     RefType {
-        nullable: *nullable,
+        nullable,
         heap_type: heap_ty_map(heap_type),
     }
 }

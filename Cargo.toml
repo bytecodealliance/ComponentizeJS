@@ -17,10 +17,10 @@ env_logger = "0.10.0"
 js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", features = ["raw-bindgen"] }
 wasmtime = { version = "7.0.0", features = ["component-model"] }
 wasmtime-environ = "7.0.0"
-wasmprinter = "0.2.54"
-wasmparser = "0.102.0"
+wasmprinter = "0.2.55"
+wasmparser = "0.103.0"
 wasm-encoder = "0.25.0"
-wat = "1.0.61"
-wit-bindgen = { git = 'https://github.com/bytecodealliance/wit-bindgen' }
-wit-component = { version = "0.7.4", features = ['dummy-module'] }
-wit-parser = "0.6.4"
+wat = "1.0.62"
+wit-bindgen = { git = 'https://github.com/bytecodealliance/wit-bindgen', rev = "0859d79f" }
+wit-component = { version = "0.8.1", features = ['dummy-module'] }
+wit-parser = "0.7.0"
