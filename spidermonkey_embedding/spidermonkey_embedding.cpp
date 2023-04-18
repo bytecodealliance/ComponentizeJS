@@ -819,11 +819,8 @@ check_init()
   return R.init_err;
 }
 
-bool first_call = true;
-
 __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx, void *argptr)
 {
-  R.free_list.clear();
   Runtime::CoreFn *fn = &R.fns[fn_idx];
   R.cur_fn_idx = fn_idx;
   if (DEBUG)
@@ -1007,11 +1004,12 @@ __attribute__((export_name("post_call"))) void post_call(uint32_t fn_idx)
   //   abort();
   // }
   R.cur_fn_idx = -1;
+  // TODO: pending https://github.com/bytecodealliance/preview2-prototyping/issues/145
+  R.free_list.clear();
   for (void *ptr : R.free_list)
   {
     cabi_free(ptr);
   }
-  R.free_list.clear();
   log("(post_call) jobs");
   js::RunJobs(R.cx);
   log("(post_call) maybe gc");
