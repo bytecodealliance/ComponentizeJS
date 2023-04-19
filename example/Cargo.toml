@@ -1,0 +1,21 @@
+[package]
+name = "hello_componentize"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace]
+
+[dependencies]
+anyhow = "1.0.65"
+async-std = { version = "1.12.0", features = ["attributes"] }
+host = { git = "https://github.com/bytecodealliance/preview2-prototyping" }
+wasi-common =  { git = "https://github.com/bytecodealliance/preview2-prototyping" }
+wasi-cap-std-sync = { git = "https://github.com/bytecodealliance/preview2-prototyping" }
+
+[dependencies.wasmtime]
+git = "https://github.com/bytecodealliance/wasmtime.git"
+# this needs to be kept in sync with https://github.com/bytecodealliance/preview2-prototyping/blob/main/host/Cargo.toml
+rev = "299131ae2d6655c49138bfab2c4469650763ef3b"
+features = ["component-model"]

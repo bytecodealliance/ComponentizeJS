@@ -1,0 +1,7 @@
+default world hello {
+  import external: interface {
+    get-answer: func() -> u32
+  }
+
+  export hello: func(name: string) -> string
+}

@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@bytecodealliance/componentize-js": "^0.0.5"
+  }
+}
