@@ -19,7 +19,6 @@ suite('Builtins', () => {
           export run: func() -> ()
         }
       `, {
-        debug: false,
         sourceName: `${name}.js`,
       });
     
@@ -74,7 +73,6 @@ suite('Bindings', () => {
 
       try {
         const { component, imports } = await componentize(source, world, {
-          debug: false,
           sourceName: `${name}.js`,
         });
 

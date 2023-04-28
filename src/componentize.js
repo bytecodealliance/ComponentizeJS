@@ -14,7 +14,7 @@ export async function componentize(
   jsSource,
   witWorld,
   {
-    debug = false,
+    debug = true,
     sourceName = "source.js",
     engine = fileURLToPath(
       new URL("../lib/spidermonkey_embedding.wasm", import.meta.url)
@@ -22,7 +22,7 @@ export async function componentize(
     preview2Adapter = preview1AdapterReactorPath()
   } = {}
 ) {
-  let { wasm, jsBindings, importWrappers, exportCoreFns, imports } = spliceBindings(
+  let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
     sourceName,
     await readFile(engine),
     witWorld
@@ -31,11 +31,12 @@ export async function componentize(
   if (debug) {
     console.log('--- JS Bindings ---');
     console.log(jsBindings);
+    console.log('--- JS Imports ---');
+    console.log(imports);
+    console.log(importWrappers);
+    console.log('--- JS Exports ---');
+    console.log(exports);
   }
-  // console.log(exportCoreFns);
-  // console.log(importWrappers);
-  // console.log(exportCoreFns);
-  // console.log(imports, importWrappers);
 
   const input = join(tmpdir(), "in.wasm");
   const output = join(tmpdir(), "out.wasm");
@@ -51,13 +52,12 @@ export async function componentize(
     SOURCE_LEN: new TextEncoder().encode(jsSource).byteLength.toString(),
     BINDINGS_LEN: new TextEncoder().encode(jsBindings).byteLength.toString(),
     IMPORT_WRAPPER_CNT: Object.keys(importWrappers).length.toString(),
-    EXPORT_CNT: exportCoreFns.length.toString(),
-    IMPORT_CNT: imports.reduce((c, i) => c + i[1].length, 0).toString()
+    EXPORT_CNT: exports.length.toString()
   };
 
-  for (const [idx, expt] of exportCoreFns.entries()) {
-    env[`EXPORT${idx}_NAME`] = expt.name;
-    env[`EXPORT${idx}_ARGS`] = (expt.paramptr ? '*' : '') + expt.args.join(',');
+  for (const [idx, [iface, name, expt]] of exports.entries()) {
+    env[`EXPORT${idx}_NAME`] = `export_${iface ? iface + '$' : ''}${name}`;
+    env[`EXPORT${idx}_ARGS`] = (expt.paramptr ? '*' : '') + expt.params.join(',');
     env[`EXPORT${idx}_RET`] = (expt.retptr ? '*' : '') + (expt.ret || '');
     env[`EXPORT${idx}_RETSIZE`] = String(expt.retsize);
   }
@@ -67,6 +67,15 @@ export async function componentize(
     env[`IMPORT_WRAPPER${idx}_LEN`] = new TextEncoder().encode(importWrapper).byteLength.toString();
     wizerInput += importWrapper;
   }
+
+  let idx = 0;
+  for (const [, specifiers] of imports) {
+    for (const name of specifiers) {
+      env[`IMPORT${idx}_NAME`] = name;
+      idx++;
+    }
+  }
+  env['IMPORT_CNT'] = idx;
 
   if (debug) {
     console.log('--- Wizer Env ---');
@@ -281,6 +290,7 @@ export async function componentize(
     process.exit(1);
   }
 
+  await writeFile('tmp.wasm', bin);
   const component = await metadataAdd(await componentNew(bin, Object.entries({
     wasi_snapshot_preview1: await readFile(preview2Adapter)
   })), Object.entries({
