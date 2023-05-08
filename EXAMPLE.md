@@ -22,6 +22,7 @@ export function hello (name) {
 
 The component can then be built with the `componentize` API:
 
+componentize.mjs
 ```js
 import { componentize } from '@bytecodealliance/componentize-js';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -32,6 +33,12 @@ const witSource = await readFile('hello.wit', 'utf8');
 const { component } = await componentize(jsSource, witSource);
 
 await writeFile('hello.component.wasm', component);
+```
+
+Run this with Node to build `hello.component.wasm`:
+
+```
+node componentize.mjs
 ```
 
 ### Running the Component in Wasmtime
@@ -50,17 +57,17 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.65"
 async-std = { version = "1.12.0", features = ["attributes"] }
-wasmtime = { git = "https://github.com/bytecodealliance/wasmtime", features = ["component-model"], branch = 'release-6.0.0' }
-host = { git = "https://github.com/bytecodealliance/preview2-prototyping" }
-wasi-common =  { git = "https://github.com/bytecodealliance/preview2-prototyping" }
-wasi-cap-std-sync = { git = "https://github.com/bytecodealliance/preview2-prototyping" }
+wasmtime = { git = "https://github.com/bytecodealliance/wasmtime", rev = "299131ae2d6655c49138bfab2c4469650763ef3b", features = ["component-model"] }
+host = { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
+wasi-common =  { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
+wasi-cap-std-sync = { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
 ```
 
 src/main.rs
 ```rs
 use anyhow::Result;
-use host::add_to_linker;
 use wasi_cap_std_sync::WasiCtxBuilder;
+use wasi_common::{wasi, Table};
 use wasmtime::{
     component::{Component, Linker},
     Config, Engine, Store, WasmBacktraceDetails,
@@ -68,36 +75,45 @@ use wasmtime::{
 
 wasmtime::component::bindgen!({
     world: "hello",
-    path: "../hello.wit",
+    path: "hello.wit",
     async: true
 });
 
 #[async_std::main]
 async fn main() -> Result<()> {
+    let builder = WasiCtxBuilder::new().inherit_stdio();
+    let mut table = Table::new();
+    let _wasi = builder.build(&mut table)?;
+
     let mut config = Config::new();
     config.cache_config_load_default().unwrap();
     config.wasm_backtrace_details(WasmBacktraceDetails::Enable);
     config.wasm_component_model(true);
     config.async_support(true);
-    
-    let engine = Engine::new(&config).unwrap();
-    let mut linker = Linker::new(&engine);
-    add_to_linker(&mut linker, |x| x).unwrap();
+
+    let engine = Engine::new(&config)?;
+    let linker = Linker::new(&engine);
+
+    let component = Component::from_file(&engine, "hello.component.wasm").unwrap();
 
     let mut store = Store::new(
         &engine,
-        WasiCtxBuilder::new()
-            .inherit_stdin()
-            .inherit_stdout()
-            .build(),
+        (),
     );
 
-    let component = Component::from_file(&engine, "../hello.component.wasm").unwrap();
+    let (wasi, _instance) =
+        wasi::command::Command::instantiate_async(&mut store, &component, &linker).await?;
+
+    let result: Result<(), ()> = wasi.call_run(&mut store).await?;
+
+    if result.is_err() {
+        anyhow::bail!("command returned with failing exit status");
+    }
 
     // after getting the component, we can instantiate a markdown instance.
     let (instance, _instance) = Hello::instantiate_async(&mut store, &component, &linker).await?;
     let res = instance.call_hello(&mut store, "ComponentizeJS").await?;
-    println!(res);
+    println!("{}", res);
     Ok(())
 }
 ```
