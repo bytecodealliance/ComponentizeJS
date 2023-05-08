@@ -27,7 +27,7 @@ struct JsBindgen<'a> {
     realloc: String,
 
     exports: Vec<(Option<String>, String, CoreFn)>,
-    imports: Vec<(Option<String>, String, CoreFn)>,
+    imports: BTreeMap<String, (Option<String>, String, CoreFn)>,
 }
 
 #[derive(Debug)]
@@ -112,7 +112,7 @@ pub fn componentize_bindgen(
         memory: "$memory".to_string(),
         realloc: "$realloc".to_string(),
         exports: Vec::new(),
-        imports: Vec::new(),
+        imports: BTreeMap::new(),
     };
 
     bindgen.sizes.fill(resolve);
@@ -125,7 +125,7 @@ pub fn componentize_bindgen(
     let mut import_bindings = Vec::new();
     let mut import_wrappers = Vec::new();
     let mut imports = BTreeMap::new();
-    for (iface, name, func) in bindgen.imports.drain(..) {
+    for (specifier, (iface, name, func)) in bindgen.imports.iter() {
         // this is weird, but it is what it is for now
         let specifier = if let Some(iface) = &iface {
             iface.into()
