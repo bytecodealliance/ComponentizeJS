@@ -57,21 +57,25 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.65"
 async-std = { version = "1.12.0", features = ["attributes"] }
+cap-std = "1.0.12"
 wasmtime = { git = "https://github.com/bytecodealliance/wasmtime", rev = "299131ae2d6655c49138bfab2c4469650763ef3b", features = ["component-model"] }
-host = { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
 wasi-common =  { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
 wasi-cap-std-sync = { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
+wasmtime-wasi-sockets =  { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
+wasmtime-wasi-sockets-sync = { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
 ```
 
 src/main.rs
 ```rs
 use anyhow::Result;
 use wasi_cap_std_sync::WasiCtxBuilder;
-use wasi_common::{wasi, Table};
+use wasi_common::{wasi, Table, WasiCtx, WasiView};
 use wasmtime::{
     component::{Component, Linker},
     Config, Engine, Store, WasmBacktraceDetails,
 };
+use wasmtime_wasi_sockets::{WasiSocketsCtx, WasiSocketsView};
+use wasmtime_wasi_sockets_sync::WasiSocketsCtxBuilder;
 
 wasmtime::component::bindgen!({
     world: "hello",
@@ -83,7 +87,7 @@ wasmtime::component::bindgen!({
 async fn main() -> Result<()> {
     let builder = WasiCtxBuilder::new().inherit_stdio();
     let mut table = Table::new();
-    let _wasi = builder.build(&mut table)?;
+    let wasi = builder.build(&mut table)?;
 
     let mut config = Config::new();
     config.cache_config_load_default().unwrap();
@@ -92,26 +96,61 @@ async fn main() -> Result<()> {
     config.async_support(true);
 
     let engine = Engine::new(&config)?;
-    let linker = Linker::new(&engine);
+    let mut linker = Linker::new(&engine);
 
     let component = Component::from_file(&engine, "hello.component.wasm").unwrap();
 
-    let mut store = Store::new(
-        &engine,
-        (),
-    );
 
-    let (wasi, _instance) =
-        wasi::command::Command::instantiate_async(&mut store, &component, &linker).await?;
-
-    let result: Result<(), ()> = wasi.call_run(&mut store).await?;
-
-    if result.is_err() {
-        anyhow::bail!("command returned with failing exit status");
+    struct CommandCtx {
+        table: Table,
+        wasi: WasiCtx,
+        sockets: WasiSocketsCtx,
+    }
+    impl WasiView for CommandCtx {
+        fn table(&self) -> &Table {
+            &self.table
+        }
+        fn table_mut(&mut self) -> &mut Table {
+            &mut self.table
+        }
+        fn ctx(&self) -> &WasiCtx {
+            &self.wasi
+        }
+        fn ctx_mut(&mut self) -> &mut WasiCtx {
+            &mut self.wasi
+        }
+    }
+    let sockets = WasiSocketsCtxBuilder::new()
+        .inherit_network(cap_std::ambient_authority())
+        .build();
+    impl WasiSocketsView for CommandCtx {
+        fn table(&self) -> &Table {
+            &self.table
+        }
+        fn table_mut(&mut self) -> &mut Table {
+            &mut self.table
+        }
+        fn ctx(&self) -> &WasiSocketsCtx {
+            &self.sockets
+        }
+        fn ctx_mut(&mut self) -> &mut WasiSocketsCtx {
+            &mut self.sockets
+        }
     }
 
-    // after getting the component, we can instantiate a markdown instance.
-    let (instance, _instance) = Hello::instantiate_async(&mut store, &component, &linker).await?;
+    wasi::command::add_to_linker(&mut linker)?;
+    let mut store = Store::new(
+        &engine,
+        CommandCtx {
+            table,
+            wasi,
+            sockets,
+        },
+    );
+
+    let (instance, _instance) =
+        Hello::instantiate_async(&mut store, &component, &linker).await?;
+
     let res = instance.call_hello(&mut store, "ComponentizeJS").await?;
     println!("{}", res);
     Ok(())
