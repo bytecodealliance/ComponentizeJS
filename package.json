@@ -1,6 +1,6 @@
 {
   "name": "@bytecodealliance/componentize-js",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "homepage": "https://github.com/bytecodealliance/componentize-js#readme",
   "type": "module",
   "exports": "./src/componentize.js",
