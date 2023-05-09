@@ -1,6 +1,5 @@
 use anyhow::Result;
 use std::borrow::Cow;
-use wit_parser::abi::WasmSignature;
 
 use crate::*;
 use wasm_encoder::{
@@ -46,8 +45,8 @@ const DEBUG: bool = false;
 //
 pub fn splice(
     engine: Vec<u8>,
-    imports: Vec<(String, String, WasmSignature, Option<i32>)>,
-    exports: Vec<(String, WasmSignature)>,
+    imports: Vec<(String, String, CoreFn, Option<i32>)>,
+    exports: Vec<(String, CoreFn)>,
 ) -> Result<Vec<u8>, String> {
     init();
 
@@ -839,7 +838,10 @@ pub fn splice(
 
                 let name = custom_section_reader.name();
                 let data = custom_section_reader.data();
-                let section = CustomSection { name, data };
+                let section = CustomSection {
+                    name: name.into(),
+                    data: data.into(),
+                };
                 custom_sections.push(section);
             }
             Payload::CodeSectionStart { .. } | Payload::DataCountSection { .. } => {}
@@ -873,22 +875,22 @@ pub fn splice(
                 .params
                 .iter()
                 .map(|ty| match ty {
-                    wit_parser::abi::WasmType::I32 => ValType::I32,
-                    wit_parser::abi::WasmType::I64 => ValType::I64,
-                    wit_parser::abi::WasmType::F32 => ValType::F32,
-                    wit_parser::abi::WasmType::F64 => ValType::F64,
+                    CoreTy::I32 => ValType::I32,
+                    CoreTy::I64 => ValType::I64,
+                    CoreTy::F32 => ValType::F32,
+                    CoreTy::F64 => ValType::F64,
                 })
                 .collect();
             type_section.function(
                 params,
                 expt_sig
-                    .results
+                    .ret
                     .iter()
                     .map(|ty| match ty {
-                        wit_parser::abi::WasmType::I32 => ValType::I32,
-                        wit_parser::abi::WasmType::I64 => ValType::I64,
-                        wit_parser::abi::WasmType::F32 => ValType::F32,
-                        wit_parser::abi::WasmType::F64 => ValType::F64,
+                        CoreTy::I32 => ValType::I32,
+                        CoreTy::I64 => ValType::I64,
+                        CoreTy::F32 => ValType::F32,
+                        CoreTy::F64 => ValType::F64,
                     })
                     .collect::<Vec<ValType>>(),
             );
@@ -903,7 +905,7 @@ pub fn splice(
             // Now we just have to add the argptr
             if expt_sig.params.len() == 0 {
                 add_instruction(&mut func, &Instruction::I32Const(0));
-            } else if expt_sig.indirect_params {
+            } else if expt_sig.paramptr {
                 // param ptr is the first arg with indirect params
                 add_instruction(&mut func, &Instruction::LocalGet(0));
             } else {
@@ -915,10 +917,10 @@ pub fn splice(
                 let mut byte_size = 0;
                 for param in expt_sig.params.iter() {
                     match param {
-                        wit_parser::abi::WasmType::I32 | wit_parser::abi::WasmType::F32 => {
+                        CoreTy::I32 | CoreTy::F32 => {
                             byte_size += 4;
                         }
-                        wit_parser::abi::WasmType::I64 | wit_parser::abi::WasmType::F64 => {
+                        CoreTy::I64 | CoreTy::F64 => {
                             byte_size += 8;
                         }
                     }
@@ -949,7 +951,7 @@ pub fn splice(
                 for (idx, param) in expt_sig.params.iter().enumerate() {
                     add_instruction(&mut func, &Instruction::LocalGet(idx as u32));
                     match param {
-                        wit_parser::abi::WasmType::I32 => {
+                        CoreTy::I32 => {
                             add_instruction(
                                 &mut func,
                                 &Instruction::I32Store(MemArg {
@@ -960,7 +962,7 @@ pub fn splice(
                             );
                             offset += 4;
                         }
-                        wit_parser::abi::WasmType::I64 => {
+                        CoreTy::I64 => {
                             add_instruction(
                                 &mut func,
                                 &Instruction::I64Store(MemArg {
@@ -971,7 +973,7 @@ pub fn splice(
                             );
                             offset += 8;
                         }
-                        wit_parser::abi::WasmType::F32 => {
+                        CoreTy::F32 => {
                             add_instruction(
                                 &mut func,
                                 &Instruction::F32Store(MemArg {
@@ -982,7 +984,7 @@ pub fn splice(
                             );
                             offset += 4;
                         }
-                        wit_parser::abi::WasmType::F64 => {
+                        CoreTy::F64 => {
                             add_instruction(
                                 &mut func,
                                 &Instruction::F64Store(MemArg {
@@ -1018,7 +1020,7 @@ pub fn splice(
                 ),
             );
 
-            if expt_sig.results.len() == 0 {
+            if expt_sig.ret.is_none() {
                 add_instruction(&mut func, &Instruction::Drop);
             } else if !expt_sig.retptr {
                 // Tee retptr into its local var
@@ -1029,8 +1031,8 @@ pub fn splice(
 
                 // if it's a direct return, we must read the return
                 // value type from the retptr
-                match expt_sig.results[0] {
-                    wit_parser::abi::WasmType::I32 => {
+                match expt_sig.ret.unwrap() {
+                    CoreTy::I32 => {
                         add_instruction(
                             &mut func,
                             &Instruction::I32Load(MemArg {
@@ -1040,7 +1042,7 @@ pub fn splice(
                             }),
                         );
                     }
-                    wit_parser::abi::WasmType::I64 => {
+                    CoreTy::I64 => {
                         add_instruction(
                             &mut func,
                             &Instruction::I64Load(MemArg {
@@ -1050,7 +1052,7 @@ pub fn splice(
                             }),
                         );
                     }
-                    wit_parser::abi::WasmType::F32 => {
+                    CoreTy::F32 => {
                         add_instruction(
                             &mut func,
                             &Instruction::F32Load(MemArg {
@@ -1060,7 +1062,7 @@ pub fn splice(
                             }),
                         );
                     }
-                    wit_parser::abi::WasmType::F64 => {
+                    CoreTy::F64 => {
                         add_instruction(
                             &mut func,
                             &Instruction::F64Load(MemArg {
@@ -1162,23 +1164,20 @@ pub fn splice(
                 .params
                 .iter()
                 .map(|ty| match ty {
-                    wit_parser::abi::WasmType::I32 => ValType::I32,
-                    wit_parser::abi::WasmType::I64 => ValType::I64,
-                    wit_parser::abi::WasmType::F32 => ValType::F32,
-                    wit_parser::abi::WasmType::F64 => ValType::F64,
+                    CoreTy::I32 => ValType::I32,
+                    CoreTy::I64 => ValType::I64,
+                    CoreTy::F32 => ValType::F32,
+                    CoreTy::F64 => ValType::F64,
                 })
                 .collect();
-            if impt_sig.results.len() > 1 {
-                return Err("Multiple return values are not supported".into());
-            }
             type_section.function(
                 params,
-                match impt_sig.results.first() {
+                match impt_sig.ret {
                     Some(ty) => vec![match ty {
-                        wit_parser::abi::WasmType::I32 => ValType::I32,
-                        wit_parser::abi::WasmType::I64 => ValType::I64,
-                        wit_parser::abi::WasmType::F32 => ValType::F32,
-                        wit_parser::abi::WasmType::F64 => ValType::F64,
+                        CoreTy::I32 => ValType::I32,
+                        CoreTy::I64 => ValType::I64,
+                        CoreTy::F32 => ValType::F32,
+                        CoreTy::F64 => ValType::F64,
                     }],
                     None => vec![],
                 },
@@ -1198,14 +1197,11 @@ pub fn splice(
 
             // stack the return arg now as it chains with the
             // args we're about to add to the stack
-            if impt_sig.results.first().is_some() {
+            if impt_sig.ret.is_some() {
                 add_instruction(&mut func, &Instruction::LocalGet(2));
 
                 // if an i64 return, then we need to stack the extra BigInt constructor arg for that now
-                if matches!(
-                    impt_sig.results.first().unwrap(),
-                    wit_parser::abi::WasmType::I64
-                ) {
+                if matches!(impt_sig.ret.unwrap(), CoreTy::I64) {
                     add_instruction(&mut func, &Instruction::LocalGet(0));
                 }
             }
@@ -1221,22 +1217,22 @@ pub fn splice(
                 add_instruction(&mut func, &Instruction::I32Const(16 + 8 * idx as i32));
                 add_instruction(&mut func, &Instruction::I32Add);
                 match arg {
-                    wit_parser::abi::WasmType::I32 => {
+                    CoreTy::I32 => {
                         for instruction in &instructions_get_i32 {
                             add_instruction(&mut func, instruction);
                         }
                     }
-                    wit_parser::abi::WasmType::I64 => {
+                    CoreTy::I64 => {
                         for instruction in &instructions_get_i64 {
                             add_instruction(&mut func, instruction);
                         }
                     }
-                    wit_parser::abi::WasmType::F32 => {
+                    CoreTy::F32 => {
                         for instruction in &instructions_get_f32 {
                             add_instruction(&mut func, instruction);
                         }
                     }
-                    wit_parser::abi::WasmType::F64 => {
+                    CoreTy::F64 => {
                         for instruction in &instructions_get_f64 {
                             add_instruction(&mut func, instruction);
                         }
@@ -1247,7 +1243,7 @@ pub fn splice(
             // if a retptr,
             // allocate and put the retptr on the call stack as the last passed argument
             if impt_sig.retptr {
-                assert!(!impt_sig.results.first().is_some());
+                assert!(!impt_sig.ret.is_some());
                 // prepare the context arg for the return set shortly
                 add_instruction(&mut func, &Instruction::LocalGet(2));
 
@@ -1290,14 +1286,14 @@ pub fn splice(
             // main call to the import lowering function
             add_instruction(&mut func, &Instruction::Call(import_section.len() - 1));
 
-            match impt_sig.results.first() {
+            match impt_sig.ret {
                 None => {}
-                Some(wit_parser::abi::WasmType::I32) => {
+                Some(CoreTy::I32) => {
                     for op in instructions_ret_i32.iter() {
                         add_instruction(&mut func, &op);
                     }
                 }
-                Some(wit_parser::abi::WasmType::I64) => {
+                Some(CoreTy::I64) => {
                     // i64 needs a BigInt initialization first
                     add_instruction(
                         &mut func,
@@ -1316,12 +1312,12 @@ pub fn splice(
                         add_instruction(&mut func, &op);
                     }
                 }
-                Some(wit_parser::abi::WasmType::F32) => {
+                Some(CoreTy::F32) => {
                     for op in instructions_ret_f32.iter() {
                         add_instruction(&mut func, &op);
                     }
                 }
-                Some(wit_parser::abi::WasmType::F64) => {
+                Some(CoreTy::F64) => {
                     for op in instructions_ret_f64.iter() {
                         add_instruction(&mut func, &op);
                     }

@@ -262,6 +262,11 @@ coreabi_get_import(int32_t idx, const char *name)
 
 // Binding Functions
 
+__attribute__((export_name("cabi_realloc_adapter"))) void *cabi_realloc_adapter(void *ptr, size_t orig_size, size_t org_align, size_t new_size)
+{
+  return JS_realloc(R.cx, ptr, orig_size, new_size);
+}
+
 __attribute__((export_name("cabi_realloc"))) void *cabi_realloc(void *ptr, size_t orig_size, size_t org_align, size_t new_size)
 {
   void *ret = JS_realloc(R.cx, ptr, orig_size, new_size);
@@ -1005,11 +1010,11 @@ __attribute__((export_name("post_call"))) void post_call(uint32_t fn_idx)
   // }
   R.cur_fn_idx = -1;
   // TODO: pending https://github.com/bytecodealliance/preview2-prototyping/issues/145
-  R.free_list.clear();
   for (void *ptr : R.free_list)
   {
     cabi_free(ptr);
   }
+  R.free_list.clear();
   log("(post_call) jobs");
   js::RunJobs(R.cx);
   log("(post_call) maybe gc");

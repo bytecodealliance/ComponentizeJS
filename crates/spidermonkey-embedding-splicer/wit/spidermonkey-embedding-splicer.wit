@@ -12,9 +12,8 @@ default world spidermonkey-embedding-splicer {
       f64
     }
 
-    record export-core-fn {
-      name: string,
-      args: list<core-ty>,
+    record core-fn {
+      params: list<core-ty>,
       ret: option<core-ty>,
       retptr: bool,
       retsize: u32,
@@ -24,7 +23,7 @@ default world spidermonkey-embedding-splicer {
     record splice-result {
       wasm: list<u8>,
       js-bindings: string,
-      export-core-fns: list<export-core-fn>,
+      exports: list<tuple<string, core-fn>>,
       import-wrappers: list<tuple<string, string>>,
       imports: list<tuple<string, list<string>>>,
     }
