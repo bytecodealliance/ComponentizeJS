@@ -75,6 +75,9 @@ jobs:
     - name: Test
       run: npm run test
 
+    - name: Test Example
+      run: cd example && npm run build && ./test.sh
+
   rustfmt:
     name: Rustfmt
     runs-on: ubuntu-latest

@@ -20,5 +20,8 @@
     "console.js",
     "lib",
     "src"
+  ],
+  "workspaces": [
+    "."
   ]
 }

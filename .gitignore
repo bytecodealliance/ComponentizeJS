@@ -1,9 +1,10 @@
 /obj/
 /test/output/
-/node_modules/
-/target/
+node_modules/
+target/
 /lib/
 /crates/wasmtime-test
-/hello.*
 /test.js
 /shared
+example/package-lock.json
+example/hello.component.wasm
