@@ -23,7 +23,7 @@ default world spidermonkey-embedding-splicer {
     record splice-result {
       wasm: list<u8>,
       js-bindings: string,
-      exports: list<tuple<option<string>, string, core-fn>>,
+      exports: list<tuple<string, core-fn>>,
       import-wrappers: list<tuple<string, string>>,
       imports: list<tuple<string, list<string>>>,
     }

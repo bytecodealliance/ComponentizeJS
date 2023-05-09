@@ -1,5 +1,5 @@
 use anyhow::Result;
-use heck::ToLowerCamelCase;
+use bindgen::BindingItem;
 use wasmtime_environ::{
     component::{ComponentTypesBuilder, Translator},
     wasmparser::{Validator, WasmFeatures},
@@ -209,27 +209,49 @@ impl exports::Exports for SpidermonkeyEmbeddingSplicer {
         }
 
         let mut exports = Vec::new();
-        for (iface, name, func) in &componentized.exports {
-            if let Some(iface) = iface {
-                exports.push((format!("{iface}#{name}"), map_core_fn(func)));
+        for (
+            export_name,
+            BindingItem {
+                name, func, iface, ..
+            },
+        ) in &componentized.exports
+        {
+            if *iface {
+                exports.push((format!("{export_name}#{name}"), map_core_fn(func)));
             } else {
-                exports.push((name.to_string(), map_core_fn(func)));
+                exports.push((export_name.to_string(), map_core_fn(func)));
             }
         }
 
         let mut imports = Vec::new();
         for (specifier, imported) in &componentized.imports {
-            for (impt, func) in imported {
-                imports.push((
-                    specifier.to_string(),
-                    impt.to_string(),
-                    map_core_fn(func),
-                    if func.retsize > 0 {
-                        Some(func.retsize as i32)
-                    } else {
-                        None
-                    },
-                ));
+            for BindingItem {
+                name, func, iface, ..
+            } in imported
+            {
+                if *iface {
+                    imports.push((
+                        specifier.to_string(),
+                        name.to_string(),
+                        map_core_fn(func),
+                        if func.retsize > 0 {
+                            Some(func.retsize as i32)
+                        } else {
+                            None
+                        },
+                    ));
+                } else {
+                    imports.push((
+                        specifier.to_string(),
+                        "default".into(),
+                        map_core_fn(func),
+                        if func.retsize > 0 {
+                            Some(func.retsize as i32)
+                        } else {
+                            None
+                        },
+                    ));
+                }
             }
         }
 
@@ -247,13 +269,14 @@ impl exports::Exports for SpidermonkeyEmbeddingSplicer {
             exports: componentized
                 .exports
                 .iter()
-                .map(|(iface, name, expt)| {
-                    (
-                        iface.as_ref().map(|iface| iface.to_lower_camel_case()),
-                        name.to_lower_camel_case(),
-                        map_core_fn(&expt),
-                    )
-                })
+                .map(
+                    |(
+                        _,
+                        BindingItem {
+                            binding_name, func, ..
+                        },
+                    )| { (binding_name.to_string(), map_core_fn(&func)) },
+                )
                 .collect(),
             imports: componentized
                 .imports
@@ -261,7 +284,16 @@ impl exports::Exports for SpidermonkeyEmbeddingSplicer {
                 .map(|(specifier, imports)| {
                     (
                         specifier.to_string(),
-                        imports.iter().map(|(impt, _)| impt.to_string()).collect(),
+                        imports
+                            .iter()
+                            .map(|BindingItem { name, iface, .. }| {
+                                if *iface {
+                                    name.to_string()
+                                } else {
+                                    "default".into()
+                                }
+                            })
+                            .collect(),
                     )
                 })
                 .collect(),

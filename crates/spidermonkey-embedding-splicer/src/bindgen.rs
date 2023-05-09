@@ -9,6 +9,15 @@ use wasmtime_environ::component::{CanonicalOptions, Component, Export, GlobalIni
 use wit_parser::abi::{AbiVariant, LiftLower, WasmSignature};
 use wit_parser::*;
 
+#[derive(Debug)]
+pub struct BindingItem {
+    pub iface: bool,
+    pub iface_name: Option<String>,
+    pub binding_name: String,
+    pub name: String,
+    pub func: CoreFn,
+}
+
 struct JsBindgen<'a> {
     /// The source code for the "main" file that's going to be created for the
     /// component we're generating bindings for. This is incrementally added to
@@ -26,8 +35,10 @@ struct JsBindgen<'a> {
     memory: String,
     realloc: String,
 
-    exports: Vec<(Option<String>, String, CoreFn)>,
-    imports: BTreeMap<String, (Option<String>, String, CoreFn)>,
+    // export "name"
+    exports: Vec<(String, BindingItem)>,
+    // imports "specifier"
+    imports: Vec<(String, BindingItem)>,
 }
 
 #[derive(Debug)]
@@ -50,8 +61,8 @@ pub struct CoreFn {
 #[derive(Debug)]
 pub struct Componentization {
     pub js_bindings: String,
-    pub exports: Vec<(Option<String>, String, CoreFn)>,
-    pub imports: BTreeMap<String, Vec<(String, CoreFn)>>,
+    pub exports: Vec<(String, BindingItem)>,
+    pub imports: BTreeMap<String, Vec<BindingItem>>,
     pub import_wrappers: Vec<(String, String)>,
 }
 
@@ -112,7 +123,7 @@ pub fn componentize_bindgen(
         memory: "$memory".to_string(),
         realloc: "$realloc".to_string(),
         exports: Vec::new(),
-        imports: BTreeMap::new(),
+        imports: Vec::new(),
     };
 
     bindgen.sizes.fill(resolve);
@@ -122,42 +133,41 @@ pub fn componentize_bindgen(
     bindgen.imports_bindgen();
 
     // consolidate import specifiers and generate wrappers
+    // we do this separately because function index order matters
     let mut import_bindings = Vec::new();
     let mut import_wrappers = Vec::new();
     let mut imports = BTreeMap::new();
-    for (specifier, (iface, name, func)) in bindgen.imports.iter() {
-        // this is weird, but it is what it is for now
-        let specifier = if let Some(iface) = &iface {
-            iface.into()
-        } else {
-            name.to_string()
-        };
-
+    for (specifier, item) in bindgen.imports {
         if !imports.contains_key(&specifier) {
             imports.insert(specifier.to_string(), Vec::new());
         }
         let impt_list = imports.get_mut(&specifier).unwrap();
 
-        let binding_name = js_canon_name(iface.as_ref(), &name, "");
+        // this import binding order matters
+        let binding_name = js_canon_name(item.iface_name.as_ref(), &item.name, "");
         import_bindings.push(binding_name);
 
-        let import_name = if iface.is_some() { name } else { "".into() };
+        impt_list.push(item);
 
-        impt_list.push((import_name, func));
+        // let import_name = if item.iface_name.is_some() { name } else { "".into() };
     }
 
-    let mut i = 0;
     for (specifier, impt_list) in imports.iter() {
         let mut specifier_list = Vec::new();
-        for (binding, _) in impt_list.iter() {
-            let binding_name = &import_bindings[i];
-            let binding_camel = binding.to_lower_camel_case();
-            if binding == "" {
-                specifier_list.push(format!("import_{binding_name} as default"));
-            } else {
+        for BindingItem {
+            iface,
+            iface_name,
+            name,
+            ..
+        } in impt_list.iter()
+        {
+            let binding_name = js_canon_name(iface_name.as_ref(), &name, "");
+            let binding_camel = name.to_lower_camel_case();
+            if *iface {
                 specifier_list.push(format!("import_{binding_name} as {binding_camel}"));
+            } else {
+                specifier_list.push(format!("import_{binding_name} as default"));
             }
-            i += 1;
         }
         let joined_bindings = specifier_list.join(", ");
         import_wrappers.push((
@@ -223,7 +233,15 @@ impl JsBindgen<'_> {
                         WorldItem::Interface(_) | WorldItem::Type(_) => unreachable!(),
                     };
                     let callee = js_canon_name(None, &func.name, "$source_mod.");
-                    self.export_bindgen(None, func.name.to_string(), &callee, options, func);
+                    self.export_bindgen(
+                        false,
+                        name.into(),
+                        None,
+                        func.name.to_string(),
+                        &callee,
+                        options,
+                        func,
+                    );
                 }
                 Export::Instance(exports) => {
                     let id = match item {
@@ -237,11 +255,13 @@ impl JsBindgen<'_> {
                             _ => unreachable!(),
                         };
                         let iface = &self.resolve.interfaces[id];
-                        let iface_camel = iface.name.as_ref().unwrap().to_lower_camel_case();
+                        let name_camel = name.to_lower_camel_case();
                         let func = &iface.functions[func_name];
                         let callee =
-                            js_canon_name(None, &func.name, &format!("$source_mod.{iface_camel}."));
+                            js_canon_name(None, &func.name, &format!("$source_mod.{name_camel}."));
                         self.export_bindgen(
+                            true,
+                            name.into(),
                             iface.name.to_owned(),
                             func.name.to_string(),
                             &callee,
@@ -265,13 +285,14 @@ impl JsBindgen<'_> {
             if let GlobalInitializer::LowerImport(import) = init {
                 let (import_index, path) = &self.component.imports[import.import];
                 let (import_name, _import_ty) = &self.component.import_types[*import_index];
-                let (func, iface_name, name, callee_name) =
+                let (func, iface, iface_name, name, callee_name) =
                     match &self.resolve.worlds[self.world].imports[import_name.as_str()] {
                         WorldItem::Function(f) => {
                             assert_eq!(path.len(), 0);
                             let fname = &f.name;
                             (
                                 f,
+                                false,
                                 None,
                                 fname.to_string(),
                                 js_canon_name(None, &fname, "$import_"),
@@ -280,14 +301,14 @@ impl JsBindgen<'_> {
                         WorldItem::Interface(i) => {
                             assert_eq!(path.len(), 1);
                             let iface = &self.resolve.interfaces[*i];
-                            let iface_name = iface.name.as_ref().unwrap();
                             let f = &iface.functions[&path[0]];
                             let fname = &f.name;
                             (
                                 f,
-                                Some(iface_name.to_string()),
+                                true,
+                                iface.name.clone(),
                                 fname.to_string(),
-                                js_canon_name(Some(iface_name), &fname, "$import_"),
+                                js_canon_name(iface.name.as_ref(), &fname, "$import_"),
                             )
                         }
                         WorldItem::Type(_) => unreachable!(),
@@ -308,12 +329,26 @@ impl JsBindgen<'_> {
                 self.src.push_str("\n");
 
                 let sig = self.resolve.wasm_signature(AbiVariant::GuestImport, func);
-                if let Some(iface_name) = iface_name {
-                    self.imports
-                        .push((Some(iface_name), name, self.core_fn(func, &sig)));
+
+                let component_item = if let Some(iface_name) = iface_name {
+                    BindingItem {
+                        iface,
+                        binding_name,
+                        iface_name: Some(iface_name),
+                        name,
+                        func: self.core_fn(func, &sig),
+                    }
                 } else {
-                    self.imports.push((None, name, self.core_fn(func, &sig)));
-                }
+                    BindingItem {
+                        iface,
+                        binding_name,
+                        iface_name: None,
+                        name,
+                        func: self.core_fn(func, &sig),
+                    }
+                };
+
+                self.imports.push((import_name.into(), component_item));
             }
         }
     }
@@ -376,13 +411,15 @@ impl JsBindgen<'_> {
 
     fn export_bindgen(
         &mut self,
-        iface_name: Option<String>,
+        iface: bool,
         name: String,
+        iface_name: Option<String>,
+        fn_name: String,
         callee: &str,
         options: &CanonicalOptions,
         func: &Function,
     ) {
-        let binding_name = js_canon_name(iface_name.as_ref(), &name, "export_");
+        let binding_name = js_canon_name(iface_name.as_ref(), &fn_name, "export_");
         uwrite!(self.src, "\nexport function {binding_name}");
 
         // exports are canonicalized as imports because
@@ -400,12 +437,17 @@ impl JsBindgen<'_> {
 
         // populate core function return info for splicer
         self.exports.push((
-            iface_name,
             name,
-            self.core_fn(
-                func,
-                &self.resolve.wasm_signature(AbiVariant::GuestExport, func),
-            ),
+            BindingItem {
+                iface,
+                binding_name,
+                iface_name,
+                name: fn_name,
+                func: self.core_fn(
+                    func,
+                    &self.resolve.wasm_signature(AbiVariant::GuestExport, func),
+                ),
+            },
         ));
     }
 

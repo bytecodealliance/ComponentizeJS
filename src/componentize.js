@@ -14,7 +14,7 @@ export async function componentize(
   jsSource,
   witWorld,
   {
-    debug = true,
+    debug = false,
     sourceName = "source.js",
     engine = fileURLToPath(
       new URL("../lib/spidermonkey_embedding.wasm", import.meta.url)
@@ -55,8 +55,8 @@ export async function componentize(
     EXPORT_CNT: exports.length.toString()
   };
 
-  for (const [idx, [iface, name, expt]] of exports.entries()) {
-    env[`EXPORT${idx}_NAME`] = `export_${iface ? iface + '$' : ''}${name}`;
+  for (const [idx, [export_name, expt]] of exports.entries()) {
+    env[`EXPORT${idx}_NAME`] = export_name;
     env[`EXPORT${idx}_ARGS`] = (expt.paramptr ? '*' : '') + expt.params.join(',');
     env[`EXPORT${idx}_RET`] = (expt.retptr ? '*' : '') + (expt.ret || '');
     env[`EXPORT${idx}_RETSIZE`] = String(expt.retsize);
@@ -117,6 +117,7 @@ export async function componentize(
   }
 
   const bin = await readFile(output);
+  // await writeFile('tmp.wasm', bin);
 
   const unlinkPromises = Promise.all([unlink(input), unlink(output)]).catch(
     () => {}
@@ -184,8 +185,9 @@ export async function componentize(
 
     for (const [importName, bindings] of imports) {
       mockImports[importName] = {};
-      for (const binding of bindings)
+      for (const binding of bindings) {
         mockImports[importName][binding] = eep(binding);
+      }
     }
 
     const { exports } = await WebAssembly.instantiate(module, mockImports);
@@ -290,7 +292,6 @@ export async function componentize(
     process.exit(1);
   }
 
-  await writeFile('tmp.wasm', bin);
   const component = await metadataAdd(await componentNew(bin, Object.entries({
     wasi_snapshot_preview1: await readFile(preview2Adapter)
   })), Object.entries({

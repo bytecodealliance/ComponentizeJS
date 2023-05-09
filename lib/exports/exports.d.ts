@@ -23,7 +23,7 @@ export interface CoreFn {
 export interface SpliceResult {
   wasm: Uint8Array,
   jsBindings: string,
-  exports: [string | null, string, CoreFn][],
+  exports: [string, CoreFn][],
   importWrappers: [string, string][],
   imports: [string, string[]][],
 }
