@@ -1,0 +1,11 @@
+{
+  "type": "module",
+  "devDependencies": {
+    "@bytecodealliance/jco": "*",
+    "@bytecodealliance/componentize-js": "*"
+  },
+  "scripts": {
+    "build": "node componentize.js && cargo build --release",
+    "test": "./target/release/wasmtime-test"
+  }
+}
