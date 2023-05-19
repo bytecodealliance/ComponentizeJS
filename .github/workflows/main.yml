@@ -27,10 +27,13 @@ jobs:
     - uses: actions/checkout@v2
       with:
         submodules: recursive
+
     - name: Install Rust
       run: rustup update stable --no-self-update && rustup default stable
+
     - name: Install wasm32-unknown-unknown target
       run: rustup target add wasm32-unknown-unknown
+
     - name: Install wasm32-wasi target
       run: rustup target add wasm32-wasi
 
@@ -62,6 +65,36 @@ jobs:
         tar xf wasi-sdk-20.0-linux.tar.gz
         sudo mkdir -p /opt/wasi-sdk
         sudo mv wasi-sdk-20.0/* /opt/wasi-sdk/
+
+    - name: Restore wasm-tools from cache
+      uses: actions/cache@v3
+      id: wasm-tools
+      with:
+        path: "/home/runner/.cargo/bin/wasm-tools"
+        key: crate-cache-wasm-tools
+
+    - name: Install wasm-tools
+      run: cargo install wasm-tools
+      if: steps.wasm-tools.outputs.cache-hit != 'true'
+
+    - name: Restore Spidermonkey from cache
+      uses: actions/cache@v3
+      id: sm-cache
+      with:
+        path: |
+          runtime/spidermonkey/${{ matrix.profile }}
+        key: cache-${{ hashFiles(
+            'runtime/spidermonkey/build-engine.sh',
+            'runtime/spidermonkey/gecko-revision',
+            'runtime/spidermonkey/object-files.list',
+            'runtime/rust-toolchain.toml'
+          ) }}-${{ matrix.profile }}
+
+    - name: Cache built Rust dependencies
+      uses: actions/cache@v3
+      with:
+        path: runtime/js-compute-runtime/rusturl
+        key: engine-cargo-${{ hashFiles('runtime/rust-toolchain.toml', 'runtime/js-compute-runtime/**/Cargo.lock') }}
 
     - uses: actions/setup-node@v2
       with:
