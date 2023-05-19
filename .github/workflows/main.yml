@@ -66,7 +66,11 @@ jobs:
         sudo mkdir -p /opt/wasi-sdk
         sudo mv wasi-sdk-20.0/* /opt/wasi-sdk/
 
-    - name: Restore wasm-tools from cache
+    - uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+
+    - name: Cache wasm-tools
       uses: actions/cache@v3
       id: wasm-tools
       with:
@@ -77,28 +81,31 @@ jobs:
       run: cargo install wasm-tools
       if: steps.wasm-tools.outputs.cache-hit != 'true'
 
-    - name: Restore Spidermonkey from cache
+    - name: Cache Spidermonkey
       uses: actions/cache@v3
       id: sm-cache
       with:
         path: |
-          runtime/spidermonkey/${{ matrix.profile }}
+          deps/js-compute-runtime/runtime/spidermonkey/${{ matrix.profile }}
         key: cache-${{ hashFiles(
-            'runtime/spidermonkey/build-engine.sh',
-            'runtime/spidermonkey/gecko-revision',
-            'runtime/spidermonkey/object-files.list',
-            'runtime/rust-toolchain.toml'
+            'deps/js-compute-runtime/runtime/spidermonkey/build-engine.sh',
+            'deps/js-compute-runtime/runtime/spidermonkey/gecko-revision',
+            'deps/js-compute-runtime/runtime/spidermonkey/object-files.list',
+            'deps/js-compute-runtime/runtime/rust-toolchain.toml'
           ) }}-${{ matrix.profile }}
 
-    - name: Cache built Rust dependencies
+    - name: Cache Rust dependencies
       uses: actions/cache@v3
       with:
-        path: runtime/js-compute-runtime/rusturl
-        key: engine-cargo-${{ hashFiles('runtime/rust-toolchain.toml', 'runtime/js-compute-runtime/**/Cargo.lock') }}
+        path: deps/js-compute-runtime/runtime/js-compute-deps/js-compute-runtime/runtime/rusturl
+        key: engine-cargo-${{ hashFiles('deps/js-compute-runtime/runtime/rust-toolchain.toml', 'deps/js-compute-runtime/runtime/js-compute-deps/js-compute-runtime/runtime/**/Cargo.lock') }}
 
-    - uses: actions/setup-node@v2
+    - name: Cache Example build
+      uses: actions/cache@v3
       with:
-        node-version: '16'
+        path: example/target
+        key: engine-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
+
     - name: Install NPM packages
       run: npm install
 
