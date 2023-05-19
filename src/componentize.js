@@ -2,7 +2,7 @@ import wizer from "@bytecodealliance/wizer";
 import { componentNew, metadataAdd, preview1AdapterReactorPath } from "@bytecodealliance/jco";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { resolve, join } from "node:path";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { exports } from "../lib/spidermonkey-embedding-splicer.js";
 import { fileURLToPath } from "node:url";
@@ -34,7 +34,7 @@ export async function componentize(
     sourceName,
     await readFile(engine),
     witWorld,
-    witPath,
+    resolve(witPath),
     worldName
   );
 
