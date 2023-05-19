@@ -92,7 +92,7 @@ jobs:
             'deps/js-compute-runtime/runtime/spidermonkey/gecko-revision',
             'deps/js-compute-runtime/runtime/spidermonkey/object-files.list',
             'deps/js-compute-runtime/runtime/rust-toolchain.toml'
-          ) }}-${{ matrix.profile }}
+          ) }}
 
     - name: Cache Rust dependencies
       uses: actions/cache@v3
