@@ -55,7 +55,6 @@ jobs:
         set -x
         export BINARYEN_VERSION=105
         curl -sS -L "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz" | tar xzf - &&
-        mv "$PWD/binaryen-version_${BINARYEN_VERSION}/bin/wasm-opt" "$PWD/binaryen-version_${BINARYEN_VERSION}/bin/wasm-opt-manual"
         echo "$PWD/binaryen-version_${BINARYEN_VERSION}/bin" >> $GITHUB_PATH
 
     - name: "Install wasi-sdk-20 (linux)"
