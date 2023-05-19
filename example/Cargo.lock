@@ -1592,34 +1592,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
-name = "wasi-cap-std-sync"
-version = "0.0.0"
-source = "git+https://github.com/bytecodealliance/preview2-prototyping?rev=dd34a00d4386000cd00071cff18b9e3a12788075#dd34a00d4386000cd00071cff18b9e3a12788075"
-dependencies = [
- "anyhow",
- "async-trait",
- "cap-fs-ext",
- "cap-net-ext",
- "cap-rand",
- "cap-std",
- "cap-time-ext",
- "fs-set-times",
- "io-extras",
- "io-lifetimes",
- "ipnet",
- "is-terminal",
- "once_cell",
- "rustix 0.37.19",
- "system-interface",
- "tracing",
- "wasi-common",
- "windows-sys 0.48.0",
-]
-
-[[package]]
 name = "wasi-common"
 version = "0.0.0"
-source = "git+https://github.com/bytecodealliance/preview2-prototyping?rev=dd34a00d4386000cd00071cff18b9e3a12788075#dd34a00d4386000cd00071cff18b9e3a12788075"
+source = "git+https://github.com/bytecodealliance/preview2-prototyping?rev=5be99d645c177198b9f5e4d76561669796f7b379#5be99d645c177198b9f5e4d76561669796f7b379"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1627,6 +1602,8 @@ dependencies = [
  "cap-fs-ext",
  "cap-rand",
  "cap-std",
+ "cap-time-ext",
+ "fs-set-times",
  "io-extras",
  "rustix 0.37.19",
  "system-interface",
@@ -1977,7 +1954,6 @@ dependencies = [
  "anyhow",
  "async-std",
  "cap-std",
- "wasi-cap-std-sync",
  "wasi-common",
  "wasmtime",
  "wasmtime-wasi-sockets",
@@ -1998,7 +1974,7 @@ dependencies = [
 [[package]]
 name = "wasmtime-wasi-sockets"
 version = "0.1.0"
-source = "git+https://github.com/bytecodealliance/preview2-prototyping?rev=dd34a00d4386000cd00071cff18b9e3a12788075#dd34a00d4386000cd00071cff18b9e3a12788075"
+source = "git+https://github.com/bytecodealliance/preview2-prototyping?rev=5be99d645c177198b9f5e4d76561669796f7b379#5be99d645c177198b9f5e4d76561669796f7b379"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2015,7 +1991,7 @@ dependencies = [
 [[package]]
 name = "wasmtime-wasi-sockets-sync"
 version = "0.1.0"
-source = "git+https://github.com/bytecodealliance/preview2-prototyping?rev=dd34a00d4386000cd00071cff18b9e3a12788075#dd34a00d4386000cd00071cff18b9e3a12788075"
+source = "git+https://github.com/bytecodealliance/preview2-prototyping?rev=5be99d645c177198b9f5e4d76561669796f7b379#5be99d645c177198b9f5e4d76561669796f7b379"
 dependencies = [
  "anyhow",
  "async-trait",

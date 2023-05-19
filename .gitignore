@@ -8,3 +8,4 @@ target/
 /shared
 example/package-lock.json
 example/hello.component.wasm
+/test/wit/deps
