@@ -48,7 +48,7 @@ pub fn splice(
     imports: Vec<(String, String, CoreFn, Option<i32>)>,
     exports: Vec<(String, CoreFn)>,
 ) -> Result<Vec<u8>, String> {
-    init();
+    // init();
 
     let mut validator = Validator::new();
     match validator.validate_all(&engine) {
@@ -233,7 +233,7 @@ pub fn splice(
             Payload::Version { .. } => {}
             Payload::TypeSection(type_section_reader) => {
                 if DEBUG {
-                    console::log(&format!("Type ({:?})", type_section_reader.range()));
+                    println!("Type ({:?})", type_section_reader.range());
                 }
                 for core_type in type_section_reader {
                     match core_type.map_err(|e| format!("Splice error:\n{:?}", e))? {
@@ -248,17 +248,25 @@ pub fn splice(
             }
             Payload::ImportSection(impt_section_reader) => {
                 if DEBUG {
-                    console::log(&format!("Import ({:?})", impt_section_reader.range()));
+                    println!("Import ({:?})", impt_section_reader.range());
                 }
                 for import in impt_section_reader {
                     let wasmparser::Import { module, name, ty } =
                         import.map_err(|e| format!("Splice error:\n{:?}", e))?;
-                    import_section.import(module, name, ty_map(&ty));
+                    import_section.import(
+                        if module == "wasi_snapshot_preview" {
+                            "wasi_snapshot_preview1_internal"
+                        } else {
+                            module
+                        },
+                        name,
+                        ty_map(&ty),
+                    );
                 }
             }
             Payload::FunctionSection(fn_section_reader) => {
                 if DEBUG {
-                    console::log(&format!("Function ({:?})", fn_section_reader.range()));
+                    println!("Function ({:?})", fn_section_reader.range());
                 }
                 let mut skipped_coreabi_sample_fn_cnt = 0;
                 for func in fn_section_reader {
@@ -275,7 +283,7 @@ pub fn splice(
             }
             Payload::TableSection(table_section_reader) => {
                 if DEBUG {
-                    console::log(&format!("Table ({:?})", table_section_reader.range()));
+                    println!("Table ({:?})", table_section_reader.range());
                 }
                 for table in table_section_reader {
                     let wasmparser::Table { ty, init: _ } =
@@ -298,7 +306,7 @@ pub fn splice(
             }
             Payload::MemorySection(memory_section_reader) => {
                 if DEBUG {
-                    console::log(&format!("Memory ({:?})", memory_section_reader.range()));
+                    println!("Memory ({:?})", memory_section_reader.range());
                 }
                 for memory in memory_section_reader {
                     let wasmparser::MemoryType {
@@ -317,7 +325,7 @@ pub fn splice(
             }
             Payload::TagSection(tag_section_reader) => {
                 if DEBUG {
-                    console::log(&format!("Tag ({:?})", tag_section_reader.range()));
+                    println!("Tag ({:?})", tag_section_reader.range());
                 }
                 for tag in tag_section_reader {
                     let wasmparser::TagType {
@@ -334,14 +342,14 @@ pub fn splice(
             }
             Payload::GlobalSection(global_section_reader) => {
                 if DEBUG {
-                    console::log(&format!("Global ({:?})", global_section_reader.range()));
+                    println!("Global ({:?})", global_section_reader.range());
                 }
                 let range = global_section_reader.range();
                 global_section.raw(&engine[range.start + 1..range.end]);
             }
             Payload::ExportSection(export_section_reader) => {
                 if DEBUG {
-                    console::log(&format!("Export ({:?})", export_section_reader.range()));
+                    println!("Export ({:?})", export_section_reader.range());
                 }
                 for export in export_section_reader.into_iter() {
                     let wasmparser::Export { name, kind, index } =
@@ -382,7 +390,7 @@ pub fn splice(
             }
             Payload::StartSection { func, .. } => {
                 if DEBUG {
-                    console::log(&format!("Start"));
+                    println!("Start");
                 }
                 start_section = Some(StartSection {
                     // (4) Function index offsetting
@@ -398,7 +406,7 @@ pub fn splice(
             }
             Payload::ElementSection(el_section_reader) => {
                 if DEBUG {
-                    console::log(&format!("Element ({:?})", el_section_reader.range()));
+                    println!("Element ({:?})", el_section_reader.range());
                 }
 
                 if element_section_tablefns.len() > 0 {
@@ -485,7 +493,7 @@ pub fn splice(
             Payload::CodeSectionEntry(parse_func) => {
                 if DEBUG {
                     // if parse_func.range().start < 40000 {
-                    //     console::log(&format!("Code ({:?})", parse_func.range()));
+                    //     println!("Code ({:?})", parse_func.range());
                     // }
                 }
                 let mut locals: Vec<(u32, ValType)> = Vec::new();
@@ -506,7 +514,7 @@ pub fn splice(
                     //     .get_operators_reader()
                     //     .map_err(|e| format!("Splice error:\n{:?}", e))?
                     // {
-                    //     console::log(&format!("OP: {:?}", op.unwrap()));
+                    //     println!("OP: {:?}", op.unwrap());
                     // }
                     // first four functions are the 4 sample functions
                     // these are processed to extract the template and removed
@@ -549,7 +557,7 @@ pub fn splice(
                             //     .get_operators_reader()
                             //     .map_err(|e| format!("Splice error:\n{:?}", e))?
                             // {
-                            //     console::log(&format!(":OP: {:?}", op.unwrap()));
+                            //     println!(":OP: {:?}", op.unwrap());
                             // }
                             let op = op_reader
                                 .read()
@@ -612,7 +620,7 @@ pub fn splice(
                         //     .get_operators_reader()
                         //     .map_err(|e| format!("Splice error:\n{:?}", e))?
                         // {
-                        //     console::log(&format!("OP: {:?}", op.unwrap()));
+                        //     println!("OP: {:?}", op.unwrap());
                         // }
 
                         // abort is the first call
@@ -696,7 +704,7 @@ pub fn splice(
                         let mut func = Function::new(locals);
 
                         if DEBUG {
-                            console::log("> COREABI IMPORT GATE FN");
+                            println!("> COREABI IMPORT GATE FN");
                         }
 
                         if imports.len() > 0 {
@@ -748,7 +756,7 @@ pub fn splice(
                         add_instruction(&mut func, &Instruction::End);
 
                         if DEBUG {
-                            console::log("< COREABI IMPORT GATE FN");
+                            println!("< COREABI IMPORT GATE FN");
                         }
 
                         code.function(&func);
@@ -788,12 +796,12 @@ pub fn splice(
                 // .get_operators_reader()
                 // .map_err(|e| format!("Splice error:\n{:?}", e))?
                 // {
-                //     console::log(&format!("OP: {:?}", op.unwrap()));
+                //     println!("OP: {:?}", op.unwrap());
                 // }
             }
             Payload::DataSection(data_section_reader) => {
                 if DEBUG {
-                    console::log(&format!("Data ({:?})", data_section_reader.range()));
+                    println!("Data ({:?})", data_section_reader.range());
                 }
                 let mut section = DataSection::new();
                 for item in data_section_reader.into_iter_with_offsets() {
@@ -829,7 +837,7 @@ pub fn splice(
             }
             Payload::CustomSection(custom_section_reader) => {
                 if DEBUG {
-                    console::log(&format!("Custom ({:?})", custom_section_reader.range()));
+                    println!("Custom ({:?})", custom_section_reader.range());
                 }
 
                 // (https://github.com/gimli-rs/gimli)
@@ -865,7 +873,7 @@ pub fn splice(
     let mut post_call_ty_idx: Option<u32> = None;
     for (export_num, (expt_name, expt_sig)) in exports.iter().enumerate() {
         if DEBUG {
-            console::log(&format!("> EXPORT {} > {:?}", expt_name, &expt_sig));
+            println!("> EXPORT {} > {:?}", expt_name, &expt_sig);
         }
         // Export function synthesis
         let call_idx = code.len() + import_fn_cnt + imports.len() as u32;
@@ -1078,7 +1086,7 @@ pub fn splice(
             add_instruction(&mut func, &Instruction::End);
 
             if DEBUG {
-                console::log(&format!("< EXPORT {}", expt_name));
+                println!("< EXPORT {}", expt_name);
             }
 
             code.function(&func);
@@ -1088,7 +1096,7 @@ pub fn splice(
         let post_call_idx = code.len() + import_fn_cnt + imports.len() as u32;
         {
             if DEBUG {
-                console::log(&format!("< EXPORT POST CALL {}", expt_name));
+                println!("< EXPORT POST CALL {}", expt_name);
             }
 
             // add the function type
@@ -1123,7 +1131,7 @@ pub fn splice(
             add_instruction(&mut func, &Instruction::End);
 
             if DEBUG {
-                console::log(&format!("> EXPORT POST CALL {}", expt_name));
+                println!("> EXPORT POST CALL {}", expt_name);
             }
 
             code.function(&func);
@@ -1153,10 +1161,10 @@ pub fn splice(
 
         for (impt_specifier, impt_name, impt_sig, retptr_size) in imports.iter() {
             if DEBUG {
-                console::log(&format!(
+                println!(
                     "> IMPORT {} {} > {:?}",
                     impt_specifier, impt_name, &impt_sig
-                ));
+                );
             }
 
             // add the imported function type
@@ -1335,7 +1343,7 @@ pub fn splice(
             element_section_tablefns.push(code.len() + import_fn_cnt + imports_offset - 1);
 
             if DEBUG {
-                console::log(&format!("< IMPORT {} {}", impt_specifier, impt_name));
+                println!("< IMPORT {} {}", impt_specifier, impt_name);
             }
         }
     }
@@ -1374,7 +1382,7 @@ pub fn splice(
     match validator.validate_all(&out) {
         Ok(_) => {}
         Err(e) => {
-            console::log(&format!("Output validation error: {:?}", e));
+            println!("Output validation error: {:?}", e);
             // return Err(Errno::Unknown);
         }
     }
@@ -1384,7 +1392,7 @@ pub fn splice(
 
 fn add_instruction(func: &mut Function, op: &Instruction) {
     if DEBUG {
-        console::log(&format!("OP: {:?}", &op));
+        println!("OP: {:?}", &op);
     }
     func.instruction(op);
 }
@@ -1424,6 +1432,14 @@ fn heap_ty_map(heap_type: &wasmparser::HeapType) -> HeapType {
         wasmparser::HeapType::TypedFunc(f) => HeapType::TypedFunc((*f).into()),
         wasmparser::HeapType::Func => HeapType::Func,
         wasmparser::HeapType::Extern => HeapType::Extern,
+        wasmparser::HeapType::Any => HeapType::Any,
+        wasmparser::HeapType::None => HeapType::None,
+        wasmparser::HeapType::NoExtern => HeapType::NoExtern,
+        wasmparser::HeapType::NoFunc => HeapType::NoFunc,
+        wasmparser::HeapType::Eq => HeapType::Eq,
+        wasmparser::HeapType::Struct => HeapType::Struct,
+        wasmparser::HeapType::Array => HeapType::Array,
+        wasmparser::HeapType::I31 => HeapType::I31,
     }
 }
 
@@ -2237,5 +2253,8 @@ fn op_map<'a>(op: &wasmparser::Operator) -> Instruction<'a> {
         wasmparser::Operator::I32x4RelaxedDotI8x16I7x16AddS => {
             Instruction::I32x4RelaxedDotI8x16I7x16AddS
         }
+        wasmparser::Operator::I31New => todo!(),
+        wasmparser::Operator::I31GetS => todo!(),
+        wasmparser::Operator::I31GetU => todo!(),
     }
 }

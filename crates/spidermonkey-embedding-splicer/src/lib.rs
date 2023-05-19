@@ -1,5 +1,6 @@
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use bindgen::BindingItem;
+use std::path::{Path, PathBuf};
 use wasmtime_environ::{
     component::{ComponentTypesBuilder, Translator},
     wasmparser::{Validator, WasmFeatures},
@@ -7,10 +8,9 @@ use wasmtime_environ::{
 };
 mod bindgen;
 
-use std::{path::PathBuf, sync::Once};
 use wasm_encoder::{Encode, Section};
 use wit_component::{ComponentEncoder, StringEncoding};
-use wit_parser::{self, Resolve, UnresolvedPackage, WorldId};
+use wit_parser::{self, PackageId, Resolve, UnresolvedPackage};
 
 wit_bindgen::generate!("spidermonkey-embedding-splicer");
 
@@ -47,16 +47,16 @@ macro_rules! uwriteln {
 
 mod splice;
 
-fn init() {
-    static INIT: Once = Once::new();
-    INIT.call_once(|| {
-        let prev_hook = std::panic::take_hook();
-        std::panic::set_hook(Box::new(move |info| {
-            console::error(&info.to_string());
-            prev_hook(info);
-        }));
-    });
-}
+// fn init() {
+//     static INIT: Once = Once::new();
+//     INIT.call_once(|| {
+//         let prev_hook = std::panic::take_hook();
+//         std::panic::set_hook(Box::new(move |info| {
+//             console::error(&info.to_string());
+//             prev_hook(info);
+//         }));
+//     });
+// }
 
 fn map_core_ty(cty: &bindgen::CoreTy) -> CoreTy {
     match cty {
@@ -87,42 +87,52 @@ fn map_core_fn(cfn: &bindgen::CoreFn) -> CoreFn {
     }
 }
 
+fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
+    let mut resolve = Resolve::default();
+    let id = if path.is_dir() {
+        resolve.push_dir(&path)?.0
+    } else {
+        let contents =
+            std::fs::read(&path).with_context(|| format!("failed to read file {path:?}"))?;
+        let text = match std::str::from_utf8(&contents) {
+            Ok(s) => s,
+            Err(_) => bail!("input file is not valid utf-8"),
+        };
+        let pkg = UnresolvedPackage::parse(&path, text)?;
+        resolve.push(pkg, &Default::default())?
+    };
+    Ok((resolve, id))
+}
+
 impl exports::Exports for SpidermonkeyEmbeddingSplicer {
     fn splice_bindings(
         source_name: Option<String>,
         engine: Vec<u8>,
-        wit_world: String,
+        wit_source: Option<String>,
         wit_path: Option<String>,
+        world_name: Option<String>,
     ) -> Result<SpliceResult, String> {
-        init();
+        // init();
 
         let source_name = source_name.unwrap_or("source.js".to_string());
-        let mut resolve = Resolve::default();
 
-        let world: WorldId = {
-            // synthesise a dummy component from the provided wit
-            let path = PathBuf::from(wit_path.as_deref().unwrap_or("component.wit"));
+        let (resolve, id) = if let Some(wit_source) = wit_source {
+            let mut resolve = Resolve::default();
+            let path = PathBuf::from("component.wit");
+            let pkg = UnresolvedPackage::parse(&path, &wit_source).map_err(|e| e.to_string())?;
 
-            // TODO: support resolution via parse_file and WASI preview2 support for the JS component
-            let pkg = UnresolvedPackage::parse(&path, &wit_world).map_err(|e| e.to_string())?;
             let id = resolve
                 .push(pkg, &Default::default())
                 .map_err(|e| e.to_string())?;
 
-            let docs = &resolve.packages[id];
-            let (_, doc) = docs.documents.first().unwrap();
-
-            let world = match resolve.documents[*doc].default_world {
-                Some(world) => world,
-                None => return Err("no default world found in document".into()),
-            };
-
-            // for (name, wasm) in adapters.iter() {
-            //     encoder = encoder.adapter(name, wasm)?;
-            // }
-
-            world
+            (resolve, id)
+        } else {
+            parse_wit(&PathBuf::from(wit_path.unwrap())).map_err(|e| e.to_string())?
         };
+
+        let world = resolve
+            .select_world(id, world_name.as_deref())
+            .map_err(|e| e.to_string())?;
 
         let encoded = wit_component::metadata::encode(&resolve, world, StringEncoding::UTF8, None)
             .map_err(|e| e.to_string())?;
@@ -224,40 +234,41 @@ impl exports::Exports for SpidermonkeyEmbeddingSplicer {
         }
 
         let mut imports = Vec::new();
-        for (specifier, imported) in &componentized.imports {
-            for BindingItem {
+        for (
+            specifier,
+            BindingItem {
                 name, func, iface, ..
-            } in imported
-            {
-                if *iface {
-                    imports.push((
-                        specifier.to_string(),
-                        name.to_string(),
-                        map_core_fn(func),
-                        if func.retsize > 0 {
-                            Some(func.retsize as i32)
-                        } else {
-                            None
-                        },
-                    ));
-                } else {
-                    imports.push((
-                        specifier.to_string(),
-                        "default".into(),
-                        map_core_fn(func),
-                        if func.retsize > 0 {
-                            Some(func.retsize as i32)
-                        } else {
-                            None
-                        },
-                    ));
-                }
+            },
+        ) in &componentized.imports
+        {
+            if *iface {
+                imports.push((
+                    specifier.to_string(),
+                    name.to_string(),
+                    map_core_fn(func),
+                    if func.retsize > 0 {
+                        Some(func.retsize as i32)
+                    } else {
+                        None
+                    },
+                ));
+            } else {
+                imports.push((
+                    specifier.to_string(),
+                    "default".into(),
+                    map_core_fn(func),
+                    if func.retsize > 0 {
+                        Some(func.retsize as i32)
+                    } else {
+                        None
+                    },
+                ));
             }
         }
 
-        // console::log(&format!("{:?}", &imports));
-        // console::log(&format!("{:?}", &componentized.imports));
-        // console::log(&format!("{:?}", &exports));
+        // println!("{:?}", &imports);
+        // println!("{:?}", &componentized.imports);
+        // println!("{:?}", &exports);
         let mut wasm = splice::splice(engine, imports, exports)?;
 
         // add the world section to the spliced wasm
@@ -281,19 +292,14 @@ impl exports::Exports for SpidermonkeyEmbeddingSplicer {
             imports: componentized
                 .imports
                 .iter()
-                .map(|(specifier, imports)| {
+                .map(|(specifier, BindingItem { name, iface, .. })| {
                     (
                         specifier.to_string(),
-                        imports
-                            .iter()
-                            .map(|BindingItem { name, iface, .. }| {
-                                if *iface {
-                                    name.to_string()
-                                } else {
-                                    "default".into()
-                                }
-                            })
-                            .collect(),
+                        if *iface {
+                            name.to_string()
+                        } else {
+                            "default".into()
+                        },
                     )
                 })
                 .collect(),

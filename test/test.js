@@ -1,8 +1,9 @@
 import { componentize } from '@bytecodealliance/componentize-js';
-import { transpile } from '@bytecodealliance/jco';
+import { transpile, componentEmbed } from '@bytecodealliance/jco';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { strictEqual } from 'node:assert';
 
 // import { setLevel } from './wasi/logging.js';
 // setLevel('debug');
@@ -103,4 +104,32 @@ suite('Bindings', () => {
       await test.test(instance);
     });
   }
+});
+
+suite('WASI', () => {
+  test('basic app', async () => {
+    const { component } = await componentize(`
+      import { now } from 'wall-clock';
+      import { getRandomBytes } from 'random';
+
+      export function test () {
+        return \`NOW: \${now().seconds}, RANDOM: \${getRandomBytes(2n)}\`;
+      }
+    `, {
+      witPath: fileURLToPath(new URL('./wit', import.meta.url)),
+      worldName: 'test1'
+    });
+
+    const { files } = await transpile(component);
+    await mkdir(new URL(`./output/wasi/imports`, import.meta.url), { recursive: true });
+    await mkdir(new URL(`./output/wasi/exports`, import.meta.url), { recursive: true });
+    for (const file of Object.keys(files)) {
+      await writeFile(new URL(`./output/wasi/${file}`, import.meta.url), files[file]);
+    }
+
+    var instance = await import(`./output/wasi/component.js`);
+    const result = instance.test();
+    strictEqual(result.slice(0, 10), `NOW: ${String(Date.now()).slice(0, 5)}`);
+    strictEqual(result.split(',').length, 3);
+  });
 });

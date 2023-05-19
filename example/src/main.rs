@@ -1,6 +1,5 @@
 use anyhow::Result;
-use wasi_cap_std_sync::WasiCtxBuilder;
-use wasi_common::{wasi, Table, WasiCtx, WasiView};
+use wasi_common::{wasi, Table, WasiCtx, WasiCtxBuilder, WasiView};
 use wasmtime::{
     component::{Component, Linker},
     Config, Engine, Store, WasmBacktraceDetails,
@@ -30,7 +29,6 @@ async fn main() -> Result<()> {
     let mut linker = Linker::new(&engine);
 
     let component = Component::from_file(&engine, "hello.component.wasm").unwrap();
-
 
     struct CommandCtx {
         table: Table,
@@ -70,6 +68,7 @@ async fn main() -> Result<()> {
     }
 
     wasi::command::add_to_linker(&mut linker)?;
+    wasmtime_wasi_sockets::add_to_linker(&mut linker)?;
     let mut store = Store::new(
         &engine,
         CommandCtx {

@@ -62,7 +62,7 @@ pub struct CoreFn {
 pub struct Componentization {
     pub js_bindings: String,
     pub exports: Vec<(String, BindingItem)>,
-    pub imports: BTreeMap<String, Vec<BindingItem>>,
+    pub imports: Vec<(String, BindingItem)>,
     pub import_wrappers: Vec<(String, String)>,
 }
 
@@ -137,18 +137,17 @@ pub fn componentize_bindgen(
     let mut import_bindings = Vec::new();
     let mut import_wrappers = Vec::new();
     let mut imports = BTreeMap::new();
-    for (specifier, item) in bindgen.imports {
-        if !imports.contains_key(&specifier) {
+    for (specifier, item) in bindgen.imports.iter() {
+        if !imports.contains_key(specifier) {
             imports.insert(specifier.to_string(), Vec::new());
         }
-        let impt_list = imports.get_mut(&specifier).unwrap();
+        let impt_list = imports.get_mut(specifier).unwrap();
 
         // this import binding order matters
         let binding_name = js_canon_name(item.iface_name.as_ref(), &item.name, "");
         import_bindings.push(binding_name);
 
         impt_list.push(item);
-
         // let import_name = if item.iface_name.is_some() { name } else { "".into() };
     }
 
@@ -213,7 +212,7 @@ pub fn componentize_bindgen(
     Componentization {
         js_bindings: output.to_string(),
         exports: bindgen.exports,
-        imports,
+        imports: bindgen.imports,
         import_wrappers,
     }
 }

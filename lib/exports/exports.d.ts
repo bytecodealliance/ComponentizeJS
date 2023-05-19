@@ -1,5 +1,5 @@
 export namespace Exports {
-  export function spliceBindings(sourceName: string | null, spidermonkeyEngine: Uint8Array | ArrayBuffer, witWorld: string, witPath: string | null): SpliceResult;
+  export function spliceBindings(sourceName: string | null, spidermonkeyEngine: Uint8Array | ArrayBuffer, witWorld: string | null, witPath: string | null, worldName: string | null): SpliceResult;
 }
 /**
  * # Variants
@@ -25,5 +25,5 @@ export interface SpliceResult {
   jsBindings: string,
   exports: [string, CoreFn][],
   importWrappers: [string, string][],
-  imports: [string, string[]][],
+  imports: [string, string][],
 }

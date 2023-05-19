@@ -1,10 +1,11 @@
 import { componentize } from '@bytecodealliance/componentize-js';
 import { readFile, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'url';
+import { resolve } from 'node:path';
 
 const jsSource = await readFile('hello.js', 'utf8');
-const witSource = await readFile('hello.wit', 'utf8');
 
-const { component } = await componentize(jsSource, witSource);
+const { component } = await componentize(jsSource, {
+  witPath: resolve('hello.wit')
+});
 
 await writeFile('hello.component.wasm', component);

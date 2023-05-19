@@ -90,7 +90,9 @@ The component iself can be executed in any component runtime, see the [example](
 ## API
 
 ```js
-componentize(jsSource: string, wit: string, {
+componentize(jsSource: string, {
+  witPath: string,
+  worldName: string,
   debug?: bool,
   sourceName?: string,
   engine?: string,

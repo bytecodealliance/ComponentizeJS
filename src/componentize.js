@@ -2,7 +2,7 @@ import wizer from "@bytecodealliance/wizer";
 import { componentNew, metadataAdd, preview1AdapterReactorPath } from "@bytecodealliance/jco";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { resolve, join } from "node:path";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { exports } from "../lib/spidermonkey-embedding-splicer.js";
 import { fileURLToPath } from "node:url";
@@ -13,19 +13,29 @@ const { spliceBindings } = exports;
 export async function componentize(
   jsSource,
   witWorld,
-  {
+  opts
+) {
+  if (typeof witWorld === 'object') {
+    opts = witWorld;
+    witWorld = null;
+  }
+  const {
     debug = false,
     sourceName = "source.js",
     engine = fileURLToPath(
       new URL("../lib/spidermonkey_embedding.wasm", import.meta.url)
     ),
-    preview2Adapter = preview1AdapterReactorPath()
-  } = {}
-) {
+    preview2Adapter = preview1AdapterReactorPath(),
+    witPath,
+    worldName
+  } = opts || {};
+
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
     sourceName,
     await readFile(engine),
-    witWorld
+    witWorld,
+    witPath ? resolve(witPath) : null,
+    worldName
   );
 
   if (debug) {
@@ -68,14 +78,10 @@ export async function componentize(
     wizerInput += importWrapper;
   }
 
-  let idx = 0;
-  for (const [, specifiers] of imports) {
-    for (const name of specifiers) {
-      env[`IMPORT${idx}_NAME`] = name;
-      idx++;
-    }
+  for (let i = 0; i < imports.length; i++) {
+    env[`IMPORT${i}_NAME`] = imports[i][1];
   }
-  env['IMPORT_CNT'] = idx;
+  env['IMPORT_CNT'] = imports.length;
 
   if (debug) {
     console.log('--- Wizer Env ---');
@@ -117,7 +123,6 @@ export async function componentize(
   }
 
   const bin = await readFile(output);
-  // await writeFile('tmp.wasm', bin);
 
   const unlinkPromises = Promise.all([unlink(input), unlink(output)]).catch(
     () => {}
@@ -126,7 +131,6 @@ export async function componentize(
   // Check for initialization errors
   // By actually executing the binary in a mini sandbox to get back
   // the initialization state
-
   const {
     exports: { check_init },
     getStderr,
@@ -183,11 +187,9 @@ export async function componentize(
       },
     };
 
-    for (const [importName, bindings] of imports) {
-      mockImports[importName] = {};
-      for (const binding of bindings) {
-        mockImports[importName][binding] = eep(binding);
-      }
+    for (const [importName, binding] of imports) {
+      mockImports[importName] = mockImports[importName] || {};
+      mockImports[importName][binding] = eep(binding);
     }
 
     const { exports } = await WebAssembly.instantiate(module, mockImports);
@@ -294,7 +296,7 @@ export async function componentize(
 
   const component = await metadataAdd(await componentNew(bin, Object.entries({
     wasi_snapshot_preview1: await readFile(preview2Adapter)
-  })), Object.entries({
+  }), false), Object.entries({
     language: [['JavaScript', '']],
     'processed-by': [['ComponentizeJS', version]],
   }));
