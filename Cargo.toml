@@ -1,6 +1,9 @@
 [workspace]
 members = ["crates/spidermonkey-embedding-splicer"]
-exclude = ["deps/js-compute-runtime/c-dependencies/js-compute-runtime/rust-url"]
+exclude = [
+  "deps/js-compute-runtime/runtime/js-compute-runtime/rust-url",
+  "deps/js-compute-runtime/runtime/js-compute-runtime/rust-encoding"
+]
 resolver = "2"
 
 [workspace.package]

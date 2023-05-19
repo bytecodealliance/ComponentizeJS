@@ -396,12 +396,7 @@ __attribute__((export_name("wizer.initialize"))) void init()
   }
   JS::RealmOptions realm_options;
   realm_options.creationOptions()
-      // .setFreezeBuiltins(true)
       .setStreamsEnabled(true)
-      .setReadableByteStreamsEnabled(true)
-      .setBYOBStreamReadersEnabled(true)
-      .setReadableStreamPipeToEnabled(true)
-      .setWritableStreamsEnabled(true)
       .setWeakRefsEnabled(JS::WeakRefSpecifier::EnabledWithoutCleanupSome);
 
   JS::DisableIncrementalGC(R.cx);

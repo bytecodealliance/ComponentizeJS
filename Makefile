@@ -22,8 +22,8 @@ ifndef WASM_TOOLS
 	WASM_TOOLS = $(error No wasm-tools in PATH. First run "cargo install wasm-tools")
 endif
 
-SM_SRC := deps/js-compute-runtime/c-dependencies/spidermonkey/release
-JSCR_SRC := deps/js-compute-runtime/c-dependencies/js-compute-runtime
+SM_SRC := deps/js-compute-runtime/runtime/spidermonkey/release
+JSCR_SRC := deps/js-compute-runtime/runtime/js-compute-runtime
 
 CXX_FLAGS := -std=gnu++20 -Wall -Werror -Qunused-arguments
 CXX_FLAGS += -fno-sized-deallocation -fno-aligned-new -mthread-model single
@@ -72,7 +72,7 @@ lib:
 	mkdir -p lib
 
 $(SM_SRC):
-	cd deps/js-compute-runtime/c-dependencies/spidermonkey && ./download-engine.sh
+	cd deps/js-compute-runtime/runtime/spidermonkey && ./download-engine.sh
 
 obj/builtins:
 	mkdir -p obj/builtins
