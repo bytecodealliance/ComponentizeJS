@@ -70,23 +70,29 @@ jobs:
       with:
         node-version: '16'
 
-    - name: Cache wasm-tools
-      uses: actions/cache@v3
-      id: wasm-tools
+    - name: Restore wasm-tools
+      id: wasm-tools-restore
+      uses: actions/cache/restore@v3
       with:
-        path: "/home/runner/.cargo/bin/wasm-tools"
+        path: /home/runner/.cargo/bin/wasm-tools
         key: crate-cache-wasm-tools
 
     - name: Install wasm-tools
       run: cargo install wasm-tools
-      if: steps.wasm-tools.outputs.cache-hit != 'true'
+      if: steps.wasm-tools-restore.outputs.cache-hit != 'true'
 
-    - name: Cache Spidermonkey
-      uses: actions/cache@v3
-      id: sm-cache
+    - name: Cache wasm-tools
+      uses: actions/cache/save@v3
       with:
-        path: |
-          deps/js-compute-runtime/runtime/spidermonkey/${{ matrix.profile }}
+        path: /home/runner/.cargo/bin/wasm-tools
+        key: crate-cache-wasm-tools
+      if: steps.wasm-tools-restore.outputs.cache-hit != 'true'
+
+    - name: Restore Spidermonkey
+      uses: actions/cache/restore@v3
+      id: sm-restore
+      with:
+        path: deps/js-compute-runtime/runtime/spidermonkey
         key: cache-${{ hashFiles(
             'deps/js-compute-runtime/runtime/spidermonkey/build-engine.sh',
             'deps/js-compute-runtime/runtime/spidermonkey/gecko-revision',
@@ -94,17 +100,12 @@ jobs:
             'deps/js-compute-runtime/runtime/rust-toolchain.toml'
           ) }}
 
-    - name: Cache Rust dependencies
-      uses: actions/cache@v3
+    - name: Restore Rust dependencies
+      uses: actions/cache/restore@v3
+      id: rust-restore
       with:
         path: deps/js-compute-runtime/runtime/js-compute-deps/js-compute-runtime/runtime/rusturl
         key: engine-cargo-${{ hashFiles('deps/js-compute-runtime/runtime/rust-toolchain.toml', 'deps/js-compute-runtime/runtime/js-compute-deps/js-compute-runtime/runtime/**/Cargo.lock') }}
-
-    - name: Cache Example build
-      uses: actions/cache@v3
-      with:
-        path: example/target
-        key: engine-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
 
     - name: Install NPM packages
       run: npm install
@@ -112,11 +113,44 @@ jobs:
     - name: Build
       run: npm run build
 
+    - name: Cache Spidermonkey
+      uses: actions/cache/save@v3
+      with:
+        path: deps/js-compute-runtime/runtime/spidermonkey
+        key: cache-${{ hashFiles(
+            'deps/js-compute-runtime/runtime/spidermonkey/build-engine.sh',
+            'deps/js-compute-runtime/runtime/spidermonkey/gecko-revision',
+            'deps/js-compute-runtime/runtime/spidermonkey/object-files.list',
+            'deps/js-compute-runtime/runtime/rust-toolchain.toml'
+          ) }}
+      if: steps.sm-restore.outputs.cache-hit != 'true'
+
+    - name: Cache Rust dependencies
+      uses: actions/cache/save@v3
+      with:
+        path: deps/js-compute-runtime/runtime/js-compute-deps/js-compute-runtime/runtime/rusturl
+        key: engine-cargo-${{ hashFiles('deps/js-compute-runtime/runtime/rust-toolchain.toml', 'deps/js-compute-runtime/runtime/js-compute-deps/js-compute-runtime/runtime/**/Cargo.lock') }}
+      if: steps.rust-restore.outputs.cache-hit != 'true'
+
     - name: Test
       run: npm run test
 
+    - name: Restore Example build
+      uses: actions/cache/restore@v3
+      id: example-restore
+      with:
+        path: example/target
+        key: engine-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
+
     - name: Test Example
       run: cd example && npm run build && ./test.sh
+
+    - name: Cache Example build
+      uses: actions/cache/save@v3
+      with:
+        path: example/target
+        key: engine-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
+      if: steps.example-restore.outputs.cache-hit != 'true'
 
   rustfmt:
     name: Rustfmt
