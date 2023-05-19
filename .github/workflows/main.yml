@@ -99,12 +99,12 @@ jobs:
             'deps/js-compute-runtime/runtime/rust-toolchain.toml'
           ) }}
 
-    - name: Restore Rust dependencies
+    - name: Restore Rust build cache
       uses: actions/cache/restore@v3
-      id: rust-restore
+      id: rust-build-restore
       with:
-        path: deps/js-compute-runtime/runtime/js-compute-deps/js-compute-runtime/runtime/rusturl
-        key: engine-cargo-${{ hashFiles('deps/js-compute-runtime/runtime/rust-toolchain.toml', 'deps/js-compute-runtime/runtime/js-compute-deps/js-compute-runtime/runtime/**/Cargo.lock') }}
+        path: target
+        key: engine-build-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
 
     - name: Install NPM packages
       run: npm install
@@ -127,9 +127,9 @@ jobs:
     - name: Cache Rust dependencies
       uses: actions/cache/save@v3
       with:
-        path: deps/js-compute-runtime/runtime/js-compute-deps/js-compute-runtime/runtime/rusturl
-        key: engine-cargo-${{ hashFiles('deps/js-compute-runtime/runtime/rust-toolchain.toml', 'deps/js-compute-runtime/runtime/js-compute-deps/js-compute-runtime/runtime/**/Cargo.lock') }}
-      if: steps.rust-restore.outputs.cache-hit != 'true'
+        path: target
+        key: engine-build-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
+      if: steps.rust-build-restore.outputs.cache-hit != 'true'
 
     - name: Test
       run: npm run test
