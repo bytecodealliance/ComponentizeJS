@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
     let (instance, _instance) =
         Hello::instantiate_async(&mut store, &component, &linker).await?;
 
-    let res = instance.call_hello(&mut store, "world").await?;
+    let res = instance.call_hello(&mut store, "ComponentizeJS").await?;
     println!("{}", res);
     Ok(())
 }
