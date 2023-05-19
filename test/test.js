@@ -120,8 +120,6 @@ suite('WASI', () => {
       worldName: 'test1'
     });
 
-    await writeFile('tmp.wasm', component);
-
     const { files } = await transpile(component);
     await mkdir(new URL(`./output/wasi/imports`, import.meta.url), { recursive: true });
     await mkdir(new URL(`./output/wasi/exports`, import.meta.url), { recursive: true });
