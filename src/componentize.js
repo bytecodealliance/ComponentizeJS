@@ -34,7 +34,7 @@ export async function componentize(
     sourceName,
     await readFile(engine),
     witWorld,
-    resolve(witPath),
+    witPath ? resolve(witPath) : null,
     worldName
   );
 
