@@ -1,4 +1,4 @@
-import { componentize } from '../src/componentize.js';
+import { componentize } from '@bytecodealliance/componentize-js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
