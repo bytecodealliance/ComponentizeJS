@@ -1,6 +1,9 @@
 [workspace]
 members = ["crates/spidermonkey-embedding-splicer"]
-exclude = ["deps/js-compute-runtime/c-dependencies/js-compute-runtime/rust-url"]
+exclude = [
+  "deps/js-compute-runtime/runtime/js-compute-runtime/rust-url",
+  "deps/js-compute-runtime/runtime/js-compute-runtime/rust-encoding"
+]
 resolver = "2"
 
 [workspace.package]
@@ -15,6 +18,7 @@ heck =  { version = "0.4", features = ["unicode"] }
 pulldown-cmark = { version = "0.8", default-features = false }
 env_logger = "0.10.0"
 js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", no-default-features = ["transpile-bindgen"], rev = "e56500595f8e25a7d1761e727df0c1cac46c211d" }
+walrus = "0.19.0"
 wasmtime = { version = "8.0.1", features = ["component-model"] }
 wasmtime-environ = "8.0.1"
 wasmprinter = "0.2.57"

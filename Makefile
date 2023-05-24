@@ -2,7 +2,7 @@ WASI_SDK ?= /opt/wasi-sdk
 WASI_CXX ?= $(WASI_SDK)/bin/clang++
 WASI_CC ?= $(WASI_SDK)/bin/clang
 WASM_TOOLS ?= $(shell which wasm-tools)
-WASM_OPT ?= $(shell which wasm-opt-manual)
+WASM_OPT ?= $(shell which wasm-opt)
 JCO ?= ./node_modules/.bin/jco
 WIT_BINDGEN := $(shell which wit-bindgen)
 
@@ -22,8 +22,8 @@ ifndef WASM_TOOLS
 	WASM_TOOLS = $(error No wasm-tools in PATH. First run "cargo install wasm-tools")
 endif
 
-SM_SRC := deps/js-compute-runtime/c-dependencies/spidermonkey/release
-JSCR_SRC := deps/js-compute-runtime/c-dependencies/js-compute-runtime
+SM_SRC := deps/js-compute-runtime/runtime/spidermonkey/release
+JSCR_SRC := deps/js-compute-runtime/runtime/js-compute-runtime
 
 CXX_FLAGS := -std=gnu++20 -Wall -Werror -Qunused-arguments
 CXX_FLAGS += -fno-sized-deallocation -fno-aligned-new -mthread-model single
@@ -54,9 +54,10 @@ target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm: crates/spidermon
 
 lib/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC)
 	-make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) $(abspath $(JSCR_SRC)/js-compute-runtime.wasm) $(abspath $(JSCR_SRC)/js-compute-runtime-component.wasm) -j16
+	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) -j16
 	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) shared-builtins -j16
 	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ shared/*.a $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
-	$(WASM_OPT) --strip-debug $@ -o $@ -O1
+	$(WASM_OPT) --strip-debug $@ -o $@ -O3
 
 test/wit/deps: preview2-prototyping
 	mkdir -p $@
@@ -72,7 +73,7 @@ lib:
 	mkdir -p lib
 
 $(SM_SRC):
-	cd deps/js-compute-runtime/c-dependencies/spidermonkey && ./download-engine.sh
+	cd deps/js-compute-runtime/runtime/spidermonkey && ./download-engine.sh
 
 obj/builtins:
 	mkdir -p obj/builtins

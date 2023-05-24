@@ -110,6 +110,15 @@ dependencies = [
 
 [[package]]
 name = "heck"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d621efb26863f0e9924c6ac577e8275e5e6b77455db64ffa6c65c904e9e132c"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
@@ -151,7 +160,7 @@ source = "git+https://github.com/bytecodealliance/jco?rev=e56500595f8e25a7d1761e
 dependencies = [
  "anyhow",
  "base64",
- "heck",
+ "heck 0.4.1",
  "indexmap",
  "wasmtime-environ",
  "wit-bindgen",
@@ -250,7 +259,7 @@ checksum = "291a097c63d8497e00160b166a967a4a79c64f3facdd01cbd7502231688d77df"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.15",
 ]
 
 [[package]]
@@ -258,8 +267,9 @@ name = "spidermonkey-embedding-splicer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "heck",
+ "heck 0.4.1",
  "js-component-bindgen",
+ "walrus",
  "wasm-encoder 0.27.0",
  "wasmparser 0.105.0",
  "wasmtime-environ",
@@ -273,6 +283,17 @@ name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
+
+[[package]]
+name = "syn"
+version = "1.0.109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
 
 [[package]]
 name = "syn"
@@ -308,7 +329,7 @@ checksum = "f9456a42c5b0d803c8cd86e73dd7cc9edd429499f37a3550d286d5e86720569f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.15",
 ]
 
 [[package]]
@@ -392,6 +413,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
+name = "walrus"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4eb08e48cde54c05f363d984bb54ce374f49e242def9468d2e1b6c2372d291f8"
+dependencies = [
+ "anyhow",
+ "id-arena",
+ "leb128",
+ "log",
+ "walrus-macro",
+ "wasmparser 0.77.1",
+]
+
+[[package]]
+name = "walrus-macro"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a6e5bd22c71e77d60140b0bd5be56155a37e5bd14e24f5f87298040d0cc40d7"
+dependencies = [
+ "heck 0.3.3",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "wasm-encoder"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -421,6 +468,12 @@ dependencies = [
  "wasm-encoder 0.27.0",
  "wasmparser 0.105.0",
 ]
+
+[[package]]
+name = "wasmparser"
+version = "0.77.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fe3d5405e9ea6c1317a656d6e0820912d8b7b3607823a7596117c8f666daf6f"
 
 [[package]]
 name = "wasmparser"
@@ -547,7 +600,7 @@ name = "wit-bindgen-rust"
 version = "0.6.0"
 source = "git+https://github.com/bytecodealliance/wit-bindgen?rev=c1eb6ba2ffe303574219a3787aa1187d70d877ec#c1eb6ba2ffe303574219a3787aa1187d70d877ec"
 dependencies = [
- "heck",
+ "heck 0.4.1",
  "wasm-metadata",
  "wit-bindgen-core",
  "wit-bindgen-rust-lib",
@@ -559,7 +612,7 @@ name = "wit-bindgen-rust-lib"
 version = "0.6.0"
 source = "git+https://github.com/bytecodealliance/wit-bindgen?rev=c1eb6ba2ffe303574219a3787aa1187d70d877ec#c1eb6ba2ffe303574219a3787aa1187d70d877ec"
 dependencies = [
- "heck",
+ "heck 0.4.1",
  "wit-bindgen-core",
 ]
 
@@ -570,7 +623,7 @@ source = "git+https://github.com/bytecodealliance/wit-bindgen?rev=c1eb6ba2ffe303
 dependencies = [
  "anyhow",
  "proc-macro2",
- "syn",
+ "syn 2.0.15",
  "wit-bindgen-core",
  "wit-bindgen-rust",
  "wit-component",
