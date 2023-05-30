@@ -80,6 +80,7 @@ export async function componentize(
 
   for (let i = 0; i < imports.length; i++) {
     env[`IMPORT${i}_NAME`] = imports[i][1];
+    env[`IMPORT${i}_ARGCNT`] = String(imports[i][2]);
   }
   env['IMPORT_CNT'] = imports.length;
 

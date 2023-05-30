@@ -25,5 +25,5 @@ export interface SpliceResult {
   jsBindings: string,
   exports: [string, CoreFn][],
   importWrappers: [string, string][],
-  imports: [string, string][],
+  imports: [string, string, number][],
 }

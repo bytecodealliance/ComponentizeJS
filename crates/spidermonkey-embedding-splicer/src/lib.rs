@@ -6,7 +6,9 @@ use wasmtime_environ::{
     wasmparser::{Validator, WasmFeatures},
     ScopeVec, Tunables,
 };
+
 mod bindgen;
+mod splice;
 
 use wasm_encoder::{Encode, Section};
 use wit_component::{ComponentEncoder, StringEncoding};
@@ -44,19 +46,6 @@ macro_rules! uwriteln {
         writeln!($dst, $($arg)*).unwrap()
     };
 }
-
-mod splice;
-
-// fn init() {
-//     static INIT: Once = Once::new();
-//     INIT.call_once(|| {
-//         let prev_hook = std::panic::take_hook();
-//         std::panic::set_hook(Box::new(move |info| {
-//             console::error(&info.to_string());
-//             prev_hook(info);
-//         }));
-//     });
-// }
 
 fn map_core_ty(cty: &bindgen::CoreTy) -> CoreTy {
     match cty {
@@ -112,8 +101,6 @@ impl exports::Exports for SpidermonkeyEmbeddingSplicer {
         wit_path: Option<String>,
         world_name: Option<String>,
     ) -> Result<SpliceResult, String> {
-        // init();
-
         let source_name = source_name.unwrap_or("source.js".to_string());
 
         let (resolve, id) = if let Some(wit_source) = wit_source {
@@ -269,7 +256,8 @@ impl exports::Exports for SpidermonkeyEmbeddingSplicer {
         // println!("{:?}", &imports);
         // println!("{:?}", &componentized.imports);
         // println!("{:?}", &exports);
-        let mut wasm = splice::splice(engine, imports, exports)?;
+        let mut wasm =
+            splice::splice(engine, imports, exports, false).map_err(|e| format!("{:?}", e))?;
 
         // add the world section to the spliced wasm
         wasm.push(section.id());
@@ -292,16 +280,24 @@ impl exports::Exports for SpidermonkeyEmbeddingSplicer {
             imports: componentized
                 .imports
                 .iter()
-                .map(|(specifier, BindingItem { name, iface, .. })| {
-                    (
-                        specifier.to_string(),
-                        if *iface {
-                            name.to_string()
-                        } else {
-                            "default".into()
+                .map(
+                    |(
+                        specifier,
+                        BindingItem {
+                            name, iface, func, ..
                         },
-                    )
-                })
+                    )| {
+                        (
+                            specifier.to_string(),
+                            if *iface {
+                                name.to_string()
+                            } else {
+                                "default".into()
+                            },
+                            func.params.len() as u32,
+                        )
+                    },
+                )
                 .collect(),
             import_wrappers: componentized.import_wrappers,
             js_bindings: generated_bindings,

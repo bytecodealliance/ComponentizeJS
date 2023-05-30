@@ -183,11 +183,9 @@ static void rejection_tracker(JSContext *cx, bool mutedErrors, JS::HandleObject 
 }
 
 // Import Splicing Functions
-__attribute__((noinline))
-int64_t
-get_int64(JS::MutableHandleValue val)
+__attribute__((noinline, export_name("coreabi_from_bigint64"))) int64_t from_bigint64(JS::MutableHandleValue handle)
 {
-  JS::BigInt *arg0 = val.toBigInt();
+  JS::BigInt *arg0 = handle.toBigInt();
   uint64_t arg0_uint64;
   if (!JS::detail::BigIntIsUint64(arg0, &arg0_uint64))
   {
@@ -195,6 +193,11 @@ get_int64(JS::MutableHandleValue val)
     abort();
   }
   return arg0_uint64;
+}
+
+__attribute__((noinline, export_name("coreabi_to_bigint64"))) JS::BigInt *to_bigint64(JSContext *cx, int64_t val)
+{
+  return JS::detail::BigIntFromUint64(cx, val);
 }
 
 /*
@@ -216,8 +219,8 @@ __attribute__((export_name("coreabi_sample_i32"))) bool CoreAbiSampleI32(JSConte
 __attribute__((export_name("coreabi_sample_i64"))) bool CoreAbiSampleI64(JSContext *cx, unsigned argc, JS::Value *vp)
 {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  int64_t arg1 = get_int64(args[1]);
-  args.rval().setBigInt(JS::detail::BigIntFromUint64(cx, arg1));
+  int64_t arg1 = from_bigint64(args[1]);
+  args.rval().setBigInt(to_bigint64(cx, arg1));
   return true;
 }
 
@@ -237,27 +240,11 @@ __attribute__((export_name("coreabi_sample_f64"))) bool CoreAbiSampleF64(JSConte
   return true;
 }
 
-/*
- * This function will get generated imports spliced into its branching
- * after compilation.
- */
-__attribute__((export_name("coreabi_get_import")))
+__attribute__((optnone, export_name("coreabi_get_import")))
 JSFunction *
-coreabi_get_import(int32_t idx, const char *name)
+coreabi_get_import(int32_t idx, int32_t argcnt, const char *name)
 {
-  switch (idx)
-  {
-  case 0:
-    return JS_NewFunction(R.cx, CoreAbiSampleI32, 1, 0, name);
-  case 1:
-    return JS_NewFunction(R.cx, CoreAbiSampleI32, 2, 0, name);
-  case 2:
-    return JS_NewFunction(R.cx, CoreAbiSampleI32, 3, 0, name);
-  case 3:
-    return JS_NewFunction(R.cx, CoreAbiSampleI32, 4, 0, name);
-  }
-  // log("(coreabi_get_import) Unable to find import function");
-  abort();
+  return JS_NewFunction(R.cx, CoreAbiSampleI32, argcnt, 0, name);
 }
 
 // Binding Functions
@@ -396,12 +383,7 @@ __attribute__((export_name("wizer.initialize"))) void init()
   }
   JS::RealmOptions realm_options;
   realm_options.creationOptions()
-      // .setFreezeBuiltins(true)
       .setStreamsEnabled(true)
-      .setReadableByteStreamsEnabled(true)
-      .setBYOBStreamReadersEnabled(true)
-      .setReadableStreamPipeToEnabled(true)
-      .setWritableStreamsEnabled(true)
       .setWeakRefsEnabled(JS::WeakRefSpecifier::EnabledWithoutCleanupSome);
 
   JS::DisableIncrementalGC(R.cx);
@@ -762,7 +744,11 @@ __attribute__((export_name("wizer.initialize"))) void init()
   for (size_t i = 0; i < import_cnt; i++)
   {
     sprintf(&env_name[0], "IMPORT%zu_NAME", i);
-    JSFunction *import_fn = coreabi_get_import(i, getenv(env_name));
+    const char* name = getenv(env_name);
+    sprintf(&env_name[0], "IMPORT%zu_ARGCNT", i);
+    uint32_t argcnt = atoi(getenv(env_name));
+
+    JSFunction *import_fn = coreabi_get_import(i, argcnt, name);
     if (!import_fn)
     {
       R.init_err = Runtime::InitError::ImportFn;
@@ -1009,7 +995,6 @@ __attribute__((export_name("post_call"))) void post_call(uint32_t fn_idx)
   //   abort();
   // }
   R.cur_fn_idx = -1;
-  // TODO: pending https://github.com/bytecodealliance/preview2-prototyping/issues/145
   for (void *ptr : R.free_list)
   {
     cabi_free(ptr);

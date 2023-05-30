@@ -20,7 +20,7 @@ default world spidermonkey-embedding-splicer {
       js-bindings: string,
       exports: list<tuple<string, core-fn>>,
       import-wrappers: list<tuple<string, string>>,
-      imports: list<tuple<string, string>>,
+      imports: list<tuple<string, string, u32>>,
     }
 
     splice-bindings: func(source-name: option<string>, spidermonkey-engine: list<u8>, wit-world: option<string>, wit-path: option<string>, world-name: option<string>) -> result<splice-result, string>
