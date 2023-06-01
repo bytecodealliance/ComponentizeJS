@@ -1,5 +1,6 @@
 export namespace Exports {
   export function spliceBindings(sourceName: string | null, spidermonkeyEngine: Uint8Array | ArrayBuffer, witWorld: string | null, witPath: string | null, worldName: string | null): SpliceResult;
+  export function stubWasi(engine: Uint8Array | ArrayBuffer): Uint8Array;
 }
 /**
  * # Variants
