@@ -46,7 +46,7 @@ OBJS := $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_
 all: lib/spidermonkey-embedding-splicer.js lib/spidermonkey_embedding.wasm test/wit/deps
 
 lib/spidermonkey-embedding-splicer.js: target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj
-	$(JCO) new target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm --adapt wasi_snapshot_preview1=node_modules/@bytecodealliance/jco/wasi_preview1_component_adapter.reactor.wasm
+	$(JCO) new target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm --adapt wasi_snapshot_preview1=node_modules/@bytecodealliance/jco/lib/wasi_snapshot_preview1.reactor.wasm
 	$(JCO) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o lib -- -O1
 
 target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs

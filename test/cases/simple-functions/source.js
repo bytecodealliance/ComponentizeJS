@@ -1,6 +1,6 @@
-import { f1, f2, f3, f4, f5, f6 } from 'imports';
+import { f1, f2, f3, f4, f5, f6 } from 'local:simple-functions/simple';
 
-export const exports = {
+export const simple = {
   f1 () {
     f1();
   },

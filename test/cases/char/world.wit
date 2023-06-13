@@ -1,3 +1,5 @@
+package local:%char
+
 interface chars {
   /// A function that returns a character
   return-char: func() -> char
@@ -5,7 +7,7 @@ interface chars {
   take-char: func(x: char)
 }
 
-default world the-world {
-  import imports: self.chars
-  export exports: self.chars
+world the-world {
+  export chars
+  import chars
 }

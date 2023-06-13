@@ -1,9 +1,37 @@
-import { WallClock as WallClockImports } from './imports/wall-clock';
-import { Streams as StreamsImports } from './imports/streams';
-import { Filesystem as FilesystemImports } from './imports/filesystem';
-import { Random as RandomImports } from './imports/random';
-import { Environment as EnvironmentImports } from './imports/environment';
-import { Preopens as PreopensImports } from './imports/preopens';
-import { Exit as ExitImports } from './imports/exit';
-import { Exports as ExportsExports } from './exports/exports';
-'exports': typeof ExportsExports,
+/**
+* # Variants
+* 
+* ## `"i32"`
+* 
+* ## `"i64"`
+* 
+* ## `"f32"`
+* 
+* ## `"f64"`
+*/
+export type CoreTy = 'i32' | 'i64' | 'f32' | 'f64';
+export interface CoreFn {
+  params: CoreTy[],
+  ret?: CoreTy,
+  retptr: boolean,
+  retsize: number,
+  paramptr: boolean,
+}
+export interface SpliceResult {
+  wasm: Uint8Array,
+  jsBindings: string,
+  exports: [string, CoreFn][],
+  importWrappers: [string, string][],
+  imports: [string, string, number][],
+}
+import { ImportsEnvironment } from './imports/environment';
+import { ImportsExit } from './imports/exit';
+import { ImportsPreopens } from './imports/preopens';
+import { ImportsStderr } from './imports/stderr';
+import { ImportsStdin } from './imports/stdin';
+import { ImportsStdout } from './imports/stdout';
+import { ImportsWallClock } from './imports/wall-clock';
+import { ImportsFilesystem } from './imports/filesystem';
+import { ImportsStreams } from './imports/streams';
+import { ImportsRandom } from './imports/random';
+export function spliceBindings(sourceName: string | null, spidermonkeyEngine: Uint8Array | ArrayBuffer, witWorld: string | null, witPath: string | null, worldName: string | null): SpliceResult;

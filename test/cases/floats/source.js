@@ -1,6 +1,6 @@
-import { float32Param, float64Param, float32Result, float64Result } from 'imports';
+import { float32Param, float64Param, float32Result, float64Result } from 'local:floats/floats';
 
-export const exports = {
+export const floats = {
   float32Param (x) {
     return float32Param(x);
   },

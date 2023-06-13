@@ -1,3 +1,5 @@
+package local:wall-clock
+
 interface random-t {
   get-random-bytes: func(len: u64) -> list<u8>
   get-random-u64: func() -> u64
@@ -13,9 +15,9 @@ interface wall-clock-t {
   now: func() -> datetime
 }
 
-default world wall-clock-world {
-  import wall-clock-t: self.wall-clock-t
-  import random-t: self.random-t
+world wall-clock-world {
+  import wall-clock-t
+  import random-t
 
   export test: func() -> string
 }

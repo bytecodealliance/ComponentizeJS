@@ -1,4 +1,6 @@
-default world the-world {
+package local:smoke
+
+world the-world {
   import imports: interface {
     y: func()
   }
