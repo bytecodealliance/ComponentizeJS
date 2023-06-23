@@ -16,10 +16,9 @@ use wit_parser::{self, PackageId, Resolve, UnresolvedPackage};
 
 wit_bindgen::generate!("spidermonkey-embedding-splicer");
 
-use exports::*;
-struct SpidermonkeyEmbeddingSplicer;
+struct SpidermonkeyEmbeddingSplicerComponent;
 
-export_spidermonkey_embedding_splicer!(SpidermonkeyEmbeddingSplicer);
+export_spidermonkey_embedding_splicer!(SpidermonkeyEmbeddingSplicerComponent);
 
 /// Calls [`write!`] with the passed arguments and unwraps the result.
 ///
@@ -88,12 +87,12 @@ fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
             Err(_) => bail!("input file is not valid utf-8"),
         };
         let pkg = UnresolvedPackage::parse(&path, text)?;
-        resolve.push(pkg, &Default::default())?
+        resolve.push(pkg)?
     };
     Ok((resolve, id))
 }
 
-impl exports::Exports for SpidermonkeyEmbeddingSplicer {
+impl SpidermonkeyEmbeddingSplicer for SpidermonkeyEmbeddingSplicerComponent {
     fn splice_bindings(
         source_name: Option<String>,
         engine: Vec<u8>,
@@ -108,13 +107,11 @@ impl exports::Exports for SpidermonkeyEmbeddingSplicer {
             let path = PathBuf::from("component.wit");
             let pkg = UnresolvedPackage::parse(&path, &wit_source).map_err(|e| e.to_string())?;
 
-            let id = resolve
-                .push(pkg, &Default::default())
-                .map_err(|e| e.to_string())?;
+            let id = resolve.push(pkg).map_err(|e| e.to_string())?;
 
             (resolve, id)
         } else {
-            parse_wit(&PathBuf::from(wit_path.unwrap())).map_err(|e| e.to_string())?
+            parse_wit(&PathBuf::from(wit_path.unwrap())).map_err(|e| format!("{:?}", e))?
         };
 
         let world = resolve

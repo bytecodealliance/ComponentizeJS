@@ -1,5 +1,5 @@
 import { componentize } from '@bytecodealliance/componentize-js';
-import { transpile, componentEmbed } from '@bytecodealliance/jco';
+import { transpile } from '@bytecodealliance/jco';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -16,7 +16,8 @@ suite('Builtins', () => {
       const { source, test: runTest } = await import(`./builtins/${filename}`);
 
       const { component } = await componentize(source, `
-        default world runworld {
+        package local:runworld
+        world runworld {
           export run: func() -> ()
         }
       `, {
@@ -62,10 +63,10 @@ suite('Builtins', () => {
 const bindingsCases = await readdir(new URL('./cases', import.meta.url));
 suite('Bindings', () => {
   for (const name of bindingsCases) {
-    if (name === 'use-across-interfaces' || name === 'rename-interface') {
-      test.skip(name, () => {});
-      continue;
-    }
+    // if (name === 'use-across-interfaces' || name === 'rename-interface') {
+    //   test.skip(name, () => {});
+    //   continue;
+    // }
     test(name, async () => {
       const source = await readFile(new URL(`./cases/${name}/source.js`, import.meta.url), 'utf8');
       const world = await readFile(new URL(`./cases/${name}/world.wit`, import.meta.url), 'utf8');
@@ -77,9 +78,21 @@ suite('Bindings', () => {
           sourceName: `${name}.js`,
         });
 
-        const map = {};
+        const map = {
+          'wasi:cli-base/*': '@bytecodealliance/preview2-shim/cli-base#*',
+          'wasi:clocks/*': '@bytecodealliance/preview2-shim/clocks#*',
+          'wasi:filesystem/*': '@bytecodealliance/preview2-shim/filesystem#*',
+          'wasi:http/*': '@bytecodealliance/preview2-shim/http#*',
+          'wasi:io/*': '@bytecodealliance/preview2-shim/io#*',
+          'wasi:logging/*': '@bytecodealliance/preview2-shim/logging#*',
+          'wasi:poll/*': '@bytecodealliance/preview2-shim/poll#*',
+          'wasi:random/*': '@bytecodealliance/preview2-shim/random#*',
+          'wasi:sockets/*': '@bytecodealliance/preview2-shim/sockets#*'
+        };
         for (const [impt] of imports) {
-          map[impt] = `../../cases/${name}/${impt}.js`;
+          let importName = impt.split('/').pop();
+          if (importName === 'test') importName = 'imports';
+          map[impt] = `../../cases/${name}/${importName}.js`;
         }
 
         const { files } = await transpile(component, { name, map, wasiShim: true });
@@ -109,8 +122,8 @@ suite('Bindings', () => {
 suite('WASI', () => {
   test('basic app', async () => {
     const { component } = await componentize(`
-      import { now } from 'wall-clock';
-      import { getRandomBytes } from 'random';
+      import { now } from 'wasi:clocks/wall-clock';
+      import { getRandomBytes } from 'wasi:random/random';
 
       export function test () {
         return \`NOW: \${now().seconds}, RANDOM: \${getRandomBytes(2n)}\`;

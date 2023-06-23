@@ -9,9 +9,9 @@ import {
   errnoResult,
   listTypedefs,
   listOfVariants,
-} from "imports";
+} from "local:flavorful/test";
 
-export const exports = {
+export const test = {
   fListInRecord1(a) {
     fListInRecord1(a);
   },

@@ -1,6 +1,6 @@
-import * as m from 'import-lists';
+import * as m from 'local:lists/lists';
 
-export const exportLists = {
+export const lists = {
   listU8Param (x) {
     // console.log('list');
     // console.log(x);

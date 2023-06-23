@@ -1,6 +1,6 @@
-import { 'type' as x } from 'imports';
+import { 'type' as x } from 'local:keywords/keywords';
 
-export const exports = {
+export const keywords = {
   'type' (t) {
     return x(t);
   }

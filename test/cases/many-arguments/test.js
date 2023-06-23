@@ -19,7 +19,7 @@ export function test(instance) {
     15n,
     16n,
   ];
-  strictEqual(instance.exports.manyArgs(...args), undefined);
+  strictEqual(instance.manyarg.manyArgs(...args), undefined);
   deepStrictEqual(globalThis.args, args);
   const struct = {
     a1: '1n',
@@ -43,6 +43,6 @@ export function test(instance) {
     a19: '19n',
     a20: '20n',
   };
-  strictEqual(instance.exports.bigArgument(struct), undefined);
+  strictEqual(instance.manyarg.bigArgument(struct), undefined);
   deepStrictEqual(globalThis.struct, struct);
 }

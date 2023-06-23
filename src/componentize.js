@@ -4,11 +4,9 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { readFile, unlink, writeFile } from "node:fs/promises";
-import { exports } from "../lib/spidermonkey-embedding-splicer.js";
+import { spliceBindings } from "../lib/spidermonkey-embedding-splicer.js";
 import { fileURLToPath } from "node:url";
 const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-
-const { spliceBindings } = exports;
 
 export async function componentize(
   jsSource,
@@ -227,55 +225,58 @@ export async function componentize(
     case INIT_OK:
       break;
     case INIT_JSINIT:
-      err = `Error building JS: JS environment could not be initialized`;
+      err = `JS environment could not be initialized`;
       break;
     case INIT_INTRINSICS:
-      err = `Error building JS: JS intrinsics could not be defined`;
+      err = `JS intrinsics could not be defined`;
       break;
     case INIT_CUSTOM_INTRINSICS:
-      err = `Error building JS: Platform intrinsics could not be defined`;
+      err = `Platform intrinsics could not be defined`;
       break;
     case INIT_SOURCE_STDIN:
-      err = `Error building JS: Unable to populate source code into Wasm`;
+      err = `Unable to populate source code into Wasm`;
       break;
     case INIT_SOURCE_COMPILE:
-      err = `Error: Unable to compile JS source code`;
+      err = `Unable to compile JS source code`;
       break;
     case INIT_BINDINGS_COMPILE:
-      err = `Error: Unable to compile JS bindings code`;
+      err = `Unable to compile JS bindings code`;
       break;
     case INIT_IMPORT_WRAPPER_COMPILE:
-      err = `Error building JS: Unable to compile the dependency wrapper code`;
+      err = `Unable to compile the dependency wrapper code`;
       break;
     case INIT_SOURCE_LINK:
-      err = `Error building JS: Unable to link the source code`;
+      err = `Unable to link the source code. Imports should be:\n\n  ${Object.entries(imports.reduce((impts, [specifier, impt]) => {
+        (impts[specifier] = impts[specifier] || []).push(impt.split('-').map((x, i) => i === 0 ? x : x[0].toUpperCase() + x.slice(1)).join(''));
+        return impts;
+      }, {})).map(([specifier, impts]) => `import { ${impts.join(', ')} } from "${specifier}";`).join('\n . ')}\n`;
       break;
     case INIT_SOURCE_EXEC:
-      err = `Error building JS: Unable to execute the JS source code`;
+      err = `Unable to execute the JS source code`;
       break;
     case INIT_BINDINGS_EXEC:
-      err = `Error building JS: Unable to execute the JS bindings code`;
+      err = `Unable to execute the JS bindings code`;
       break;
     case INIT_FN_LIST:
-      err = `Error building JS: Unable to extract expected exports list`;
+      err = `Unable to extract expected exports list`;
       break;
     case INIT_MEM_BUFFER:
-      err = `Error building JS: Unable to initialize JS binding memory buffer`;
+      err = `Unable to initialize JS binding memory buffer`;
       break;
     case INIT_REALLOC_FN:
-      err = `Error building JS: Unable to create JS binding realloc function`;
+      err = `Unable to create JS binding realloc function`;
       break;
     case INIT_MEM_BINDINGS:
-      err = `Error: Unable to initialize JS bindings.`;
+      err = `Unable to initialize JS bindings.`;
       break;
     case INIT_PROMISE_REJECTIONS:
-      err = `Error: Unable to initialize promise rejection handler`;
+      err = `Unable to initialize promise rejection handler`;
       break;
     case INIT_IMPORT_FN:
-      err = `Error: Unable to initialize imported bindings`;
+      err = `Unable to initialize imported bindings`;
       break;
     case INIT_TYPE_PARSE:
-      err = `Error: Unable to parse the core ABI export types`;
+      err = `Unable to parse the core ABI export types`;
       break;
     default:
       err = `Unknown error - ${status}`;

@@ -5,7 +5,7 @@ export function test (instance) {
     howFastAreYouGoing: 999,
     iAmGoingExtremelySlow: 999999n
   };
-  strictEqual(instance.exports.foo(val), undefined);
+  strictEqual(instance.conventions.foo(val), undefined);
   // checks roundtripping
   deepStrictEqual(globalThis.x, val);
 }

@@ -6,9 +6,9 @@ import {
   roundtripFlag16,
   roundtripFlag32,
   roundtripFlag64
-} from 'import-flags';
+} from 'local:flags/flags';
 
-export const exportFlags = {
+export const flags = {
   roundtripFlag1 (f) {
     return roundtripFlag1(f);
   },

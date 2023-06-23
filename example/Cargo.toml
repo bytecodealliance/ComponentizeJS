@@ -11,7 +11,5 @@ edition = "2021"
 anyhow = "1.0.65"
 async-std = { version = "1.12.0", features = ["attributes"] }
 cap-std = "1.0.12"
-wasmtime = { git = "https://github.com/bytecodealliance/wasmtime", features = ["component-model"], rev = "299131ae2d6655c49138bfab2c4469650763ef3b" }
-wasi-common =  { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "5be99d645c177198b9f5e4d76561669796f7b379" }
-wasmtime-wasi-sockets =  { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "5be99d645c177198b9f5e4d76561669796f7b379" }
-wasmtime-wasi-sockets-sync = { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "5be99d645c177198b9f5e4d76561669796f7b379" }
+wasmtime = { version = "10.0.1", features = ["component-model"] }
+wasmtime-wasi =  "10.0.1"

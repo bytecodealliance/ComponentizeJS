@@ -1,3 +1,5 @@
-default world the-world {
+package local:smoke-default
+
+world the-world {
   export y: func()
 }

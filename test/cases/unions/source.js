@@ -9,9 +9,9 @@ import {
   identifyDuplicated,
   addOneDistinguishableNum,
   identifyDistinguishableNum,
-} from "import-unions";
+} from "local:unions/unions";
 
-export const exportUnions = {
+export const unions = {
   addOneInteger(num) {
     return addOneInteger(num);
   },

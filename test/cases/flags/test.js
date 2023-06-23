@@ -1,20 +1,20 @@
 import { deepStrictEqual } from "node:assert";
 
 export function test(instance) {
-  deepStrictEqual(instance.exportFlags.roundtripFlag1({ b0: false }), {
+  deepStrictEqual(instance.flags.roundtripFlag1({ b0: false }), {
     b0: true,
   });
-  deepStrictEqual(instance.exportFlags.roundtripFlag2({ b0: true }), {
+  deepStrictEqual(instance.flags.roundtripFlag2({ b0: true }), {
     b0: true,
     b1: true,
   });
-  deepStrictEqual(instance.exportFlags.roundtripFlag4({ b0: true }), {
+  deepStrictEqual(instance.flags.roundtripFlag4({ b0: true }), {
     b0: true,
     b1: false,
     b2: false,
     b3: true,
   });
-  deepStrictEqual(instance.exportFlags.roundtripFlag8({ b0: true }), {
+  deepStrictEqual(instance.flags.roundtripFlag8({ b0: true }), {
     b0: true,
     b1: false,
     b2: false,
@@ -24,7 +24,7 @@ export function test(instance) {
     b6: false,
     b7: true,
   });
-  deepStrictEqual(instance.exportFlags.roundtripFlag16({ b0: true }), {
+  deepStrictEqual(instance.flags.roundtripFlag16({ b0: true }), {
     b0: true,
     b1: false,
     b2: false,
@@ -42,7 +42,7 @@ export function test(instance) {
     b14: false,
     b15: true,
   });
-  deepStrictEqual(instance.exportFlags.roundtripFlag32({ b0: true }), {
+  deepStrictEqual(instance.flags.roundtripFlag32({ b0: true }), {
     b0: true,
     b1: false,
     b2: false,
@@ -76,7 +76,7 @@ export function test(instance) {
     b30: false,
     b31: true,
   });
-  deepStrictEqual(instance.exportFlags.roundtripFlag64({ b0: true }), {
+  deepStrictEqual(instance.flags.roundtripFlag64({ b0: true }), {
     b0: true,
     b1: false,
     b2: false,

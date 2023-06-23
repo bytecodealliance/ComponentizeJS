@@ -23,9 +23,9 @@ import {
   isCloneReturn,
   returnNamedOption,
   returnNamedResult,
-} from "imports";
+} from "local:variants/variants";
 
-export const exports = {
+export const variants = {
   e1Arg(x) {
     e1Arg(x);
   },

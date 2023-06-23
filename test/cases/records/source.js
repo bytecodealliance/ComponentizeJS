@@ -10,9 +10,9 @@ import {
   aggregateArg,
   aggregateResult,
   typedefInout,
-} from "imports";
+} from "local:records/records";
 
-export const exports = {
+export const records = {
   tupleArg(x) {
     tupleArg(x);
   },

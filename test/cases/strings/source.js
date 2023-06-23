@@ -1,6 +1,6 @@
-import { a, b, c } from 'imports';
+import { a, b, c } from 'local:strings/strings';
 
-export const exports = {
+export const strings = {
   a (x) {
     return a(x);
   },

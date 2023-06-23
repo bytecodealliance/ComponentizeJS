@@ -1,28 +1,28 @@
-default world spidermonkey-embedding-splicer {
-  export exports: interface {
-    enum core-ty {
-      i32,
-      i64,
-      f32,
-      f64
-    }
+package local:spidermonkey-embedding-splicer
 
-    record core-fn {
-      params: list<core-ty>,
-      ret: option<core-ty>,
-      retptr: bool,
-      retsize: u32,
-      paramptr: bool,
-    }
-
-    record splice-result {
-      wasm: list<u8>,
-      js-bindings: string,
-      exports: list<tuple<string, core-fn>>,
-      import-wrappers: list<tuple<string, string>>,
-      imports: list<tuple<string, string, u32>>,
-    }
-
-    splice-bindings: func(source-name: option<string>, spidermonkey-engine: list<u8>, wit-world: option<string>, wit-path: option<string>, world-name: option<string>) -> result<splice-result, string>
+world spidermonkey-embedding-splicer {
+  enum core-ty {
+    i32,
+    i64,
+    f32,
+    f64
   }
+
+  record core-fn {
+    params: list<core-ty>,
+    ret: option<core-ty>,
+    retptr: bool,
+    retsize: u32,
+    paramptr: bool,
+  }
+
+  record splice-result {
+    wasm: list<u8>,
+    js-bindings: string,
+    exports: list<tuple<string, core-fn>>,
+    import-wrappers: list<tuple<string, string>>,
+    imports: list<tuple<string, string, u32>>,
+  }
+
+  export splice-bindings: func(source-name: option<string>, spidermonkey-engine: list<u8>, wit-world: option<string>, wit-path: option<string>, world-name: option<string>) -> result<splice-result, string>
 }

@@ -1,4 +1,6 @@
-default world hello {
+package local:hello
+
+world hello {
   import get-num: interface {
     get-num: func(text: string) -> string
   }

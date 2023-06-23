@@ -1,8 +1,8 @@
-import { optionTest } from 'imports';
+import { optionTest } from 'local:small-anonymous/anon';
 
 let run = 0;
 
-export const exports = {
+export const anon = {
   optionTest () {
     switch (++run) {
       case 1: throw 'failure';

@@ -43,10 +43,10 @@ INCLUDES := -I $(JSCR_SRC)
 
 OBJS := $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/**/*.cpp)) $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/*.cpp))
 
-all: lib/spidermonkey-embedding-splicer.js lib/spidermonkey_embedding.wasm test/wit/deps
+all: lib/spidermonkey-embedding-splicer.js lib/spidermonkey_embedding.wasm
 
 lib/spidermonkey-embedding-splicer.js: target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj
-	$(JCO) new target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm --adapt wasi_snapshot_preview1=node_modules/@bytecodealliance/jco/wasi_preview1_component_adapter.reactor.wasm
+	$(JCO) new target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm --adapt wasi_snapshot_preview1=node_modules/@bytecodealliance/jco/lib/wasi_snapshot_preview1.reactor.wasm
 	$(JCO) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o lib -- -O1
 
 target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs
@@ -58,10 +58,6 @@ lib/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC)
 	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) shared-builtins -j16
 	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ shared/*.a $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
 	$(WASM_OPT) --strip-debug $@ -o $@ -O3
-
-test/wit/deps: preview2-prototyping
-	mkdir -p $@
-	cp -r preview2-prototyping/wit/deps/* $@
 
 obj/%.o: spidermonkey_embedding/%.cpp Makefile | $(SM_SRC) obj obj/builtins
 	$(WASI_CXX) $(CXX_FLAGS) -O2 $(DEFINES) $(INCLUDES) -I $(SM_SRC)/include -MMD -MP -c -o $@ $<

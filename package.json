@@ -5,12 +5,12 @@
   "type": "module",
   "exports": "./src/componentize.js",
   "devDependencies": {
-    "@bytecodealliance/preview2-shim": "0.0.8",
+    "@bytecodealliance/preview2-shim": "0.0.10",
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "^0.7.0",
-    "@bytecodealliance/wizer": "^1.6.1-beta.4"
+    "@bytecodealliance/jco": "^0.9.2",
+    "@bytecodealliance/wizer": "^3.0.1"
   },
   "scripts": {
     "build": "cargo build --release --target wasm32-wasi && make -j",

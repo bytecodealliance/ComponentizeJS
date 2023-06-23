@@ -1,6 +1,6 @@
-import { takeChar, returnChar } from 'imports';
+import { takeChar, returnChar } from 'local:char/chars';
 
-export const exports = {
+export const chars = {
   takeChar (x) {
     takeChar(x);
   },

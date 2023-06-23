@@ -1,6 +1,6 @@
-import { mra, mrb, mrc, mrd, mre } from 'imports';
+import { mra, mrb, mrc, mrd, mre } from 'local:multi-return/multi-return';
 
-export const exports = {
+export const multiReturn = {
   mra () {
     return mra();
   },

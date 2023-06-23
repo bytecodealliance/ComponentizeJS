@@ -1,6 +1,6 @@
-import { simpleList1, simpleList2, simpleList4 } from 'imports';
+import { simpleList1, simpleList2, simpleList4 } from 'local:simple-lists/simple-lists';
 
-export const exports = {
+export const simpleLists = {
   simpleList1 (list) {
     simpleList1(list);
   },

@@ -345,7 +345,7 @@ static JSObject *EmbeddingResolveHook(JSContext *cx,
   {
     if (R.import_wrappers.find(filename) == R.import_wrappers.end())
     {
-      fprintf(stderr, "Import '%s' in '%s' is not defined as a world import. Only component-defined imports can be used.\n", filename.c_str(), R.source_name.c_str());
+      fprintf(stderr, "Import '%s' in %s is not defined as a world import. Only component-defined imports can be used.\n", filename.c_str(), R.source_name.c_str());
       R.init_err = Runtime::InitError::SourceLink;
       return nullptr;
     }

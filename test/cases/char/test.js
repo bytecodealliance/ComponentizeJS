@@ -1,6 +1,6 @@
 import { strictEqual } from 'node:assert';
 
 export function test (instance) {
-  instance.exports.takeChar('p');
-  strictEqual(instance.exports.returnChar(), 'p');
+  instance.chars.takeChar('p');
+  strictEqual(instance.chars.returnChar(), 'p');
 }
