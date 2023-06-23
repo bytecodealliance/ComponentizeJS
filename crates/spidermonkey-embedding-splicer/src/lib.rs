@@ -2,8 +2,9 @@ use anyhow::{bail, Context, Result};
 use bindgen::BindingItem;
 use std::path::{Path, PathBuf};
 use wasmtime_environ::{
+    component::{ComponentTypesBuilder, Translator},
     wasmparser::{Validator, WasmFeatures},
-    ScopeVec, Tunables, component::{ComponentTypesBuilder, Translator},
+    ScopeVec, Tunables,
 };
 
 mod bindgen;
