@@ -2,7 +2,7 @@ WASI_SDK ?= /opt/wasi-sdk
 WASI_CXX ?= $(WASI_SDK)/bin/clang++
 WASI_CC ?= $(WASI_SDK)/bin/clang
 WASM_TOOLS ?= $(shell which wasm-tools)
-WASM_OPT ?= $(shell which wasm-opt)
+WASM_OPT ?= $(shell rm node_modules/.bin/wasm-opt ; which wasm-opt)
 JCO ?= ./node_modules/.bin/jco
 WIT_BINDGEN := $(shell which wit-bindgen)
 
