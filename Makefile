@@ -57,7 +57,7 @@ lib/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC)
 	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) -j16
 	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) shared-builtins -j16
 	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ shared/*.a $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
-	$(WASM_OPT) --strip-debug $@ -o $@ -O3
+	~/bin/wasm-opt --strip-debug $@ -o $@ -O3
 
 obj/%.o: spidermonkey_embedding/%.cpp Makefile | $(SM_SRC) obj obj/builtins
 	$(WASI_CXX) $(CXX_FLAGS) -O2 $(DEFINES) $(INCLUDES) -I $(SM_SRC)/include -MMD -MP -c -o $@ $<

@@ -1,11 +1,9 @@
 use anyhow::Result;
-use wasi_common::{wasi, Table, WasiCtx, WasiCtxBuilder, WasiView};
 use wasmtime::{
     component::{Component, Linker},
     Config, Engine, Store, WasmBacktraceDetails,
 };
-use wasmtime_wasi_sockets::{WasiSocketsCtx, WasiSocketsView};
-use wasmtime_wasi_sockets_sync::WasiSocketsCtxBuilder;
+use wasmtime_wasi::preview2::{WasiCtxBuilder, Table, WasiCtx, WasiView, wasi};
 
 wasmtime::component::bindgen!({
     world: "hello",
@@ -33,7 +31,6 @@ async fn main() -> Result<()> {
     struct CommandCtx {
         table: Table,
         wasi: WasiCtx,
-        sockets: WasiSocketsCtx,
     }
     impl WasiView for CommandCtx {
         fn table(&self) -> &Table {
@@ -49,32 +46,13 @@ async fn main() -> Result<()> {
             &mut self.wasi
         }
     }
-    let sockets = WasiSocketsCtxBuilder::new()
-        .inherit_network(cap_std::ambient_authority())
-        .build();
-    impl WasiSocketsView for CommandCtx {
-        fn table(&self) -> &Table {
-            &self.table
-        }
-        fn table_mut(&mut self) -> &mut Table {
-            &mut self.table
-        }
-        fn ctx(&self) -> &WasiSocketsCtx {
-            &self.sockets
-        }
-        fn ctx_mut(&mut self) -> &mut WasiSocketsCtx {
-            &mut self.sockets
-        }
-    }
 
     wasi::command::add_to_linker(&mut linker)?;
-    wasmtime_wasi_sockets::add_to_linker(&mut linker)?;
     let mut store = Store::new(
         &engine,
         CommandCtx {
             table,
             wasi,
-            sockets,
         },
     );
 

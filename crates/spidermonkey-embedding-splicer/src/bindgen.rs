@@ -4,9 +4,9 @@ use js_component_bindgen::function_bindgen::{ErrHandling, FunctionBindgen};
 use js_component_bindgen::intrinsics::{render_intrinsics, Intrinsic};
 use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
+use wasmtime_environ::component::{Component, Export, GlobalInitializer, CanonicalOptions};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
-use wasmtime_environ::component::{CanonicalOptions, Component, Export, GlobalInitializer};
 use wit_parser::abi::{AbiVariant, LiftLower, WasmSignature};
 use wit_parser::*;
 
