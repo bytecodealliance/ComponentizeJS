@@ -43,119 +43,9 @@ node componentize.mjs
 
 ### Running the Component in Wasmtime
 
-Cargo.toml
-```toml
-[package]
-name = "wasmtime-test"
-version = "0.1.0"
-edition = "2021"
+Set up the [Cargo.toml as in the example directory](example/Cargo.toml).
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[workspace]
-
-[dependencies]
-anyhow = "1.0.65"
-async-std = { version = "1.12.0", features = ["attributes"] }
-cap-std = "1.0.12"
-wasmtime = { git = "https://github.com/bytecodealliance/wasmtime", rev = "299131ae2d6655c49138bfab2c4469650763ef3b", features = ["component-model"] }
-wasi-common =  { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
-wasi-cap-std-sync = { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
-wasmtime-wasi-sockets =  { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
-wasmtime-wasi-sockets-sync = { git = "https://github.com/bytecodealliance/preview2-prototyping", rev = "dd34a00d4386000cd00071cff18b9e3a12788075" }
-```
-
-src/main.rs
-```rs
-use anyhow::Result;
-use wasi_cap_std_sync::WasiCtxBuilder;
-use wasi_common::{wasi, Table, WasiCtx, WasiView};
-use wasmtime::{
-    component::{Component, Linker},
-    Config, Engine, Store, WasmBacktraceDetails,
-};
-use wasmtime_wasi_sockets::{WasiSocketsCtx, WasiSocketsView};
-use wasmtime_wasi_sockets_sync::WasiSocketsCtxBuilder;
-
-wasmtime::component::bindgen!({
-    world: "hello",
-    path: "hello.wit",
-    async: true
-});
-
-#[async_std::main]
-async fn main() -> Result<()> {
-    let builder = WasiCtxBuilder::new().inherit_stdio();
-    let mut table = Table::new();
-    let wasi = builder.build(&mut table)?;
-
-    let mut config = Config::new();
-    config.cache_config_load_default().unwrap();
-    config.wasm_backtrace_details(WasmBacktraceDetails::Enable);
-    config.wasm_component_model(true);
-    config.async_support(true);
-
-    let engine = Engine::new(&config)?;
-    let mut linker = Linker::new(&engine);
-
-    let component = Component::from_file(&engine, "hello.component.wasm").unwrap();
-
-
-    struct CommandCtx {
-        table: Table,
-        wasi: WasiCtx,
-        sockets: WasiSocketsCtx,
-    }
-    impl WasiView for CommandCtx {
-        fn table(&self) -> &Table {
-            &self.table
-        }
-        fn table_mut(&mut self) -> &mut Table {
-            &mut self.table
-        }
-        fn ctx(&self) -> &WasiCtx {
-            &self.wasi
-        }
-        fn ctx_mut(&mut self) -> &mut WasiCtx {
-            &mut self.wasi
-        }
-    }
-    let sockets = WasiSocketsCtxBuilder::new()
-        .inherit_network(cap_std::ambient_authority())
-        .build();
-    impl WasiSocketsView for CommandCtx {
-        fn table(&self) -> &Table {
-            &self.table
-        }
-        fn table_mut(&mut self) -> &mut Table {
-            &mut self.table
-        }
-        fn ctx(&self) -> &WasiSocketsCtx {
-            &self.sockets
-        }
-        fn ctx_mut(&mut self) -> &mut WasiSocketsCtx {
-            &mut self.sockets
-        }
-    }
-
-    wasi::command::add_to_linker(&mut linker)?;
-    let mut store = Store::new(
-        &engine,
-        CommandCtx {
-            table,
-            wasi,
-            sockets,
-        },
-    );
-
-    let (instance, _instance) =
-        Hello::instantiate_async(&mut store, &component, &linker).await?;
-
-    let res = instance.call_hello(&mut store, "ComponentizeJS").await?;
-    println!("{}", res);
-    Ok(())
-}
-```
+Set up [`src/main.rs`](example/src/main.rs) as in the example directory.
 
 Building and running the binary should print the result:
 
@@ -177,6 +67,15 @@ Transpile the component:
 
 ```
 jco transpile hello.component.wasm -o hello --map 'wasi-*=@bytecodealliance/preview2-shim/*'
+```
+
+Set up a Node.js package.json:
+
+package.json
+```
+{
+  "type": "module"
+}
 ```
 
 The custom WASI mapping argument allows us to direct the WASI component imports to the experimental JS WASI shim.
