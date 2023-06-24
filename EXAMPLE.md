@@ -162,7 +162,7 @@ Building and running the binary should print the result:
 ```
 cargo build --release
 ./target/release/wasmtime-test
-> Hello CompontizeJS
+> Hello ComponentizeJS
 ```
 
 ### Running the Component in Node.js
@@ -186,6 +186,21 @@ We can install this shim itself from npm as well:
 ```
 npm install @bytecodealliance/preview2-shim
 ```
+
+Create package.json in the *hello* folder
+
+```npm init
+```
+
+Append the below line to the package.json file that was just created.
+
+```
+"type": "module",
+```
+
+This is added to ensure all .js and .mjs files are interpreted as ES modules. 
+
+In the absence of this, you may receive the following error SyntaxError: Cannot use import statement outside a module
 
 To test the component:
 
