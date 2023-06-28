@@ -130,7 +130,7 @@ impl SpidermonkeyEmbeddingSplicer for SpidermonkeyEmbeddingSplicerComponent {
         wasm_bytes.push(section.id());
         section.encode(&mut wasm_bytes);
 
-        // encode the core wasm into a component bindary
+        // encode the core wasm into a component binary
         let encoder = ComponentEncoder::default()
             .validate(false)
             .module(&wasm_bytes)
