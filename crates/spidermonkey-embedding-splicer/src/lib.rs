@@ -238,8 +238,8 @@ impl SpidermonkeyEmbeddingSplicer for SpidermonkeyEmbeddingSplicerComponent {
                 ));
             } else {
                 imports.push((
+                    "$root".into(),
                     specifier.to_string(),
-                    "default".into(),
                     map_core_fn(func),
                     if func.retsize > 0 {
                         Some(func.retsize as i32)
@@ -285,11 +285,15 @@ impl SpidermonkeyEmbeddingSplicer for SpidermonkeyEmbeddingSplicerComponent {
                         },
                     )| {
                         (
-                            specifier.to_string(),
+                            if *iface {
+                                specifier.to_string()
+                            } else {
+                                "$root".into()
+                            },
                             if *iface {
                                 name.to_string()
                             } else {
-                                "default".into()
+                                specifier.to_string()
                             },
                             func.params.len() as u32,
                         )

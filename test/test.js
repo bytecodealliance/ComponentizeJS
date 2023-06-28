@@ -103,7 +103,12 @@ suite('Bindings', () => {
         await writeFile(new URL(`./output/${name}.component.wasm`, import.meta.url), component);
 
         for (const file of Object.keys(files)) {
-          await writeFile(new URL(`./output/${name}/${file}`, import.meta.url), files[file]);
+          let source = files[file];
+          // JCO patch pending kebab import fix
+          if (file === 'kebab-fn-impt.js') {
+            source = new TextDecoder().decode(source).replace('import import', 'import');
+          }
+          await writeFile(new URL(`./output/${name}/${file}`, import.meta.url), source);
         }
 
         var instance = await import(`./output/${name}/${name}.js`);
