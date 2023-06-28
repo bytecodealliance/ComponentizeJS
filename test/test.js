@@ -105,8 +105,8 @@ suite('Bindings', () => {
         for (const file of Object.keys(files)) {
           let source = files[file];
           // JCO patch pending kebab import fix
-          if (file === 'kebab-fn-impt.js') {
-            source = new TextDecoder().decode(source).replace('import import', 'import');
+          if (file.endsWith('.js')) {
+            source = new TextDecoder().decode(source).replace(/import import/g, 'import');
           }
           await writeFile(new URL(`./output/${name}/${file}`, import.meta.url), source);
         }
