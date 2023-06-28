@@ -156,7 +156,7 @@ dependencies = [
 [[package]]
 name = "js-component-bindgen"
 version = "0.1.0"
-source = "git+https://github.com/bytecodealliance/jco?rev=e93527eb3f8566271d1ccb67608693117433d390#e93527eb3f8566271d1ccb67608693117433d390"
+source = "git+https://github.com/bytecodealliance/jco?rev=a825aa7ec6131d63b0289f4cb1952bbf89ffe720#a825aa7ec6131d63b0289f4cb1952bbf89ffe720"
 dependencies = [
  "anyhow",
  "base64",
