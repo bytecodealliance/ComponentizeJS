@@ -6,6 +6,7 @@ import { resolve, join } from "node:path";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { spliceBindings } from "../lib/spidermonkey-embedding-splicer.js";
 import { fileURLToPath } from "node:url";
+import { writeFileSync } from 'node:fs';
 const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
 export async function componentize(
@@ -200,6 +201,9 @@ export async function componentize(
     };
   }
 
+  // convert CABI import conventiosn to ESM import conventions
+  imports = imports.map(([specifier, impt]) => specifier === '$root' ? [impt, 'default'] : [specifier, impt]);
+
   const INIT_OK =  0;
   const INIT_JSINIT =  1;
   const INIT_INTRINSICS =  2;
@@ -305,6 +309,6 @@ export async function componentize(
 
   return {
     component,
-    imports
+    imports: imports.map(([specifier, impt]) => specifier === '$root' ? [impt, 'default'] : [specifier, impt])
   };
 }

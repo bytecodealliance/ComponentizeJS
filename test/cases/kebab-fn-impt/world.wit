@@ -1,0 +1,7 @@
+package example:protocol
+
+world my-world {
+  import print: func(msg: string)
+
+  export run: func()
+}
