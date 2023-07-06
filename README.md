@@ -107,7 +107,19 @@ Converts a JS source into a component binary.
 
 ## Contributing
 
+### Pre-requisites
+
+* `git submodule update --init --recursive` to update the submodules.
+* Stable Rust with the `wasm32-unknown-unknown` and `wasm32-wasi` targets
+  installed.
+* `cbindgen`, which can be installed via `cargo install --force cbindgen`
+* `wget`, in macOS can be installed via `brew install wget`
+* `wasi-sdk-20.0` installed at `/opt/wasi-sdk/`
+
+### Building and testing
+
 Building and testing is based on a `npm install && npm run build && npm run test` workflow.
+
 
 # License
 
