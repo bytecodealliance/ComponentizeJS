@@ -6,7 +6,7 @@ use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
-use wasmtime_environ::component::StringEncoding;
+use wit_component::StringEncoding;
 use wit_parser::abi::{AbiVariant, LiftLower, WasmSignature};
 use wit_parser::*;
 
@@ -223,7 +223,7 @@ impl JsBindgen<'_> {
                         None,
                         func.name.to_string(),
                         &local_name,
-                        StringEncoding::Utf8,
+                        StringEncoding::UTF8,
                         func,
                     );
                 }
@@ -244,7 +244,7 @@ impl JsBindgen<'_> {
                             iface.name.to_owned(),
                             func.name.to_string(),
                             &local_name,
-                            StringEncoding::Utf8,
+                            StringEncoding::UTF8,
                             &func,
                         );
                         self.esm_bindgen.add_export_binding(
@@ -332,7 +332,7 @@ impl JsBindgen<'_> {
         self.bindgen(
             func.params.len(),
             &callee_name,
-            StringEncoding::Utf8,
+            StringEncoding::UTF8,
             func,
             AbiVariant::GuestExport,
         );
@@ -401,7 +401,11 @@ impl JsBindgen<'_> {
             tmp: 0,
             params,
             post_return: None,
-            encoding: string_encoding,
+            encoding: match string_encoding {
+                StringEncoding::UTF8 => StringEncoding::UTF8,
+                StringEncoding::UTF16 => todo!(),
+                StringEncoding::CompactUTF16 => todo!(),
+            },
             src: Source::default(),
         };
         self.resolve.call(

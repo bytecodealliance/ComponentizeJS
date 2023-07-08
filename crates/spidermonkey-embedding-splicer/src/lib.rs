@@ -9,11 +9,14 @@ use wasm_encoder::{Encode, Section};
 use wit_component::StringEncoding;
 use wit_parser::{self, PackageId, Resolve, UnresolvedPackage};
 
-wit_bindgen::generate!("spidermonkey-embedding-splicer");
+wit_bindgen::generate!({
+    world: "spidermonkey-embedding-splicer",
+    exports: {
+        world: SpidermonkeyEmbeddingSplicerComponent
+    }
+});
 
 struct SpidermonkeyEmbeddingSplicerComponent;
-
-export_spidermonkey_embedding_splicer!(SpidermonkeyEmbeddingSplicerComponent);
 
 /// Calls [`write!`] with the passed arguments and unwraps the result.
 ///
