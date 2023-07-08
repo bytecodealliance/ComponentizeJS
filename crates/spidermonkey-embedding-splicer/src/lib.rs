@@ -1,17 +1,12 @@
 use anyhow::{bail, Context, Result};
 use bindgen::BindingItem;
 use std::path::{Path, PathBuf};
-use wasmtime_environ::{
-    component::{ComponentTypesBuilder, Translator},
-    wasmparser::{Validator, WasmFeatures},
-    ScopeVec, Tunables,
-};
 
 mod bindgen;
 mod splice;
 
 use wasm_encoder::{Encode, Section};
-use wit_component::{ComponentEncoder, StringEncoding};
+use wit_component::StringEncoding;
 use wit_parser::{self, PackageId, Resolve, UnresolvedPackage};
 
 wit_bindgen::generate!("spidermonkey-embedding-splicer");
@@ -130,30 +125,7 @@ impl SpidermonkeyEmbeddingSplicer for SpidermonkeyEmbeddingSplicerComponent {
         wasm_bytes.push(section.id());
         section.encode(&mut wasm_bytes);
 
-        // encode the core wasm into a component binary
-        let encoder = ComponentEncoder::default()
-            .validate(false)
-            .module(&wasm_bytes)
-            .map_err(|e| format!("unable to encode wit component\n{:?}", e))?;
-
-        let component_bytes = encoder
-            .encode()
-            .map_err(|e| format!("failed to encode a component from module\n{:?}", e))?;
-
-        let scope = ScopeVec::new();
-        let tunables = Tunables::default();
-        let mut types = ComponentTypesBuilder::default();
-        let mut validator = Validator::new_with_features(WasmFeatures {
-            component_model: true,
-            ..WasmFeatures::default()
-        });
-
-        let (component, _) = Translator::new(&tunables, &mut validator, &mut types, &scope)
-            .translate(&component_bytes)
-            .map_err(|e| format!("Failed to parse component\n{:?}", e))?;
-
-        let componentized =
-            bindgen::componentize_bindgen(&component, &resolve, world, &source_name);
+        let componentized = bindgen::componentize_bindgen(&resolve, world, &source_name);
 
         let mut generated_bindings = componentized.js_bindings;
 

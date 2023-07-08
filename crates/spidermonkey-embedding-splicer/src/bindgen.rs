@@ -6,7 +6,7 @@ use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
-use wasmtime_environ::component::{Component, GlobalInitializer, StringEncoding};
+use wasmtime_environ::component::StringEncoding;
 use wit_parser::abi::{AbiVariant, LiftLower, WasmSignature};
 use wit_parser::*;
 
@@ -35,7 +35,6 @@ struct JsBindgen<'a> {
     resolve: &'a Resolve,
     world: WorldId,
     sizes: SizeAlign,
-    component: &'a Component,
     memory: String,
     realloc: String,
 
@@ -70,12 +69,7 @@ pub struct Componentization {
     pub import_wrappers: Vec<(String, String)>,
 }
 
-pub fn componentize_bindgen(
-    component: &Component,
-    resolve: &Resolve,
-    id: WorldId,
-    name: &str,
-) -> Componentization {
+pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Componentization {
     let mut bindgen = JsBindgen {
         src: Source::default(),
         esm_bindgen: EsmBindgen::default(),
@@ -84,7 +78,6 @@ pub fn componentize_bindgen(
         resolve,
         world: id,
         sizes: SizeAlign::default(),
-        component,
         memory: "$memory".to_string(),
         realloc: "$realloc".to_string(),
         exports: Vec::new(),
@@ -269,92 +262,103 @@ impl JsBindgen<'_> {
     }
 
     fn imports_bindgen(&mut self) {
-        // populate reverse map from import names to world items
-        let mut imports = BTreeMap::new();
-        for (key, _) in &self.resolve.worlds[self.world].imports {
-            let name = match key {
+        for (key, impt) in &self.resolve.worlds[self.world].imports {
+            let import_name = match key {
                 WorldKey::Name(name) => name.to_string(),
                 WorldKey::Interface(iface) => match self.resolve.id_of(*iface) {
                     Some(name) => name.to_string(),
                     None => continue,
                 },
             };
-            imports.insert(name, key.clone());
+            match &impt {
+                WorldItem::Function(f) => {
+                    let binding_name = format!("$import_{}", f.name.to_lower_camel_case());
+                    self.import_bindgen(
+                        import_name,
+                        f,
+                        false,
+                        None,
+                        f.name.to_string(),
+                        binding_name,
+                    );
+                }
+                WorldItem::Interface(i) => {
+                    let iface = &self.resolve.interfaces[*i];
+                    for (func_name, func) in &iface.functions {
+                        let binding_name = match &iface.name {
+                            Some(iface_name) => format!(
+                                "$import_{}${}",
+                                iface_name.to_lower_camel_case(),
+                                func_name.to_lower_camel_case()
+                            ),
+                            None => format!("$import_{}", import_name.to_lower_camel_case()),
+                        };
+                        self.import_bindgen(
+                            import_name.clone(),
+                            func,
+                            true,
+                            iface.name.clone(),
+                            func_name.clone(),
+                            binding_name,
+                        );
+                    }
+                }
+                WorldItem::Type(_) => unreachable!(),
+            };
         }
-        for init in self.component.initializers.iter() {
-            if let GlobalInitializer::LowerImport(import) = init {
-                let (import_index, path) = &self.component.imports[import.import];
-                let (import_name, _import_ty) = &self.component.import_types[*import_index];
-                let import_key = &imports[import_name];
-                let (func, iface, iface_name, name, callee_name) =
-                    match &self.resolve.worlds[self.world].imports[import_key] {
-                        WorldItem::Function(f) => {
-                            assert_eq!(path.len(), 0);
-                            let binding_name = format!("$import_{}", f.name.to_lower_camel_case());
-                            (f, false, None, f.name.to_string(), binding_name)
-                        }
-                        WorldItem::Interface(i) => {
-                            assert_eq!(path.len(), 1);
-                            let iface = &self.resolve.interfaces[*i];
-                            let f = &iface.functions[&path[0]];
-                            let binding_name = match &iface.name {
-                                Some(iface_name) => format!(
-                                    "$import_{}${}",
-                                    iface_name.to_lower_camel_case(),
-                                    f.name.to_lower_camel_case()
-                                ),
-                                None => format!("$import_{}", import_name.to_lower_camel_case()),
-                            };
-                            let fname = &f.name;
-                            (f, true, iface.name.clone(), fname.to_string(), binding_name)
-                        }
-                        WorldItem::Type(_) => unreachable!(),
-                    };
+    }
 
-                let binding_name = match &iface_name {
-                    Some(iface_name) => format!(
-                        "import_{}${}",
-                        iface_name.to_lower_camel_case(),
-                        name.to_lower_camel_case()
-                    ),
-                    None => format!("import_{}", name.to_lower_camel_case()),
-                };
+    fn import_bindgen(
+        &mut self,
+        import_name: String,
+        func: &Function,
+        iface: bool,
+        iface_name: Option<String>,
+        name: String,
+        callee_name: String,
+    ) {
+        let binding_name = match &iface_name {
+            Some(iface_name) => format!(
+                "import_{}${}",
+                iface_name.to_lower_camel_case(),
+                name.to_lower_camel_case()
+            ),
+            None => format!("import_{}", name.to_lower_camel_case()),
+        };
 
-                // imports are canonicalized as exports because
-                // the function bindgen as currently written still makes this assumption
-                uwrite!(self.src, "\nexport function {binding_name}");
-                self.bindgen(
-                    func.params.len(),
-                    &callee_name,
-                    StringEncoding::Utf8,
-                    func,
-                    AbiVariant::GuestExport,
-                );
-                self.src.push_str("\n");
+        // imports are canonicalized as exports because
+        // the function bindgen as currently written still makes this assumption
+        uwrite!(self.src, "\nexport function {binding_name}");
+        self.bindgen(
+            func.params.len(),
+            &callee_name,
+            StringEncoding::Utf8,
+            func,
+            AbiVariant::GuestExport,
+        );
+        self.src.push_str("\n");
 
-                let sig = self.resolve.wasm_signature(AbiVariant::GuestImport, func);
+        let sig = self.resolve.wasm_signature(AbiVariant::GuestImport, func);
 
-                let component_item = if let Some(iface_name) = iface_name {
-                    BindingItem {
-                        iface,
-                        binding_name,
-                        iface_name: Some(iface_name),
-                        name,
-                        func: self.core_fn(func, &sig),
-                    }
-                } else {
-                    BindingItem {
-                        iface,
-                        binding_name,
-                        iface_name: None,
-                        name,
-                        func: self.core_fn(func, &sig),
-                    }
-                };
-
-                self.imports.push((import_name.into(), component_item));
+        let component_item = if let Some(iface_name) = iface_name {
+            BindingItem {
+                iface,
+                binding_name,
+                iface_name: Some(iface_name),
+                name,
+                func: self.core_fn(func, &sig),
             }
-        }
+        } else {
+            BindingItem {
+                iface,
+                binding_name,
+                iface_name: None,
+                name,
+                func: self.core_fn(func, &sig),
+            }
+        };
+
+        self.imports.push((import_name, component_item));
     }
 
     fn bindgen(
