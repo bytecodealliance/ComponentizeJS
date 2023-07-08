@@ -6,7 +6,7 @@ use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
-use wasmtime_environ::component::{CanonicalOptions, Component, Export, GlobalInitializer};
+use wasmtime_environ::component::{Component, GlobalInitializer, StringEncoding};
 use wit_parser::abi::{AbiVariant, LiftLower, WasmSignature};
 use wit_parser::*;
 
@@ -208,9 +208,7 @@ pub fn componentize_bindgen(
 
 impl JsBindgen<'_> {
     fn exports_bindgen(&mut self) {
-        // populate reverse map from import names to world items
-        let mut exports = BTreeMap::new();
-        for (key, _) in &self.resolve.worlds[self.world].exports {
+        for (key, export) in &self.resolve.worlds[self.world].exports {
             let name = match key {
                 WorldKey::Name(name) => name.to_string(),
                 WorldKey::Interface(iface) => match self.resolve.id_of(*iface) {
@@ -218,22 +216,8 @@ impl JsBindgen<'_> {
                     None => continue,
                 },
             };
-            exports.insert(name, key.clone());
-        }
-
-        for (name, export) in &self.component.exports {
-            let world_key = &exports[name];
-            let item = &self.resolve.worlds[self.world].exports[world_key];
             match export {
-                Export::LiftedFunction {
-                    ty: _,
-                    func: _,
-                    options,
-                } => {
-                    let func = match item {
-                        WorldItem::Function(f) => f,
-                        WorldItem::Interface(_) | WorldItem::Type(_) => unreachable!(),
-                    };
+                WorldItem::Function(func) => {
                     let local_name = self.local_names.create_once(&func.name).to_string();
                     self.esm_bindgen.add_export_binding(
                         None,
@@ -246,23 +230,17 @@ impl JsBindgen<'_> {
                         None,
                         func.name.to_string(),
                         &local_name,
-                        options,
+                        StringEncoding::Utf8,
                         func,
                     );
                 }
-                Export::Instance(exports) => {
-                    let id = match item {
-                        WorldItem::Interface(id) => *id,
-                        WorldItem::Function(_) | WorldItem::Type(_) => unreachable!(),
-                    };
-                    for (func_name, export) in exports {
-                        let options = match export {
-                            Export::LiftedFunction { options, .. } => options,
-                            Export::Type(_) => continue, // ignored
-                            _ => unreachable!(),
-                        };
-                        let iface = &self.resolve.interfaces[id];
-                        let func = &iface.functions[func_name];
+                WorldItem::Interface(id) => {
+                    let iface = &self.resolve.interfaces[*id];
+                    for _ty in &iface.types {
+                        // TODO
+                    }
+                    for (func_name, func) in &iface.functions {
+                        let name = &name;
                         let local_name = self
                             .local_names
                             .create_once(&format!("{name}-{func_name}"))
@@ -273,8 +251,8 @@ impl JsBindgen<'_> {
                             iface.name.to_owned(),
                             func.name.to_string(),
                             &local_name,
-                            options,
-                            func,
+                            StringEncoding::Utf8,
+                            &func,
                         );
                         self.esm_bindgen.add_export_binding(
                             Some(name),
@@ -285,10 +263,7 @@ impl JsBindgen<'_> {
                 }
 
                 // ignore type exports for now
-                Export::Type(_) => {}
-
-                // This can't be tested at this time so leave it unimplemented
-                Export::Module(_) => unimplemented!(),
+                WorldItem::Type(_) => {}
             }
         }
     }
@@ -351,7 +326,7 @@ impl JsBindgen<'_> {
                 self.bindgen(
                     func.params.len(),
                     &callee_name,
-                    &import.options,
+                    StringEncoding::Utf8,
                     func,
                     AbiVariant::GuestExport,
                 );
@@ -386,7 +361,7 @@ impl JsBindgen<'_> {
         &mut self,
         nparams: usize,
         callee: &str,
-        opts: &CanonicalOptions,
+        string_encoding: StringEncoding,
         func: &Function,
         abi: AbiVariant,
     ) {
@@ -422,7 +397,7 @@ impl JsBindgen<'_> {
             tmp: 0,
             params,
             post_return: None,
-            encoding: opts.string_encoding,
+            encoding: string_encoding,
             src: Source::default(),
         };
         self.resolve.call(
@@ -445,7 +420,7 @@ impl JsBindgen<'_> {
         iface_name: Option<String>,
         fn_name: String,
         callee: &str,
-        options: &CanonicalOptions,
+        string_encoding: StringEncoding,
         func: &Function,
     ) {
         let binding_name = match &iface_name {
@@ -465,7 +440,7 @@ impl JsBindgen<'_> {
         self.bindgen(
             sig.params.len(),
             callee,
-            options,
+            string_encoding,
             func,
             AbiVariant::GuestImport,
         );
