@@ -18,8 +18,8 @@ export async function componentize(
     witWorld = opts?.witWorld;
   }
   const {
-    debug = false,
-    sourceName = 'source.js',
+    debug = true,
+    sourceName = "source.js",
     engine = fileURLToPath(
       new URL('../lib/spidermonkey_embedding.wasm', import.meta.url)
     ),
