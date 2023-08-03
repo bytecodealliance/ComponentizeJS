@@ -188,15 +188,20 @@ impl SpidermonkeyEmbeddingSplicer for SpidermonkeyEmbeddingSplicerComponent {
         for (
             export_name,
             BindingItem {
-                name, func, iface, ..
+                name,
+                func,
+                iface,
+                resource,
+                ..
             },
         ) in &componentized.exports
         {
+            let mut expt = export_name.to_string();
             if *iface {
-                exports.push((format!("{export_name}#{name}"), map_core_fn(func)));
-            } else {
-                exports.push((export_name.to_string(), map_core_fn(func)));
+                expt.push('#');
             }
+            expt.push_str(&resource.canon_string(&name));
+            exports.push((expt, map_core_fn(func)));
         }
 
         let mut imports = Vec::new();

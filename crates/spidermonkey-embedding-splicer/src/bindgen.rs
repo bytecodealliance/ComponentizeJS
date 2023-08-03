@@ -1,6 +1,8 @@
 use crate::{uwrite, uwriteln};
 use heck::*;
-use js_component_bindgen::function_bindgen::{ErrHandling, FunctionBindgen};
+use js_component_bindgen::function_bindgen::{
+    ErrHandling, FunctionBindgen, ResourceMap, ResourceTable,
+};
 use js_component_bindgen::intrinsics::{render_intrinsics, Intrinsic};
 use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
@@ -12,10 +14,30 @@ use wit_parser::abi::{AbiVariant, WasmSignature};
 use wit_parser::*;
 
 #[derive(Debug)]
+pub enum Resource {
+    None,
+    Constructor(String),
+    Static(String),
+    Method(String),
+}
+
+impl Resource {
+    pub fn canon_string(&self, fn_name: &str) -> String {
+        match self {
+            Resource::None => fn_name.to_string(),
+            Resource::Constructor(name) => format!("[constructor]{name}"),
+            Resource::Static(name) => format!("[static]{name}.{fn_name}"),
+            Resource::Method(name) => format!("[method]{name}.{fn_name}"),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct BindingItem {
     pub iface: bool,
     pub iface_name: Option<String>,
     pub binding_name: String,
+    pub resource: Resource,
     pub name: String,
     pub func: CoreFn,
 }
@@ -158,6 +180,16 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         "
             import * as $source_mod from '{name}';
 
+            let handleCnt0 = 0;
+            let handleTable0 = new Map();
+            const finalizationRegistry0 = new FinalizationRegistry(handle => {{
+                const handleEntry = handleTable0.get(handle);
+                if (handleEntry) {{
+                    handleTable0.delete(handle);
+                    // TODO: generic dtor goes here
+                }}
+            }});
+
             let $memory, $realloc{};
             export function $initBindings (_memory, _realloc{}) {{
                 $memory = _memory;
@@ -203,56 +235,80 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
 impl JsBindgen<'_> {
     fn exports_bindgen(&mut self) {
         for (key, export) in &self.resolve.worlds[self.world].exports {
-            let name = match key {
-                WorldKey::Name(name) => name.to_string(),
-                WorldKey::Interface(iface) => match self.resolve.id_of(*iface) {
-                    Some(name) => name.to_string(),
-                    None => continue,
-                },
-            };
+            let name = self.resolve.name_world_key(key);
             match export {
                 WorldItem::Function(func) => {
                     let local_name = self.local_names.create_once(&func.name).to_string();
-                    self.esm_bindgen.add_export_binding(
-                        None,
-                        local_name.to_string(),
-                        func.name.to_lower_camel_case(),
-                    );
                     self.export_bindgen(
-                        false,
                         name.into(),
+                        false,
                         None,
-                        func.name.to_string(),
                         &local_name,
                         StringEncoding::UTF8,
                         func,
+                    );
+                    self.esm_bindgen.add_export_func(
+                        None,
+                        local_name.to_string(),
+                        func.name.to_lower_camel_case(),
                     );
                 }
                 WorldItem::Interface(id) => {
                     let iface = &self.resolve.interfaces[*id];
                     for _ty in &iface.types {
-                        // TODO
+                        // ... type exports
                     }
                     for (func_name, func) in &iface.functions {
-                        let name = &name;
                         let local_name = self
                             .local_names
                             .create_once(&format!("{name}-{func_name}"))
                             .to_string();
-                        self.export_bindgen(
-                            true,
-                            name.into(),
-                            iface.name.to_owned(),
-                            func.name.to_string(),
-                            &local_name,
-                            StringEncoding::UTF8,
-                            &func,
-                        );
-                        self.esm_bindgen.add_export_binding(
-                            Some(name),
-                            local_name,
-                            func.name.to_lower_camel_case(),
-                        );
+                        match &func.kind {
+                            FunctionKind::Freestanding => {
+                                let name = &name;
+                                self.export_bindgen(
+                                    name.to_string(),
+                                    true,
+                                    iface.name.to_owned(),
+                                    &local_name,
+                                    StringEncoding::UTF8,
+                                    &func,
+                                );
+                                self.esm_bindgen.add_export_func(
+                                    Some(&name),
+                                    local_name,
+                                    func.name.to_lower_camel_case(),
+                                );
+                            }
+                            FunctionKind::Method(ty)
+                            | FunctionKind::Static(ty)
+                            | FunctionKind::Constructor(ty) => {
+                                let name = &name;
+                                let ty = &self.resolve.types[*ty];
+                                let resource_name = ty.name.as_ref().unwrap().to_upper_camel_case();
+                                let local_name = self
+                                    .local_names
+                                    .get_or_create(
+                                        &format!("resource:{resource_name}"),
+                                        &resource_name,
+                                    )
+                                    .0
+                                    .to_upper_camel_case();
+                                self.export_bindgen(
+                                    name.to_string(),
+                                    true,
+                                    iface.name.to_owned(),
+                                    &local_name,
+                                    StringEncoding::UTF8,
+                                    &func,
+                                );
+                                self.esm_bindgen.ensure_exported_resource(
+                                    Some(&name),
+                                    local_name,
+                                    resource_name,
+                                );
+                            }
+                        };
                     }
                 }
 
@@ -264,13 +320,7 @@ impl JsBindgen<'_> {
 
     fn imports_bindgen(&mut self) {
         for (key, impt) in &self.resolve.worlds[self.world].imports {
-            let import_name = match key {
-                WorldKey::Name(name) => name.to_string(),
-                WorldKey::Interface(iface) => match self.resolve.id_of(*iface) {
-                    Some(name) => name.to_string(),
-                    None => continue,
-                },
-            };
+            let import_name = self.resolve.name_world_key(key);
             match &impt {
                 WorldItem::Function(f) => {
                     let binding_name = format!("$import_{}", f.name.to_lower_camel_case());
@@ -324,12 +374,60 @@ impl JsBindgen<'_> {
                 iface_name.to_lower_camel_case(),
                 name.to_lower_camel_case()
             ),
-            None => format!("import_{}", name.to_lower_camel_case()),
+            None => {
+                match &func.kind {
+                    FunctionKind::Freestanding => {
+                        let binding_name = format!("import_{}", name.to_lower_camel_case());
+                        // imports are canonicalized as exports because
+                        // the function bindgen as currently written still makes this assumption
+                        uwrite!(self.src, "\nexport function {binding_name}");
+                        binding_name
+                    }
+                    FunctionKind::Method(ty) => {
+                        let ty = &self.resolve.types[*ty];
+                        let name = ty.name.as_ref().unwrap().to_upper_camel_case();
+                        let method = func.item_name();
+                        let binding_name = format!(
+                            "import_{}_{}",
+                            name.to_lower_camel_case(),
+                            method.to_lower_camel_case()
+                        );
+                        uwrite!(self.src, "\nfunction {binding_name}");
+                        uwrite!(self.src, "\nexport function {binding_name}");
+                        binding_name
+                    }
+                    FunctionKind::Static(ty) => {
+                        let ty = &self.resolve.types[*ty];
+                        let name = ty.name.as_ref().unwrap().to_upper_camel_case();
+                        let method = func.item_name();
+                        let binding_name = format!(
+                            "import_{}_{}",
+                            name.to_lower_camel_case(),
+                            method.to_lower_camel_case()
+                        );
+                        uwrite!(self.src, "\nfunction {binding_name}");
+                        uwrite!(self.src, "\nexport function {binding_name}");
+                        binding_name
+                    }
+                    FunctionKind::Constructor(ty) => {
+                        let ty = &self.resolve.types[*ty];
+                        let name = ty.name.as_ref().unwrap().to_upper_camel_case();
+                        let method = func.item_name();
+                        let binding_name = format!(
+                            "import_{}_{}",
+                            name.to_lower_camel_case(),
+                            method.to_lower_camel_case()
+                        );
+                        uwrite!(self.src, "\nfunction {binding_name}");
+                        uwrite!(self.src, "\nexport function {binding_name}");
+                        binding_name
+                    }
+                }
+            }
         };
 
-        // imports are canonicalized as exports because
-        // the function bindgen as currently written still makes this assumption
-        uwrite!(self.src, "\nexport function {binding_name}");
+        let resource = Resource::None;
+
         self.bindgen(
             func.params.len(),
             &callee_name,
@@ -346,6 +444,7 @@ impl JsBindgen<'_> {
                 iface,
                 binding_name,
                 iface_name: Some(iface_name),
+                resource,
                 name,
                 func: self.core_fn(func, &sig),
             }
@@ -354,12 +453,81 @@ impl JsBindgen<'_> {
                 iface,
                 binding_name,
                 iface_name: None,
+                resource,
                 name,
                 func: self.core_fn(func, &sig),
             }
         };
 
         self.imports.push((import_name, component_item));
+    }
+
+    fn create_resource_map(&self, func: &Function) -> ResourceMap {
+        let mut resource_map = BTreeMap::new();
+        for (_, ty) in func.params.iter() {
+            self.iter_resources(ty, &mut resource_map);
+        }
+        for ty in func.results.iter_types() {
+            self.iter_resources(ty, &mut resource_map);
+        }
+        resource_map
+    }
+
+    fn iter_resources(&self, ty: &Type, map: &mut ResourceMap) {
+        let Type::Id(id) = ty else { return };
+        match &self.resolve.types[*id].kind {
+            TypeDefKind::Flags(_) | TypeDefKind::Enum(_) => {}
+            TypeDefKind::Record(ty) => {
+                for field in ty.fields.iter() {
+                    self.iter_resources(&field.ty, map);
+                }
+            }
+            TypeDefKind::Handle(Handle::Own(t) | Handle::Borrow(t)) => {
+                map.insert(
+                    *t,
+                    ResourceTable {
+                        id: 0,
+                        imported: true,
+                    },
+                );
+            }
+
+            TypeDefKind::Tuple(t) => {
+                for ty in t.types.iter() {
+                    self.iter_resources(ty, map);
+                }
+            }
+            TypeDefKind::Variant(t) => {
+                for case in t.cases.iter() {
+                    if let Some(ty) = &case.ty {
+                        self.iter_resources(ty, map);
+                    }
+                }
+            }
+            TypeDefKind::Option(ty) => {
+                self.iter_resources(ty, map);
+            }
+            TypeDefKind::Result(ty) => {
+                if let Some(ty) = &ty.ok {
+                    self.iter_resources(ty, map);
+                }
+                if let Some(ty) = &ty.err {
+                    self.iter_resources(ty, map);
+                }
+            }
+            TypeDefKind::Union(t) => {
+                for field in t.cases.iter() {
+                    self.iter_resources(&field.ty, map);
+                }
+            }
+            TypeDefKind::List(ty) => {
+                self.iter_resources(ty, map);
+            }
+            TypeDefKind::Type(ty) => {
+                self.iter_resources(ty, map);
+            }
+            _ => unreachable!(),
+        }
     }
 
     fn bindgen(
@@ -381,6 +549,8 @@ impl JsBindgen<'_> {
             params.push(param);
         }
         uwriteln!(self.src, ") {{");
+
+        let resource_map = self.create_resource_map(func);
 
         let mut f = FunctionBindgen {
             intrinsics: &mut self.all_intrinsics,
@@ -404,11 +574,11 @@ impl JsBindgen<'_> {
             post_return: None,
             encoding: match string_encoding {
                 StringEncoding::UTF8 => StringEncoding::UTF8,
-                StringEncoding::UTF16 => todo!(),
-                StringEncoding::CompactUTF16 => todo!(),
+                StringEncoding::UTF16 => todo!("UTF16 encoding"),
+                StringEncoding::CompactUTF16 => todo!("Compact UTF16 encoding"),
             },
             src: Source::default(),
-            resource_map: &BTreeMap::new(),
+            resource_map: &resource_map,
             cur_resource_borrows: Vec::new(),
         };
         abi::call(
@@ -427,22 +597,44 @@ impl JsBindgen<'_> {
 
     fn export_bindgen(
         &mut self,
-        iface: bool,
         name: String,
+        iface: bool,
         iface_name: Option<String>,
-        fn_name: String,
         callee: &str,
         string_encoding: StringEncoding,
         func: &Function,
     ) {
-        let binding_name = match &iface_name {
-            Some(iface_name) => format!(
-                "export_{}${}",
-                iface_name.to_lower_camel_case(),
-                fn_name.to_lower_camel_case()
-            ),
-            None => format!("export_{}", fn_name.to_lower_camel_case()),
+        let mut binding_name = match &iface_name {
+            Some(iface_name) => format!("export_{}$", iface_name),
+            None => format!("export_"),
         };
+
+        let fn_name = func.item_name();
+
+        let (resource, callee) = match &func.kind {
+            FunctionKind::Freestanding => (Resource::None, callee.to_string()),
+            FunctionKind::Method(ty) => {
+                let resource = self.resolve.types[*ty].name.as_ref().unwrap().to_string();
+                binding_name.push_str(&format!("{}$method$", &resource));
+                (
+                    Resource::Method(resource),
+                    format!("{callee}.prototype.METHOD"),
+                )
+            }
+            FunctionKind::Static(ty) => {
+                let resource = self.resolve.types[*ty].name.as_ref().unwrap().to_string();
+                binding_name.push_str(&format!("{}$static$", &resource));
+                (Resource::Static(resource), format!("{callee}.METHOD"))
+            }
+            FunctionKind::Constructor(ty) => {
+                let resource = self.resolve.types[*ty].name.as_ref().unwrap().to_string();
+                binding_name.push_str(&format!("{}$", &resource));
+                (Resource::Constructor(resource), format!("new {callee}"))
+            }
+        };
+
+        binding_name.push_str(&fn_name.to_lower_camel_case());
+
         uwrite!(self.src, "\nexport function {binding_name}");
 
         // exports are canonicalized as imports because
@@ -451,7 +643,7 @@ impl JsBindgen<'_> {
 
         self.bindgen(
             sig.params.len(),
-            callee,
+            &callee,
             string_encoding,
             func,
             AbiVariant::GuestImport,
@@ -465,7 +657,8 @@ impl JsBindgen<'_> {
                 iface,
                 binding_name,
                 iface_name,
-                name: fn_name,
+                name: fn_name.to_string(),
+                resource,
                 func: self.core_fn(
                     func,
                     &self.resolve.wasm_signature(AbiVariant::GuestExport, func),
@@ -510,8 +703,10 @@ impl JsBindgen<'_> {
 
 type LocalName = String;
 
+#[derive(Debug)]
 enum Binding {
     Interface(BTreeMap<String, Binding>),
+    Resource(LocalName),
     Local(LocalName),
 }
 
@@ -523,7 +718,7 @@ struct EsmBindgen {
 
 impl EsmBindgen {
     /// add an exported function binding, optionally on an interface id or kebab name
-    pub fn add_export_binding(
+    pub fn add_export_func(
         &mut self,
         iface_id_or_kebab: Option<&str>,
         local_name: String,
@@ -545,13 +740,44 @@ impl EsmBindgen {
             }
             iface = match iface.get_mut(&iface_id_or_kebab).unwrap() {
                 Binding::Interface(iface) => iface,
-                Binding::Local(_) => panic!(
-                    "Exported interface {} cannot be both a function and an interface",
+                Binding::Resource(_) | Binding::Local(_) => panic!(
+                    "Exported interface {} cannot be both a function and an interface or resource",
                     iface_id_or_kebab
                 ),
             };
         }
         iface.insert(func_name, Binding::Local(local_name));
+    }
+
+    pub fn ensure_exported_resource(
+        &mut self,
+        iface_id_or_kebab: Option<&str>,
+        local_name: String,
+        resource_name: String,
+    ) {
+        let mut iface = &mut self.exports;
+        if let Some(iface_id_or_kebab) = iface_id_or_kebab {
+            // convert kebab names to camel case, leave ids as-is
+            let iface_id_or_kebab = if iface_id_or_kebab.contains(':') {
+                iface_id_or_kebab.to_string()
+            } else {
+                iface_id_or_kebab.to_lower_camel_case()
+            };
+            if !iface.contains_key(&iface_id_or_kebab) {
+                iface.insert(
+                    iface_id_or_kebab.to_string(),
+                    Binding::Interface(BTreeMap::new()),
+                );
+            }
+            iface = match iface.get_mut(&iface_id_or_kebab).unwrap() {
+                Binding::Interface(iface) => iface,
+                Binding::Resource(_) | Binding::Local(_) => panic!(
+                    "Exported interface {} cannot be both a function and an interface or resource",
+                    iface_id_or_kebab
+                ),
+            };
+        }
+        iface.insert(resource_name, Binding::Resource(local_name));
     }
 
     /// once all exports have been created, aliases can be populated for interface
@@ -607,6 +833,14 @@ impl EsmBindgen {
                             throw new BindingsError(exportName, `${{ifaceProp}} function`, ` on the interface alias \"${{interfaceExportAlias}}\"`, `export const ${{interfaceExportAlias}} = {{\n\t${{ifaceProp}} () {{\n\n}}\n}};`);
                     }}
                 }}
+                function verifyInterfaceResource (fn, exportName, ifaceProp, interfaceExportAlias) {{
+                    if (typeof fn !== 'function') {{
+                        if (!interfaceExportAlias)
+                            throw new BindingsError(exportName, `${{ifaceProp}} resource`, ' on the exported interface object', `const obj = {{\n\t${{ifaceProp}} () {{\n\n}}\n}};\n\nexport {{ obj as '${{exportName}}' }}\n`);
+                        else
+                            throw new BindingsError(exportName, `${{ifaceProp}} resource`, ` on the interface alias \"${{interfaceExportAlias}}\"`, `export const ${{interfaceExportAlias}} = {{\n\t${{ifaceProp}} () {{\n\n}}\n}};`);
+                    }}
+                }}
                 ");
         }
         for (export_name, binding) in &self.exports {
@@ -624,7 +858,9 @@ impl EsmBindgen {
                         }
                         let local_name = match import {
                             Binding::Interface(_) => panic!("Nested interfaces unsupported"),
-                            Binding::Local(local_name) => local_name,
+                            Binding::Resource(local_name) | Binding::Local(local_name) => {
+                                local_name
+                            }
                         };
                         if external_name == local_name {
                             uwrite!(output, "{external_name}");
@@ -658,14 +894,29 @@ impl EsmBindgen {
                     for (external_name, import) in bindings {
                         let local_name = match import {
                             Binding::Interface(_) => panic!("Nested interfaces unsupported"),
-                            Binding::Local(local_name) => local_name,
+                            Binding::Resource(local_name) | Binding::Local(local_name) => {
+                                local_name
+                            }
+                        };
+                        let is_resource = matches!(import, Binding::Resource(_));
+                        let verify_name = if is_resource {
+                            "verifyInterfaceResource"
+                        } else {
+                            "verifyInterfaceFn"
                         };
                         if let Some(alias) = self.export_aliases.get(export_name) {
-                            uwriteln!(output, "verifyInterfaceFn({local_name}, '{export_name}', '{external_name}', '{alias}');");
+                            uwriteln!(output, "{verify_name}({local_name}, '{export_name}', '{external_name}', '{alias}');");
                         } else {
-                            uwriteln!(output, "verifyInterfaceFn({local_name}, '{export_name}', '{external_name}', null);");
+                            uwriteln!(output, "{verify_name}({local_name}, '{export_name}', '{external_name}', null);");
                         };
                     }
+                }
+                Binding::Resource(local_name) => {
+                    uwriteln!(output, "
+                        const {local_name} = {imports_object}.{export_name};
+                        if (typeof {local_name} !== 'function')
+                            throw new BindingsError('{export_name}', 'function', '', `export function {export_name} () {{}};\n`);
+                    ");
                 }
                 Binding::Local(local_name) => {
                     uwriteln!(output, "
