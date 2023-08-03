@@ -14,16 +14,15 @@ version = "0.1.0"
 anyhow = "1.0.69"
 base64 = "0.21.0"
 bitflags = "1.3.2"
-heck =  { version = "0.4", features = ["unicode"] }
-pulldown-cmark = { version = "0.8", default-features = false }
 env_logger = "0.10.0"
-js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", rev = "a825aa7ec6131d63b0289f4cb1952bbf89ffe720", no-default-features = ["transpile-bindgen"] }
-walrus = "0.19.0"
-wasmtime-environ = { version = "10.0.1", features = ["component-model"] }
-wasmprinter = "0.2.59"
-wasmparser = "0.107.0"
-wasm-encoder = "0.29.0"
-wat = "1.0.66"
-wit-bindgen = { git = "https://github.com/bytecodealliance/wit-bindgen", rev = "e69cf5db8754f829637e25491c560ec0d9728852" }
-wit-component = { version = "0.11.0", features = ['dummy-module'] }
-wit-parser = "0.8.0"
+heck =  { version = "0.4", features = ["unicode"] }
+js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", no-default-features = ["transpile-bindgen"] }
+pulldown-cmark = { version = "0.8", default-features = false }
+walrus = "0.20.1"
+wasm-encoder = { git = "https://github.com/bytecodealliance/wasm-tools", rev = "5605721e5373015e70401962a5d381f6968e3fbd" }
+wasmparser = { git = "https://github.com/bytecodealliance/wasm-tools", rev = "5605721e5373015e70401962a5d381f6968e3fbd" }
+wasmprinter = { git = "https://github.com/bytecodealliance/wasm-tools", rev = "5605721e5373015e70401962a5d381f6968e3fbd" }
+wat = { path = "../wasm-tools/crates/wat" }
+wit-bindgen = { git = "https://github.com/bytecodealliance/wit-bindgen" }
+wit-component = { git = "https://github.com/bytecodealliance/wasm-tools", rev = "5605721e5373015e70401962a5d381f6968e3fbd", features = ["dummy-module"] }
+wit-parser = { git = "https://github.com/bytecodealliance/wasm-tools", rev = "5605721e5373015e70401962a5d381f6968e3fbd" }

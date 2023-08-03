@@ -15,7 +15,6 @@ heck = { workspace = true }
 js-component-bindgen = { workspace = true }
 walrus = { workspace = true }
 wasmparser = { workspace = true }
-wasmtime-environ = { workspace = true }
 wasm-encoder = { workspace = true }
 wit-component = { workspace = true }
 wit-parser = { workspace = true }
