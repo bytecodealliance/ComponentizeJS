@@ -125,11 +125,11 @@ export async function componentize(
     process.exit(1);
   }
 
+  const bin = await readFile(output);
+
   const unlinkPromises = Promise.all([unlink(input), unlink(output)]).catch(
     () => {}
   );
-
-  const bin = await readFile(output)
 
   // Check for initialization errors
   // By actually executing the binary in a mini sandbox to get back
