@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 
 use walrus::{
     Function, FunctionBuilder, FunctionKind, ImportKind, ImportedFunction, InstrSeqBuilder,
-    LocalId, Module,
+    LocalId, Module, ValType,
 };
 
 fn stub_import<StubFn>(module: &mut Module, import: &str, name: &str, stub: StubFn) -> Result<()>
@@ -46,7 +46,7 @@ fn unreachable_stub(body: &mut InstrSeqBuilder) -> Result<Vec<LocalId>> {
 
 const WASI: &str = "wasi_snapshot_preview1";
 
-pub fn stub_wasi(wasm: Vec<u8>) -> Result<Vec<u8>> {
+pub fn stub_wasi(wasm: Vec<u8>, stdout: bool) -> Result<Vec<u8>> {
     let mut module = Module::from_buffer(wasm.as_slice())?;
 
     stub_import(&mut module, WASI, "clock_res_get", unreachable_stub)?;
@@ -77,10 +77,13 @@ pub fn stub_wasi(wasm: Vec<u8>) -> Result<Vec<u8>> {
     })?;
 
     // (func (param i32 i32 i32 i32) (result i32)))
-    // stub_import(&mut module, WASI, "fd_write", |body| {
-    //     body.local_get(len_local);
-    //     Ok(vec![len_local])
-    // })?;
+    let len_local = module.locals.add(ValType::I32);
+    if !stdout {
+        stub_import(&mut module, WASI, "fd_write", |body| {
+            body.local_get(len_local);
+            Ok(vec![len_local])
+        })?;
+    }
 
     Ok(module.emit_wasm())
 }

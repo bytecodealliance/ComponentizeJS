@@ -26,6 +26,7 @@ export async function componentize(
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
     worldName,
+    enableStdout = false,
   } = opts || {};
 
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
@@ -48,8 +49,6 @@ export async function componentize(
 
   const input = join(tmpdir(), 'in.wasm');
   const output = join(tmpdir(), 'out.wasm');
-
-  await writeFile('tmpa.wasm', Buffer.from(wasm));
 
   await writeFile(input, Buffer.from(wasm));
 
@@ -311,9 +310,7 @@ export async function componentize(
   }
 
   // after wizering, stub out the wasi imports
-  const finalBin = stubWasi(bin);
-
-  await writeFile('tmpb.wasm', Buffer.from(finalBin));
+  const finalBin = stubWasi(bin, enableStdout);
 
   const component = await metadataAdd(
     await componentNew(

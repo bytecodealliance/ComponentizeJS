@@ -50,35 +50,6 @@ pub fn splice(
     // create the exported functions as wrappers around the "cabi_call" function
     synthesize_export_functions(&mut module, &exports)?;
 
-    // stub out the unneeded wasi imports
-    let mut to_stub = Vec::new();
-    for impt in module.imports.iter_mut() {
-        if impt.module == "wasi_snapshot_preview1" {
-            if impt.name != "clock_time_get" && impt.name != "random_get" {
-                let fid = match impt.kind {
-                    walrus::ImportKind::Function(fid) => fid,
-                    _ => panic!(),
-                };
-                to_stub.push((fid, impt.id()));
-            }
-        }
-    }
-
-    // inline empty wasi functions
-    // for (fid, impt_id) in to_stub {
-    //     let ty = module.types.get(module.funcs.get(fid).ty());
-    //     let params = ty.params().iter().map(|v| v.clone()).collect::<Vec<walrus::ValType>>();
-    //     let results = ty.results().iter().map(|v| v.clone()).collect::<Vec<walrus::ValType>>();
-    //     let mut stub_func = FunctionBuilder::new(&mut module.types, params.as_slice(), results.as_slice());
-    //     stub_func.func_body().unreachable();
-    //     let local_func = stub_func.local_func(vec![]);
-
-    //     let mut func = module.funcs.get_mut(fid);
-    //     func.kind = FunctionKind::Local(local_func);
-
-    //     module.imports.delete(impt_id);
-    // }
-
     Ok(module.emit_wasm())
 }
 

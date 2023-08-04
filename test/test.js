@@ -22,6 +22,7 @@ suite('Builtins', () => {
         }
       `, {
         sourceName: `${name}.js`,
+        enableStdout: true,
       });
     
       const { files } = await transpile(component, { name, wasiShim: true });
