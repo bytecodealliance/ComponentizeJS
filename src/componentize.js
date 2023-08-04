@@ -4,9 +4,8 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { readFile, unlink, writeFile } from "node:fs/promises";
-import { spliceBindings } from "../lib/spidermonkey-embedding-splicer.js";
+import { spliceBindings, stubWasi } from "../lib/spidermonkey-embedding-splicer.js";
 import { fileURLToPath } from "node:url";
-import { writeFileSync } from 'node:fs';
 const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
 export async function componentize(
@@ -20,13 +19,14 @@ export async function componentize(
   }
   const {
     debug = false,
-    sourceName = "source.js",
+    sourceName = 'source.js',
     engine = fileURLToPath(
-      new URL("../lib/spidermonkey_embedding.wasm", import.meta.url)
+      new URL('../lib/spidermonkey_embedding.wasm', import.meta.url)
     ),
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
-    worldName
+    worldName,
+    enableStdout = false,
   } = opts || {};
 
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
@@ -47,8 +47,8 @@ export async function componentize(
     console.log(exports);
   }
 
-  const input = join(tmpdir(), "in.wasm");
-  const output = join(tmpdir(), "out.wasm");
+  const input = join(tmpdir(), 'in.wasm');
+  const output = join(tmpdir(), 'out.wasm');
 
   await writeFile(input, Buffer.from(wasm));
 
@@ -61,19 +61,22 @@ export async function componentize(
     SOURCE_LEN: new TextEncoder().encode(jsSource).byteLength.toString(),
     BINDINGS_LEN: new TextEncoder().encode(jsBindings).byteLength.toString(),
     IMPORT_WRAPPER_CNT: Object.keys(importWrappers).length.toString(),
-    EXPORT_CNT: exports.length.toString()
+    EXPORT_CNT: exports.length.toString(),
   };
 
   for (const [idx, [export_name, expt]] of exports.entries()) {
     env[`EXPORT${idx}_NAME`] = export_name;
-    env[`EXPORT${idx}_ARGS`] = (expt.paramptr ? '*' : '') + expt.params.join(',');
+    env[`EXPORT${idx}_ARGS`] =
+      (expt.paramptr ? '*' : '') + expt.params.join(',');
     env[`EXPORT${idx}_RET`] = (expt.retptr ? '*' : '') + (expt.ret || '');
     env[`EXPORT${idx}_RETSIZE`] = String(expt.retsize);
   }
 
   for (const [idx, [name, importWrapper]] of importWrappers.entries()) {
     env[`IMPORT_WRAPPER${idx}_NAME`] = name;
-    env[`IMPORT_WRAPPER${idx}_LEN`] = new TextEncoder().encode(importWrapper).byteLength.toString();
+    env[`IMPORT_WRAPPER${idx}_LEN`] = new TextEncoder()
+      .encode(importWrapper)
+      .byteLength.toString();
     wizerInput += importWrapper;
   }
 
@@ -92,10 +95,10 @@ export async function componentize(
     let wizerProcess = spawnSync(
       wizer,
       [
-        "--allow-wasi",
+        '--allow-wasi',
         `--dir=.`,
         `--wasm-bulk-memory=true`,
-        "--inherit-env=true",
+        '--inherit-env=true',
         `-o=${output}`,
         input,
       ],
@@ -104,11 +107,11 @@ export async function componentize(
         env,
         input: wizerInput,
         shell: true,
-        encoding: "utf-8",
+        encoding: 'utf-8',
       }
     );
     if (wizerProcess.status !== 0)
-      throw new Error("Wizering failed to complete");
+      throw new Error('Wizering failed to complete');
   } catch (error) {
     console.error(
       `Error: Failed to initialize the compiled Wasm binary with Wizer:\n`,
@@ -145,7 +148,7 @@ export async function componentize(
       );
     };
 
-    let stderr = "";
+    let stderr = '';
     const module = await WebAssembly.compile(bin);
 
     const mockImports = {
@@ -168,22 +171,22 @@ export async function componentize(
           mem.setUint32(nwritten, written, true);
           return 1;
         },
-        environ_get: eep("environ_get"),
-        environ_sizes_get: eep("environ_sizes_get"),
-        clock_res_get: eep("clock_res_get"),
-        clock_time_get: eep("clock_time_get"),
-        fd_close: eep("fd_close"),
-        fd_fdstat_get: eep("fd_fdstat_get"),
-        fd_fdstat_set_flags: eep("fd_fdstat_set_flags"),
-        fd_prestat_get: eep("fd_prestat_get"),
-        fd_prestat_dir_name: eep("fd_prestat_dir_name"),
-        fd_read: eep("fd_read"),
-        fd_seek: eep("fd_seek"),
-        path_open: eep("path_open"),
-        path_remove_directory: eep("path_remove_directory"),
-        path_unlink_file: eep("path_unlink_file"),
-        proc_exit: eep("proc_exit"),
-        random_get: eep("random_get"),
+        environ_get: eep('environ_get'),
+        environ_sizes_get: eep('environ_sizes_get'),
+        clock_res_get: eep('clock_res_get'),
+        clock_time_get: eep('clock_time_get'),
+        fd_close: eep('fd_close'),
+        fd_fdstat_get: eep('fd_fdstat_get'),
+        fd_fdstat_set_flags: eep('fd_fdstat_set_flags'),
+        fd_prestat_get: eep('fd_prestat_get'),
+        fd_prestat_dir_name: eep('fd_prestat_dir_name'),
+        fd_read: eep('fd_read'),
+        fd_seek: eep('fd_seek'),
+        path_open: eep('path_open'),
+        path_remove_directory: eep('path_remove_directory'),
+        path_unlink_file: eep('path_unlink_file'),
+        proc_exit: eep('proc_exit'),
+        random_get: eep('random_get'),
       },
     };
 
@@ -287,8 +290,14 @@ export async function componentize(
   }
 
   // in debug mode, log the generated bindings for bindings errors
-  if (debug && (status === INIT_BINDINGS_COMPILE || status === INIT_MEM_BINDINGS)) {
-    err += `\n\nGenerated bindings:\n_____\n${jsBindings.split('\n').map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`).join('\n')}\n-----\n`;
+  if (
+    debug &&
+    (status === INIT_BINDINGS_COMPILE || status === INIT_MEM_BINDINGS)
+  ) {
+    err += `\n\nGenerated bindings:\n_____\n${jsBindings
+      .split('\n')
+      .map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`)
+      .join('\n')}\n-----\n`;
   }
 
   if (err) {
@@ -300,15 +309,25 @@ export async function componentize(
     process.exit(1);
   }
 
-  const component = await metadataAdd(await componentNew(bin, Object.entries({
-    wasi_snapshot_preview1: await readFile(preview2Adapter)
-  }), false), Object.entries({
-    language: [['JavaScript', '']],
-    'processed-by': [['ComponentizeJS', version]],
-  }));
+  // after wizering, stub out the wasi imports
+  const finalBin = stubWasi(bin, enableStdout);
+
+  const component = await metadataAdd(
+    await componentNew(
+      finalBin,
+      Object.entries({
+        wasi_snapshot_preview1: await readFile(preview2Adapter),
+      }),
+      false
+    ),
+    Object.entries({
+      language: [['JavaScript', '']],
+      'processed-by': [['ComponentizeJS', version]],
+    })
+  );
 
   return {
     component,
-    imports: imports.map(([specifier, impt]) => specifier === '$root' ? [impt, 'default'] : [specifier, impt])
+    imports,
   };
 }

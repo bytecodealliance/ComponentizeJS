@@ -87,6 +87,12 @@ await writeFile('test.component.wasm', component);
 
 The component iself can be executed in any component runtime, see the [example](EXAMPLE.md) for a full workflow.
 
+## Console Support
+
+By default, `console.log` calls will not write to `stdout`, unless explicitly configured by the `enableStdout: true` option.
+
+In future this will use the WASI logging subsystem directly.
+
 ## API
 
 ```js
@@ -96,7 +102,8 @@ componentize(jsSource: string, {
   debug?: bool,
   sourceName?: string,
   engine?: string,
-  preview2Adapter?: string
+  preview2Adapter?: string,
+  enableStdout?: bool,
 }): {
   component: Uint8Array,
   imports: string[]

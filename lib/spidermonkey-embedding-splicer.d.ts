@@ -34,4 +34,5 @@ import { ImportsWallClock } from './imports/wall-clock';
 import { ImportsFilesystem } from './imports/filesystem';
 import { ImportsStreams } from './imports/streams';
 import { ImportsRandom } from './imports/random';
+export function stubWasi(engine: Uint8Array | ArrayBuffer, stdout: boolean): Uint8Array;
 export function spliceBindings(sourceName: string | null, spidermonkeyEngine: Uint8Array | ArrayBuffer, witWorld: string | null, witPath: string | null, worldName: string | null): SpliceResult;

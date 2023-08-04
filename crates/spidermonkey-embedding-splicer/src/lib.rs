@@ -4,6 +4,9 @@ use std::path::{Path, PathBuf};
 
 mod bindgen;
 mod splice;
+mod stub_wasi;
+
+use crate::stub_wasi::stub_wasi;
 
 use wasm_encoder::{Encode, Section};
 use wit_component::StringEncoding;
@@ -91,6 +94,10 @@ fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
 }
 
 impl SpidermonkeyEmbeddingSplicer for SpidermonkeyEmbeddingSplicerComponent {
+    fn stub_wasi(wasm: Vec<u8>, stdout: bool) -> Result<Vec<u8>, String> {
+        stub_wasi(wasm, stdout).map_err(|e| e.to_string())
+    }
+
     fn splice_bindings(
         source_name: Option<String>,
         engine: Vec<u8>,

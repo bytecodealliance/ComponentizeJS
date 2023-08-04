@@ -50,13 +50,6 @@ pub fn splice(
     // create the exported functions as wrappers around the "cabi_call" function
     synthesize_export_functions(&mut module, &exports)?;
 
-    // rename the wasi importer
-    for impt in module.imports.iter_mut() {
-        if impt.module == "wasi_snapshot_preview" {
-            impt.module = String::from("wasi_snapshot_preview1_internal");
-        }
-    }
-
     Ok(module.emit_wasm())
 }
 
@@ -417,7 +410,7 @@ fn synthesize_import_functions(
         }
 
         // extend the main table to include indices for generated imported functions
-        let mut table = module.tables.get_mut(main_tid);
+        let table = module.tables.get_mut(main_tid);
         table.initial += imports.len() as u32;
         table.maximum = Some(table.maximum.unwrap() + imports.len() as u32);
 
