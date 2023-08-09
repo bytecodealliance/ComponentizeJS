@@ -15,7 +15,7 @@ export async function componentize(
 ) {
   if (typeof witWorld === 'object') {
     opts = witWorld;
-    witWorld = null;
+    witWorld = opts?.witWorld;
   }
   const {
     debug = false,

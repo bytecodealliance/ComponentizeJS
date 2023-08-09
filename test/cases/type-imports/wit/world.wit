@@ -1,0 +1,7 @@
+package local:a
+
+world type-imports {
+  use local:b/foo.{bar}
+
+  export test: func() -> bar
+}

@@ -19,10 +19,13 @@ heck =  { version = "0.4", features = ["unicode"] }
 js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", no-default-features = ["transpile-bindgen"] }
 pulldown-cmark = { version = "0.8", default-features = false }
 walrus = "0.20.1"
-wasm-encoder = { git = "https://github.com/bytecodealliance/wasm-tools", rev = "5605721e5373015e70401962a5d381f6968e3fbd" }
-wasmparser = { git = "https://github.com/bytecodealliance/wasm-tools", rev = "5605721e5373015e70401962a5d381f6968e3fbd" }
-wasmprinter = { git = "https://github.com/bytecodealliance/wasm-tools", rev = "5605721e5373015e70401962a5d381f6968e3fbd" }
-wat = { path = "../wasm-tools/crates/wat" }
+wasm-encoder = "0.31.1"
+wasmparser = "0.110.0"
+wasmprinter = "0.2.62"
+wat = "1.0.69"
 wit-bindgen = { git = "https://github.com/bytecodealliance/wit-bindgen" }
-wit-component = { git = "https://github.com/bytecodealliance/wasm-tools", rev = "5605721e5373015e70401962a5d381f6968e3fbd", features = ["dummy-module"] }
-wit-parser = { git = "https://github.com/bytecodealliance/wasm-tools", rev = "5605721e5373015e70401962a5d381f6968e3fbd" }
+wit-component = { version = "0.13.1", features = ["dummy-module"] }
+wit-parser = "0.9.2"
+
+[patch.crates-io]
+wasmtime-environ = { git = 'https://github.com/bytecodealliance/wasmtime', branch = 'release-12.0.0' }

@@ -27,7 +27,8 @@ suite('Builtins', () => {
     
       const { files } = await transpile(component, { name, wasiShim: true });
 
-      await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), { recursive: true });
+      await mkdir(new URL(`./output/${name}/imports`, import.meta.url), { recursive: true });
+      await mkdir(new URL(`./output/${name}/exports`, import.meta.url), { recursive: true });
     
       await writeFile(new URL(`./output/${name}.component.wasm`, import.meta.url), component);
     
@@ -63,19 +64,27 @@ suite('Builtins', () => {
 const bindingsCases = await readdir(new URL('./cases', import.meta.url));
 suite('Bindings', () => {
   for (const name of bindingsCases) {
-    // if (name === 'use-across-interfaces' || name === 'rename-interface') {
-    //   test.skip(name, () => {});
-    //   continue;
-    // }
     test(name, async () => {
       const source = await readFile(new URL(`./cases/${name}/source.js`, import.meta.url), 'utf8');
-      const world = await readFile(new URL(`./cases/${name}/world.wit`, import.meta.url), 'utf8');
+
+      let witWorld, witPath;
+      try {
+        witWorld = await readFile(new URL(`./cases/${name}/world.wit`, import.meta.url), 'utf8');
+      } catch (e) {
+        if (e?.code == 'ENOENT') {
+          witPath = fileURLToPath(new URL(`./cases/${name}/wit`, import.meta.url));
+        } else {
+          throw e;
+        }
+      }
 
       const test = await import(`./cases/${name}/test.js`);
 
       try {
-        const { component, imports } = await componentize(source, world, {
+        const { component, imports } = await componentize(source, {
           sourceName: `${name}.js`,
+          witWorld,
+          witPath,
         });
 
         const map = {
@@ -97,16 +106,13 @@ suite('Bindings', () => {
 
         const { files } = await transpile(component, { name, map, wasiShim: true });
 
-        await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), { recursive: true });
+        await mkdir(new URL(`./output/${name}/imports`, import.meta.url), { recursive: true });
+        await mkdir(new URL(`./output/${name}/exports`, import.meta.url), { recursive: true });
 
         await writeFile(new URL(`./output/${name}.component.wasm`, import.meta.url), component);
 
         for (const file of Object.keys(files)) {
           let source = files[file];
-          // JCO patch pending kebab import fix
-          if (file.endsWith('.js')) {
-            source = new TextDecoder().decode(source).replace(/import import/g, 'import');
-          }
           await writeFile(new URL(`./output/${name}/${file}`, import.meta.url), source);
         }
 
@@ -141,7 +147,8 @@ suite('WASI', () => {
 
     const { files } = await transpile(component);
 
-    await mkdir(new URL(`./output/wasi/interfaces`, import.meta.url), { recursive: true });
+    await mkdir(new URL(`./output/wasi/imports`, import.meta.url), { recursive: true });
+    await mkdir(new URL(`./output/wasi/exports`, import.meta.url), { recursive: true });
 
     for (const file of Object.keys(files)) {
       await writeFile(new URL(`./output/wasi/${file}`, import.meta.url), files[file]);

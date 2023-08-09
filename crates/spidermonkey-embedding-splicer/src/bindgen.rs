@@ -303,7 +303,7 @@ impl JsBindgen<'_> {
                         );
                     }
                 }
-                WorldItem::Type(_) => unreachable!(),
+                WorldItem::Type(_) => {}
             };
         }
     }
