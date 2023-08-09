@@ -1,5 +1,5 @@
 import { componentize } from '@bytecodealliance/componentize-js';
-import { transpile } from '../../jco/src/api.js';
+import { transpile } from '@bytecodealliance/jco';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
