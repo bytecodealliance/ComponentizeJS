@@ -1,7 +1,9 @@
 package local:rename-interface
 
 interface foo {
-  record bar {}
+  record bar {
+    dummy: bool
+  }
 }
 
 world the-world {

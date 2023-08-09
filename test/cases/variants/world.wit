@@ -16,7 +16,9 @@ interface variants {
   u1-arg: func(x: u1)
   u1-result: func() -> u1
 
-  record empty {}
+  record empty {
+    dummy: bool
+  }
 
   variant v1 {
       a,
@@ -36,7 +38,7 @@ interface variants {
 
   option-arg: func(
     a: option<bool>,
-    b: option<tuple<>>,
+    b: option<tuple<bool>>,
     c: option<u32>,
     d: option<e1>,
     e: option<float32>,
@@ -45,7 +47,7 @@ interface variants {
   )
   option-result: func() -> tuple<
     option<bool>,
-    option<tuple<>>,
+    option<tuple<bool>>,
     option<u32>,
     option<e1>,
     option<float32>,
@@ -103,7 +105,7 @@ interface variants {
     a: result,
     b: result<_, e1>,
     c: result<e1>,
-    d: result<tuple<>, tuple<>>,
+    d: result<tuple<bool>, tuple<bool>>,
     e: result<u32, v1>,
     f: result<string, list<u8>>,
   )
@@ -111,7 +113,7 @@ interface variants {
     result,
     result<_, e1>,
     result<e1>,
-    result<tuple<>, tuple<>>,
+    result<tuple<bool>, tuple<bool>>,
     result<u32, v1>,
     result<string, list<u8>>,
   >
