@@ -24,15 +24,15 @@ export interface SpliceResult {
   importWrappers: [string, string][],
   imports: [string, string, number][],
 }
-import { ImportsEnvironment } from './imports/environment';
-import { ImportsExit } from './imports/exit';
-import { ImportsPreopens } from './imports/preopens';
-import { ImportsStderr } from './imports/stderr';
-import { ImportsStdin } from './imports/stdin';
-import { ImportsStdout } from './imports/stdout';
-import { ImportsWallClock } from './imports/wall-clock';
-import { ImportsFilesystem } from './imports/filesystem';
-import { ImportsStreams } from './imports/streams';
-import { ImportsRandom } from './imports/random';
+import { Environment } from './interfaces/environment';
+import { Exit } from './interfaces/exit';
+import { Preopens } from './interfaces/preopens';
+import { Stderr } from './interfaces/stderr';
+import { Stdin } from './interfaces/stdin';
+import { Stdout } from './interfaces/stdout';
+import { WallClock } from './interfaces/wall-clock';
+import { Filesystem } from './interfaces/filesystem';
+import { Streams } from './interfaces/streams';
+import { Random } from './interfaces/random';
 export function stubWasi(engine: Uint8Array | ArrayBuffer, stdout: boolean): Uint8Array;
 export function spliceBindings(sourceName: string | null, spidermonkeyEngine: Uint8Array | ArrayBuffer, witWorld: string | null, witPath: string | null, worldName: string | null): SpliceResult;

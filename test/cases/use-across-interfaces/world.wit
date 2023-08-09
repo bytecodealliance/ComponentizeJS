@@ -1,7 +1,9 @@
 package local:use-across-interfaces
 
 interface foo {
-  record a {}
+  record a {
+    dummy: bool
+  }
   x: func() -> a
 }
 
