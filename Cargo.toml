@@ -1,5 +1,8 @@
 [workspace]
-members = ["crates/spidermonkey-embedding-splicer"]
+members = [
+  "crates/spidermonkey-embedding-splicer",
+  "crates/component-init"
+]
 exclude = [
   "deps/js-compute-runtime/runtime/js-compute-runtime/rust-url",
   "deps/js-compute-runtime/runtime/js-compute-runtime/rust-encoding"

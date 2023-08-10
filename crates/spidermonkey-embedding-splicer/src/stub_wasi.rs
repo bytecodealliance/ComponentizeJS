@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 
 use walrus::{
+    ir::{MemArg, StoreKind},
     Function, FunctionBuilder, FunctionKind, ImportKind, ImportedFunction, InstrSeqBuilder,
     LocalId, Module, ValType,
 };
@@ -64,15 +65,28 @@ pub fn stub_wasi(wasm: Vec<u8>, stdout: bool) -> Result<Vec<u8>> {
     stub_import(&mut module, WASI, "proc_exit", unreachable_stub)?;
     stub_import(&mut module, WASI, "random_get", unreachable_stub)?;
 
+    let mem = module.memories.iter().next().unwrap().id();
+
     // (func (param i32 i32 i32 i32) (result i32)))
+    let ptr_local = module.locals.add(ValType::I32);
     stub_import(&mut module, WASI, "clock_time_get", |body| {
-        body.i32_const(0);
+        body.local_get(ptr_local)
+            .i64_const(0)
+            .store(
+                mem,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 3,
+                    offset: 0,
+                },
+            )
+            .i32_const(0);
         Ok(vec![])
     })?;
 
     // (func (param i32 i32) (result i32)))
     stub_import(&mut module, WASI, "fd_fdstat_get", |body| {
-        body.i32_const(0);
+        body.i32_const(8);
         Ok(vec![])
     })?;
 

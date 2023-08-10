@@ -7,3 +7,6 @@
 [submodule "preview2-prototyping"]
 	path = preview2-prototyping
 	url = git@github.com:bytecodealliance/preview2-prototyping
+[submodule "component-init"]
+	path = crates/component-init
+	url = git@github.com:dicej/component-init
