@@ -6,8 +6,9 @@ use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
+use wit_bindgen_core::abi::{self, LiftLower};
 use wit_component::StringEncoding;
-use wit_parser::abi::{AbiVariant, LiftLower, WasmSignature};
+use wit_parser::abi::{AbiVariant, WasmSignature};
 use wit_parser::*;
 
 #[derive(Debug)]
@@ -407,8 +408,11 @@ impl JsBindgen<'_> {
                 StringEncoding::CompactUTF16 => todo!(),
             },
             src: Source::default(),
+            resource_map: &BTreeMap::new(),
+            cur_resource_borrows: Vec::new(),
         };
-        self.resolve.call(
+        abi::call(
+            self.resolve,
             abi,
             match abi {
                 AbiVariant::GuestImport => LiftLower::LiftArgsLowerResults,
