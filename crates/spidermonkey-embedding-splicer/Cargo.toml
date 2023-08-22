@@ -18,4 +18,5 @@ wasmparser = { workspace = true }
 wasm-encoder = { workspace = true }
 wit-component = { workspace = true }
 wit-parser = { workspace = true }
+wit-bindgen-core = { workspace = true }
 wit-bindgen = { workspace = true }

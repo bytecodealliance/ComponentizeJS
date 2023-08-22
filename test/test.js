@@ -85,6 +85,7 @@ suite('Bindings', () => {
           sourceName: `${name}.js`,
           witWorld,
           witPath,
+          enableStdout: true,
         });
 
         const map = {
@@ -135,9 +136,14 @@ suite('WASI', () => {
       import { now } from 'wasi:clocks/wall-clock';
       import { getRandomBytes } from 'wasi:random/random';
 
-      export function test () {
-        return \`NOW: \${now().seconds}, RANDOM: \${getRandomBytes(2n)}\`;
-      }
+      let result;
+      export const run = {
+        run () {
+          result = \`NOW: \${now().seconds}, RANDOM: \${getRandomBytes(2n)}\`;
+        }
+      };
+
+      export const getResult = () => result;
     `, {
       witPath: fileURLToPath(new URL('./wit', import.meta.url)),
       worldName: 'test1'
@@ -155,7 +161,8 @@ suite('WASI', () => {
     }
 
     var instance = await import(`./output/wasi/component.js`);
-    const result = instance.test();
+    instance.run.run();
+    const result = instance.getResult();
     strictEqual(result.slice(0, 10), `NOW: ${String(Date.now()).slice(0, 5)}`);
     strictEqual(result.split(',').length, 3);
   });

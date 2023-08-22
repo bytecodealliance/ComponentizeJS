@@ -673,9 +673,21 @@ fn synthesize_export_functions(
         }
 
         // Post export function synthesis
-        {
+        // We always define a post-export since we use a bulk deallocation strategy
+        // TODO: remove after jco upgrade
+        if expt_sig.ret.is_some() {
             // add the function type
-            let mut func = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
+            let params = if let Some(ret) = expt_sig.ret {
+                vec![match ret {
+                    CoreTy::I32 => ValType::I32,
+                    CoreTy::I64 => ValType::I64,
+                    CoreTy::F32 => ValType::F32,
+                    CoreTy::F64 => ValType::F64,
+                }]
+            } else {
+                vec![]
+            };
+            let mut func = FunctionBuilder::new(&mut module.types, &params, &[]);
             func.name(format!("post_{}", expt_name));
             let mut func_body = func.func_body();
 
