@@ -673,9 +673,18 @@ fn synthesize_export_functions(
         }
 
         // Post export function synthesis
-        {
+        if let Some(ret) = expt_sig.ret {
             // add the function type
-            let mut func = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
+            let mut func = FunctionBuilder::new(
+                &mut module.types,
+                &[match ret {
+                    CoreTy::I32 => ValType::I32,
+                    CoreTy::I64 => ValType::I64,
+                    CoreTy::F32 => ValType::F32,
+                    CoreTy::F64 => ValType::F64,
+                }],
+                &[],
+            );
             func.name(format!("post_{}", expt_name));
             let mut func_body = func.func_body();
 
