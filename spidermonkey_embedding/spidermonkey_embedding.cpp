@@ -937,7 +937,7 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx, void *argptr
     {
       fprintf(stderr, "(call) setting retptr at arg %d\n", argcnt);
     }
-    retptr = cabi_realloc(0, 0, 4, fn->retsize);
+    retptr = JS_realloc(R.cx, 0, 0, fn->retsize);
     args[argcnt].setInt32((uint32_t)retptr);
   }
 
@@ -988,7 +988,7 @@ __attribute__((export_name("post_call"))) void post_call(uint32_t fn_idx)
   {
     fprintf(stderr, "(post_call) Function [%d]\n", fn_idx);
   }
-  // disabled pending ensuring post_calls
+  // TODO: remove after jco upgrade
   // if (R.cur_fn_idx != fn_idx)
   // {
   //   log("(post_call) Unexpected call state, was call definitely called last?");
@@ -997,6 +997,7 @@ __attribute__((export_name("post_call"))) void post_call(uint32_t fn_idx)
   R.cur_fn_idx = -1;
   for (void *ptr : R.free_list)
   {
+    log("(free list)");
     cabi_free(ptr);
   }
   R.free_list.clear();

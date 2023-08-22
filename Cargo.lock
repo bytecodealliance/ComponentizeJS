@@ -52,7 +52,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "cranelift-entity"
 version = "0.100.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#367bdc8c66df62d6854966a90564b42692a3f023"
+source = "git+https://github.com/bytecodealliance/wasmtime#af35da6946cf5fe55c053807b3787ca58b228a66"
 dependencies = [
  "serde",
 ]
@@ -193,8 +193,8 @@ checksum = "af150ab688ff2122fcef229be89cb50dd66af9e01a4ff320cc137eecc9bacc38"
 
 [[package]]
 name = "js-component-bindgen"
-version = "0.10.1"
-source = "git+https://github.com/bytecodealliance/jco#8a0aa572a918b6acc7052056f946208567f69926"
+version = "0.11.0"
+source = "git+https://github.com/bytecodealliance/jco#9095dc8b89bbd1d34300343a21c19598f811ebc8"
 dependencies = [
  "anyhow",
  "base64",
@@ -292,18 +292,18 @@ checksum = "b0293b4b29daaf487284529cc2f5675b8e57c61f70167ba415a463651fd6a918"
 
 [[package]]
 name = "serde"
-version = "1.0.183"
+version = "1.0.185"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32ac8da02677876d532745a130fc9d8e6edfa81a269b107c5b00829b91d8eb3c"
+checksum = "be9b6f69f1dfd54c3b568ffa45c310d6973a5e5148fd40cf515acaf38cf5bc31"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.183"
+version = "1.0.185"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aafe972d60b0b9bee71a91b92fee2d4fb3c9d7e8f6b179aa99f27203d99a4816"
+checksum = "dc59dfdcbad1437773485e0367fea4b090a2e0a16d9ffc46af47764536a298ec"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -423,9 +423,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "unicase"
-version = "2.6.0"
+version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50f37be617794602aabbeee0be4f259dc1778fabe05e2d67ee8f79326d5cb4f6"
+checksum = "f7d2d4dafb69621809a81864c9c1b864479e1235c0dd4e199924b9742439ed89"
 dependencies = [
  "version_check",
 ]
@@ -586,12 +586,12 @@ dependencies = [
 [[package]]
 name = "wasmtime-component-util"
 version = "13.0.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#367bdc8c66df62d6854966a90564b42692a3f023"
+source = "git+https://github.com/bytecodealliance/wasmtime#af35da6946cf5fe55c053807b3787ca58b228a66"
 
 [[package]]
 name = "wasmtime-environ"
 version = "13.0.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#367bdc8c66df62d6854966a90564b42692a3f023"
+source = "git+https://github.com/bytecodealliance/wasmtime#af35da6946cf5fe55c053807b3787ca58b228a66"
 dependencies = [
  "anyhow",
  "cranelift-entity",
@@ -612,7 +612,7 @@ dependencies = [
 [[package]]
 name = "wasmtime-types"
 version = "13.0.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#367bdc8c66df62d6854966a90564b42692a3f023"
+source = "git+https://github.com/bytecodealliance/wasmtime#af35da6946cf5fe55c053807b3787ca58b228a66"
 dependencies = [
  "cranelift-entity",
  "serde",

@@ -673,7 +673,9 @@ fn synthesize_export_functions(
         }
 
         // Post export function synthesis
-        {
+        // We always define a post-export since we use a bulk deallocation strategy
+        // TODO: remove after jco upgrade
+        if expt_sig.ret.is_some() {
             // add the function type
             let params = if let Some(ret) = expt_sig.ret {
                 vec![match ret {

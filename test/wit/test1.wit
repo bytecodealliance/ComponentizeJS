@@ -4,7 +4,8 @@ world test1 {
   import wasi:clocks/wall-clock
   import wasi:clocks/monotonic-clock
   import wasi:clocks/timezone
-  import wasi:filesystem/filesystem
+  import wasi:filesystem/types
+  import wasi:filesystem/preopens
   import wasi:sockets/instance-network
   import wasi:sockets/ip-name-lookup
   import wasi:sockets/network
@@ -17,12 +18,17 @@ world test1 {
   import wasi:random/insecure-seed
   import wasi:poll/poll
   import wasi:io/streams
-  import wasi:cli-base/environment
-  import wasi:cli-base/preopens
-  import wasi:cli-base/exit
-  import wasi:cli-base/stdin
-  import wasi:cli-base/stdout
-  import wasi:cli-base/stderr
+  import wasi:cli/environment
+  import wasi:cli/exit
+  import wasi:cli/stdin
+  import wasi:cli/stdout
+  import wasi:cli/stderr
+  import wasi:cli/terminal-input
+  import wasi:cli/terminal-output
+  import wasi:cli/terminal-stdin
+  import wasi:cli/terminal-stdout
+  import wasi:cli/terminal-stderr
+  export wasi:cli/run
 
-  export test: func() -> string
+  export get-result: func() -> string
 }
