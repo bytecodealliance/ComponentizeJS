@@ -1,8 +1,6 @@
 import {
   e1Arg,
   e1Result,
-  u1Arg,
-  u1Result,
   v1Arg,
   v1Result,
   boolArg,
@@ -31,12 +29,6 @@ export const variants = {
   },
   e1Result() {
     return e1Result();
-  },
-  u1Arg(x) {
-    return u1Arg(x);
-  },
-  u1Result() {
-    return u1Result();
   },
   v1Arg(x) {
     v1Arg(x);

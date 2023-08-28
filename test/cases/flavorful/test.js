@@ -8,7 +8,7 @@ export function test (instance) {
   deepStrictEqual(instance.test.fListInRecord4({ a: 'c' }), { a: 'ca' });
 
   strictEqual(instance.test.fListInVariant1(null, { tag: 'ok' }, { tag: 0, val: 'test' }), undefined);
-  deepStrictEqual(JSON.parse(instance.test.fListInVariant2()), [null, { tag: 'ok'}, { tag: 0, val: 'test' }]);
+  deepStrictEqual(JSON.parse(instance.test.fListInVariant2()), [null, { tag: 'ok'}]);
 
   strictEqual(instance.test.fListInVariant3('test'), 'test');
 

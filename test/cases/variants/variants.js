@@ -5,12 +5,6 @@ export function e1Arg(x) {
 export function e1Result() {
   return z;
 }
-export function u1Arg(x) {
-  z = x;
-}
-export function u1Result() {
-  return z;
-}
 export function v1Arg(x) {
   z = x;
 }
