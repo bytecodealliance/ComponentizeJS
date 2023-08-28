@@ -24,8 +24,8 @@ export const test = {
   fListInRecord4(a) {
     return fListInRecord4(a);
   },
-  fListInVariant1(a, b, c) {
-    fListInVariant1(a, b, c);
+  fListInVariant1(a, b) {
+    fListInVariant1(a, b);
   },
   fListInVariant2() {
     return fListInVariant2();

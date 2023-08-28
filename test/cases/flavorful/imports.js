@@ -14,8 +14,8 @@ export function fListInRecord4(a) {
   a.a += z.a;
   return a;
 }
-export function fListInVariant1(a, b, c) {
-  z = [a, b, c];
+export function fListInVariant1(a, b) {
+  z = [a, b];
 }
 export function fListInVariant2() {
   return JSON.stringify(z);

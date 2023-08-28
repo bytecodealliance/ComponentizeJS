@@ -93,7 +93,7 @@ fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
     Ok((resolve, id))
 }
 
-impl SpidermonkeyEmbeddingSplicer for SpidermonkeyEmbeddingSplicerComponent {
+impl Guest for SpidermonkeyEmbeddingSplicerComponent {
     fn stub_wasi(wasm: Vec<u8>, stdout: bool) -> Result<Vec<u8>, String> {
         stub_wasi(wasm, stdout).map_err(|e| e.to_string())
     }
