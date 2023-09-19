@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ['*']
+    branches: [main]
   pull_request:
-    branches: ['*']
+    branches: [main]
 defaults:
   run:
     shell: bash
@@ -102,7 +102,7 @@ jobs:
 
     - name: Cache js-compute-runtime
       uses: actions/cache@v3
-      id: sm-cache
+      id: js-compute-runtime-hash
       with:
         path: deps/js-compute-runtime/runtime/js-compute-runtime/build
         key: cache-${{ steps.gecko-dev-hash.outputs.GECKO_DEV_HASH }}-${{ steps.js-compute-runtime-hash.outputs.GECKO_DEV_HASH }}
