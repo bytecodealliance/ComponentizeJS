@@ -71,7 +71,7 @@ jobs:
 
     - name: Cache wasm-tools
       id: wasm-tools-cache
-      uses: actions/cache/restore@v3
+      uses: actions/cache@v3
       with:
         path: /home/runner/.cargo/bin/wasm-tools
         key: crate-cache-wasm-tools
@@ -86,7 +86,7 @@ jobs:
       shell: bash
 
     - name: Cache Spidermonkey
-      uses: actions/cache/save@v3
+      uses: actions/cache@v3
       id: sm-cache
       with:
         path: deps/js-compute-runtime/runtime/spidermonkey/release
@@ -96,7 +96,7 @@ jobs:
           ) }}-${{ steps.gecko-dev-hash.outputs.GECKO_DEV_HASH }}
 
     - name: Cache Rust dependencies
-      uses: actions/cache/save@v3
+      uses: actions/cache@v3
       id: rust-build
       with:
         path: target
@@ -112,7 +112,7 @@ jobs:
       run: npm run test
 
     - name: Cache Example build
-      uses: actions/cache/save@v3
+      uses: actions/cache@v3
       with:
         path: example/target
         key: engine-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
