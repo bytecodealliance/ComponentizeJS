@@ -95,6 +95,18 @@ jobs:
             'deps/js-compute-runtime/runtime/spidermonkey/object-files.list'
           ) }}-${{ steps.gecko-dev-hash.outputs.GECKO_DEV_HASH }}
 
+    - name: js-compute-runtime hash
+      id: js-compute-runtime-hash
+      run: cd deps/js-compute-runtime/runtime/js-compute-runtime && echo "GECKO_DEV_HASH=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    - name: Cache js-compute-runtime
+      uses: actions/cache@v3
+      id: sm-cache
+      with:
+        path: deps/js-compute-runtime/runtime/js-compute-runtime/build
+        key: cache-${{ steps.gecko-dev-hash.outputs.GECKO_DEV_HASH }}-${{ steps.js-compute-runtime-hash.outputs.GECKO_DEV_HASH }}
+
     - name: Cache Rust dependencies
       uses: actions/cache@v3
       id: rust-build
