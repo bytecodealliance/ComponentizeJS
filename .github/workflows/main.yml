@@ -69,27 +69,20 @@ jobs:
       with:
         node-version: '16'
 
-    - name: Restore wasm-tools
-      id: wasm-tools-restore
+    - name: Cache wasm-tools
+      id: wasm-tools-cache
       uses: actions/cache/restore@v3
       with:
         path: /home/runner/.cargo/bin/wasm-tools
         key: crate-cache-wasm-tools
 
-    - name: Install wasm-tools
+    - name: "Install wasm-tools"
+      if: steps.wasm-tools-cache.outputs.cache-hit != 'true'
       run: cargo install wasm-tools
-      if: steps.wasm-tools-restore.outputs.cache-hit != 'true'
-
-    - name: Cache wasm-tools
-      uses: actions/cache/save@v3
-      with:
-        path: /home/runner/.cargo/bin/wasm-tools
-        key: crate-cache-wasm-tools
-      if: steps.wasm-tools-restore.outputs.cache-hit != 'true'
 
     - name: gecko-dev hash
       id: gecko-dev-hash
-      run: cd runtime/spidermonkey/gecko-dev && echo "GECKO_DEV_HASH=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      run: cd deps/js-compute-runtime/runtime/spidermonkey/gecko-dev && echo "GECKO_DEV_HASH=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       shell: bash
 
     - name: Cache Spidermonkey
