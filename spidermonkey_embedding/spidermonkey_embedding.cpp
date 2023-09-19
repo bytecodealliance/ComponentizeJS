@@ -807,21 +807,6 @@ check_init()
 
 bool first_call = true;
 
-const char *core_ty_str(CoreVal ty)
-{
-  switch (ty)
-  {
-  case CoreVal::I32:
-    return "i32";
-  case CoreVal::I64:
-    return "i64";
-  case CoreVal::F32:
-    return "f32";
-  case CoreVal::F64:
-    return "f64";
-  }
-}
-
 __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx, void *argptr)
 {
   if (first_call)
@@ -986,4 +971,19 @@ __attribute__((export_name("post_call"))) void post_call(uint32_t fn_idx)
   js::RunJobs(R.cx);
   JS_MaybeGC(R.cx);
   log("(post_call) end");
+}
+
+const char *core_ty_str(CoreVal ty)
+{
+  switch (ty)
+  {
+  case CoreVal::I32:
+    return "i32";
+  case CoreVal::I64:
+    return "i64";
+  case CoreVal::F32:
+    return "f32";
+  case CoreVal::F64:
+    return "f64";
+  }
 }
