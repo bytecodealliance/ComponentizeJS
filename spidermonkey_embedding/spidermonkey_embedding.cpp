@@ -306,11 +306,6 @@ static bool ReallocFn(JSContext *cx, unsigned argc, JS::Value *vp)
   return true;
 }
 
-#define FN_CNT_MAX 1024
-#define FREE_LIST_MAX 1024
-
-// Main (Wizer initialize)
-
 int main() {}
 
 extern "C" void __wasm_call_ctors();
