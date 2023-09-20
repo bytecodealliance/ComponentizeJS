@@ -117,6 +117,9 @@ jobs:
     - name: Install NPM packages
       run: npm install
 
+    - name: Check npm install
+      run: ls node_modules/.bin
+
     - name: Build
       run: npm run build
 
