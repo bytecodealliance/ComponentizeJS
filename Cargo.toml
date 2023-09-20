@@ -11,19 +11,19 @@ edition = "2021"
 version = "0.1.0"
 
 [workspace.dependencies]
-anyhow = "1.0.69"
+anyhow = "1.0.71"
 base64 = "0.21.2"
 bitflags = "1.3.2"
 env_logger = "0.10.0"
 heck =  { version = "0.4", features = ["unicode"] }
-js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", no-default-features = ["transpile-bindgen"] }
+js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", branch = "toolchain-upgrade", no-default-features = ["transpile-bindgen"] }
 pulldown-cmark = { version = "0.8", default-features = false }
 walrus = "0.20.1"
-wasm-encoder = "0.32.0"
-wasmparser = "0.112.0"
-wasmprinter = "0.2.64"
-wat = "1.0.71"
-wit-bindgen = "0.11.0"
-wit-bindgen-core = "0.11.0"
-wit-component = { version = "0.14.0", features = ["dummy-module"] }
-wit-parser = "0.11.0"
+wasm-encoder = "0.33.1"
+wasmparser = "0.113.1"
+wasmprinter = "0.2.66"
+wat = "1.0.73"
+wit-bindgen = "0.12.0"
+wit-bindgen-core = "0.12.0"
+wit-component = { version = "0.14.2", features = ["dummy-module"] }
+wit-parser = "0.11.1"

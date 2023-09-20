@@ -24,20 +24,20 @@ export interface SpliceResult {
   importWrappers: [string, string][],
   imports: [string, string, number][],
 }
-import { WasiCliEnvironment } from './imports/wasi-cli-environment';
-import { WasiCliExit } from './imports/wasi-cli-exit';
-import { WasiCliStderr } from './imports/wasi-cli-stderr';
-import { WasiCliStdin } from './imports/wasi-cli-stdin';
-import { WasiCliStdout } from './imports/wasi-cli-stdout';
-import { WasiCliTerminalInput } from './imports/wasi-cli-terminal-input';
-import { WasiCliTerminalOutput } from './imports/wasi-cli-terminal-output';
-import { WasiCliTerminalStderr } from './imports/wasi-cli-terminal-stderr';
-import { WasiCliTerminalStdin } from './imports/wasi-cli-terminal-stdin';
-import { WasiCliTerminalStdout } from './imports/wasi-cli-terminal-stdout';
-import { WasiClocksWallClock } from './imports/wasi-clocks-wall-clock';
-import { WasiFilesystemPreopens } from './imports/wasi-filesystem-preopens';
-import { WasiFilesystemTypes } from './imports/wasi-filesystem-types';
-import { WasiIoStreams } from './imports/wasi-io-streams';
-import { WasiRandomRandom } from './imports/wasi-random-random';
-export function stubWasi(engine: Uint8Array | ArrayBuffer, stdout: boolean): Uint8Array;
-export function spliceBindings(sourceName: string | null, spidermonkeyEngine: Uint8Array | ArrayBuffer, witWorld: string | null, witPath: string | null, worldName: string | null): SpliceResult;
+import { WasiCliEnvironment } from './interfaces/wasi-cli-environment';
+import { WasiCliExit } from './interfaces/wasi-cli-exit';
+import { WasiCliStderr } from './interfaces/wasi-cli-stderr';
+import { WasiCliStdin } from './interfaces/wasi-cli-stdin';
+import { WasiCliStdout } from './interfaces/wasi-cli-stdout';
+import { WasiCliTerminalInput } from './interfaces/wasi-cli-terminal-input';
+import { WasiCliTerminalOutput } from './interfaces/wasi-cli-terminal-output';
+import { WasiCliTerminalStderr } from './interfaces/wasi-cli-terminal-stderr';
+import { WasiCliTerminalStdin } from './interfaces/wasi-cli-terminal-stdin';
+import { WasiCliTerminalStdout } from './interfaces/wasi-cli-terminal-stdout';
+import { WasiClocksWallClock } from './interfaces/wasi-clocks-wall-clock';
+import { WasiFilesystemPreopens } from './interfaces/wasi-filesystem-preopens';
+import { WasiFilesystemTypes } from './interfaces/wasi-filesystem-types';
+import { WasiIoStreams } from './interfaces/wasi-io-streams';
+import { WasiRandomRandom } from './interfaces/wasi-random-random';
+export function stubWasi(engine: Uint8Array, stdout: boolean): Uint8Array;
+export function spliceBindings(sourceName: string | undefined, spidermonkeyEngine: Uint8Array, witWorld: string | undefined, witPath: string | undefined, worldName: string | undefined): SpliceResult;

@@ -27,8 +27,7 @@ suite('Builtins', () => {
     
       const { files } = await transpile(component, { name, wasiShim: true });
 
-      await mkdir(new URL(`./output/${name}/imports`, import.meta.url), { recursive: true });
-      await mkdir(new URL(`./output/${name}/exports`, import.meta.url), { recursive: true });
+      await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), { recursive: true });
     
       await writeFile(new URL(`./output/${name}.component.wasm`, import.meta.url), component);
     
@@ -107,8 +106,7 @@ suite('Bindings', () => {
 
         const { files } = await transpile(component, { name, map, wasiShim: true });
 
-        await mkdir(new URL(`./output/${name}/imports`, import.meta.url), { recursive: true });
-        await mkdir(new URL(`./output/${name}/exports`, import.meta.url), { recursive: true });
+        await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), { recursive: true });
 
         await writeFile(new URL(`./output/${name}.component.wasm`, import.meta.url), component);
 
@@ -153,8 +151,7 @@ suite('WASI', () => {
 
     const { files } = await transpile(component);
 
-    await mkdir(new URL(`./output/wasi/imports`, import.meta.url), { recursive: true });
-    await mkdir(new URL(`./output/wasi/exports`, import.meta.url), { recursive: true });
+    await mkdir(new URL(`./output/wasi/interfaces`, import.meta.url), { recursive: true });
 
     for (const file of Object.keys(files)) {
       await writeFile(new URL(`./output/wasi/${file}`, import.meta.url), files[file]);

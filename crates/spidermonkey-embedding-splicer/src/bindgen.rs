@@ -383,6 +383,7 @@ impl JsBindgen<'_> {
         uwriteln!(self.src, ") {{");
 
         let mut f = FunctionBindgen {
+            tracing_prefix: None,
             intrinsics: &mut self.all_intrinsics,
             valid_lifting_optimization: true,
             sizes: &self.sizes,
