@@ -5,7 +5,7 @@
   "type": "module",
   "exports": "./src/componentize.js",
   "devDependencies": {
-    "@bytecodealliance/preview2-shim": "0.0.15",
+    "@bytecodealliance/preview2-shim": "0.0.16",
     "mocha": "^10.2.0"
   },
   "dependencies": {
