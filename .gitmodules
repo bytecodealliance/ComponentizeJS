@@ -2,6 +2,3 @@
 	path = deps/js-compute-runtime
 	url = https://github.com/fastly/js-compute-runtime
 	shallow = true
-[submodule "preview2-prototyping"]
-	path = preview2-prototyping
-	url = git@github.com:bytecodealliance/preview2-prototyping
