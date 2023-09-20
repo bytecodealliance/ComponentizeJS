@@ -46,7 +46,7 @@ OBJS := $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_
 all: lib/spidermonkey-embedding-splicer.js lib/spidermonkey_embedding.wasm
 
 lib/spidermonkey-embedding-splicer.js: target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj
-	$(JCO) new target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm --adapt wasi_snapshot_preview1=node_modules/@bytecodealliance/jco/lib/wasi_snapshot_preview1.reactor.wasm
+	$(JCO) new target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm --wasi-reactor
 	$(JCO) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o lib -- -O1
 
 target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs
@@ -55,8 +55,8 @@ target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm: crates/spidermon
 lib/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC)
 	-make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) $(abspath $(JSCR_SRC)/js-compute-runtime.wasm) $(abspath $(JSCR_SRC)/js-compute-runtime-component.wasm) -j16
 	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) -j16
-	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) shared-builtins -j16
-	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ shared/*.a $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
+	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) $(abspath $(JSCR_SRC)/build/release/shared.a) -j16
+	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ deps/js-compute-runtime/runtime/js-compute-runtime/build/release/*.a $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
 	$(WASM_OPT) --strip-debug $@ -o $@ -O3
 
 obj/%.o: spidermonkey_embedding/%.cpp Makefile | $(SM_SRC) obj obj/builtins
@@ -69,7 +69,7 @@ lib:
 	mkdir -p lib
 
 $(SM_SRC):
-	cd deps/js-compute-runtime/runtime/spidermonkey && ./download-engine.sh
+	cd deps/js-compute-runtime/runtime/spidermonkey && ./build-engine.sh release
 
 obj/builtins:
 	mkdir -p obj/builtins

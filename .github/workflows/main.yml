@@ -69,39 +69,47 @@ jobs:
       with:
         node-version: '16'
 
-    - name: Restore wasm-tools
-      id: wasm-tools-restore
-      uses: actions/cache/restore@v3
-      with:
-        path: /home/runner/.cargo/bin/wasm-tools
-        key: crate-cache-wasm-tools
-
-    - name: Install wasm-tools
-      run: cargo install wasm-tools
-      if: steps.wasm-tools-restore.outputs.cache-hit != 'true'
-
     - name: Cache wasm-tools
-      uses: actions/cache/save@v3
+      id: wasm-tools-cache
+      uses: actions/cache@v3
       with:
         path: /home/runner/.cargo/bin/wasm-tools
         key: crate-cache-wasm-tools
-      if: steps.wasm-tools-restore.outputs.cache-hit != 'true'
 
-    - name: Restore Spidermonkey
-      uses: actions/cache/restore@v3
-      id: sm-restore
+    - name: "Install wasm-tools"
+      if: steps.wasm-tools-cache.outputs.cache-hit != 'true'
+      run: cargo install wasm-tools
+
+    - name: gecko-dev hash
+      id: gecko-dev-hash
+      run: cd deps/js-compute-runtime/runtime/spidermonkey/gecko-dev && echo "GECKO_DEV_HASH=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    - name: Cache Spidermonkey
+      uses: actions/cache@v3
+      id: sm-cache
       with:
-        path: deps/js-compute-runtime/runtime/spidermonkey
+        path: deps/js-compute-runtime/runtime/spidermonkey/release
         key: cache-${{ hashFiles(
             'deps/js-compute-runtime/runtime/spidermonkey/build-engine.sh',
-            'deps/js-compute-runtime/runtime/spidermonkey/gecko-revision',
-            'deps/js-compute-runtime/runtime/spidermonkey/object-files.list',
-            'deps/js-compute-runtime/runtime/rust-toolchain.toml'
-          ) }}
+            'deps/js-compute-runtime/runtime/spidermonkey/object-files.list'
+          ) }}-${{ steps.gecko-dev-hash.outputs.GECKO_DEV_HASH }}
 
-    - name: Restore Rust build cache
-      uses: actions/cache/restore@v3
-      id: rust-build-restore
+    - name: js-compute-runtime hash
+      id: js-compute-runtime-hash
+      run: cd deps/js-compute-runtime/runtime/js-compute-runtime && echo "JS_COMPUTE_RUNTIME_HASH=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    - name: Cache js-compute-runtime
+      uses: actions/cache@v3
+      id: js-compute-runtime
+      with:
+        path: deps/js-compute-runtime/runtime/js-compute-runtime/build
+        key: cache-${{ steps.js-compute-runtime-hash.outputs.GECKO_DEV_HASH }}-${{ steps.js-compute-runtime-hash.outputs.JS_COMPUTE_RUNTIME_HASH }}
+
+    - name: Cache Rust dependencies
+      uses: actions/cache@v3
+      id: rust-build
       with:
         path: target
         key: engine-build-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
@@ -112,44 +120,17 @@ jobs:
     - name: Build
       run: npm run build
 
-    - name: Cache Spidermonkey
-      uses: actions/cache/save@v3
-      with:
-        path: deps/js-compute-runtime/runtime/spidermonkey
-        key: cache-${{ hashFiles(
-            'deps/js-compute-runtime/runtime/spidermonkey/build-engine.sh',
-            'deps/js-compute-runtime/runtime/spidermonkey/gecko-revision',
-            'deps/js-compute-runtime/runtime/spidermonkey/object-files.list',
-            'deps/js-compute-runtime/runtime/rust-toolchain.toml'
-          ) }}
-      if: steps.sm-restore.outputs.cache-hit != 'true'
-
-    - name: Cache Rust dependencies
-      uses: actions/cache/save@v3
-      with:
-        path: target
-        key: engine-build-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
-      if: steps.rust-build-restore.outputs.cache-hit != 'true'
-
     - name: Test
       run: npm run test
 
-    - name: Restore Example build
-      uses: actions/cache/restore@v3
-      id: example-restore
+    - name: Cache Example build
+      uses: actions/cache@v3
       with:
         path: example/target
         key: engine-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
 
     - name: Test Example
       run: cd example && npm run build && ./test.sh
-
-    - name: Cache Example build
-      uses: actions/cache/save@v3
-      with:
-        path: example/target
-        key: engine-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
-      if: steps.example-restore.outputs.cache-hit != 'true'
 
   rustfmt:
     name: Rustfmt

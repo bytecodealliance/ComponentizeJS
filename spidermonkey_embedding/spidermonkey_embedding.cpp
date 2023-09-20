@@ -306,11 +306,6 @@ static bool ReallocFn(JSContext *cx, unsigned argc, JS::Value *vp)
   return true;
 }
 
-#define FN_CNT_MAX 1024
-#define FREE_LIST_MAX 1024
-
-// Main (Wizer initialize)
-
 int main() {}
 
 extern "C" void __wasm_call_ctors();
@@ -744,7 +739,7 @@ __attribute__((export_name("wizer.initialize"))) void init()
   for (size_t i = 0; i < import_cnt; i++)
   {
     sprintf(&env_name[0], "IMPORT%zu_NAME", i);
-    const char* name = getenv(env_name);
+    const char *name = getenv(env_name);
     sprintf(&env_name[0], "IMPORT%zu_ARGCNT", i);
     uint32_t argcnt = atoi(getenv(env_name));
 
@@ -810,10 +805,37 @@ check_init()
   return R.init_err;
 }
 
+const char *core_ty_str(CoreVal ty)
+{
+  switch (ty)
+  {
+  case CoreVal::I32:
+    return "i32";
+  case CoreVal::I64:
+    return "i64";
+  case CoreVal::F32:
+    return "f32";
+  case CoreVal::F64:
+    return "f64";
+  }
+}
+
+bool first_call = true;
+
 __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx, void *argptr)
 {
-  Runtime::CoreFn *fn = &R.fns[fn_idx];
+  if (first_call)
+  {
+    js::ResetMathRandomSeed(R.cx);
+    first_call = false;
+  }
+  if (R.cur_fn_idx != -1)
+  {
+    log("(call) unexpected call state, post_call was not called after last call");
+    abort();
+  }
   R.cur_fn_idx = fn_idx;
+  Runtime::CoreFn *fn = &R.fns[fn_idx];
   if (DEBUG)
   {
     fprintf(stderr, "(call) Function [%d] - ", fn_idx);
@@ -833,21 +855,7 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx, void *argptr
       {
         fprintf(stderr, ", ");
       }
-      switch (fn->args[i])
-      {
-      case CoreVal::I32:
-        fprintf(stderr, "i32");
-        break;
-      case CoreVal::I64:
-        fprintf(stderr, "i64");
-        break;
-      case CoreVal::F32:
-        fprintf(stderr, "f32");
-        break;
-      case CoreVal::F64:
-        fprintf(stderr, "f64");
-        break;
-      }
+      fprintf(stderr, "%s", core_ty_str(fn->args[i]));
     }
     fprintf(stderr, ")");
     if (fn->ret.has_value())
@@ -857,36 +865,12 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx, void *argptr
       {
         fprintf(stderr, "*");
       }
-      switch (fn->ret.value())
-      {
-      case CoreVal::I32:
-        fprintf(stderr, "i32");
-        break;
-      case CoreVal::I64:
-        fprintf(stderr, "i64");
-        break;
-      case CoreVal::F32:
-        fprintf(stderr, "f32");
-        break;
-      case CoreVal::F64:
-        fprintf(stderr, "f64");
-        break;
-      }
+      fprintf(stderr, "%s", core_ty_str(fn->ret.value()));
     }
     fprintf(stderr, "\n");
   }
 
   JSAutoRealm ar(R.cx, R.global);
-
-  js::ResetMathRandomSeed(R.cx);
-
-  // TODO: fixup post-calls for non post-calling functions
-  if ((R.cur_fn_idx != -1 || R.free_list.size() != 0) && false)
-  {
-    log("(call) unexpected call state, was post_call previously called?");
-    abort();
-  }
-  R.cur_fn_idx = fn_idx;
 
   JS::RootedVector<JS::Value> args(R.cx);
   if (!args.resize(fn->args.size() + (fn->retptr ? 1 : 0)))
@@ -988,22 +972,18 @@ __attribute__((export_name("post_call"))) void post_call(uint32_t fn_idx)
   {
     fprintf(stderr, "(post_call) Function [%d]\n", fn_idx);
   }
-  // TODO: remove after jco upgrade
-  // if (R.cur_fn_idx != fn_idx)
-  // {
-  //   log("(post_call) Unexpected call state, was call definitely called last?");
-  //   abort();
-  // }
+  if (R.cur_fn_idx != fn_idx)
+  {
+    log("(post_call) Unexpected call state, post_call must only be called immediately after call");
+    abort();
+  }
   R.cur_fn_idx = -1;
   for (void *ptr : R.free_list)
   {
-    log("(free list)");
     cabi_free(ptr);
   }
   R.free_list.clear();
-  log("(post_call) jobs");
   js::RunJobs(R.cx);
-  log("(post_call) maybe gc");
   JS_MaybeGC(R.cx);
   log("(post_call) end");
 }

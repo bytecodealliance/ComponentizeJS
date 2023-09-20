@@ -1,9 +1,7 @@
-[submodule "deps/spidermonkey-wasi-embedding"]
-	path = deps/spidermonkey-wasi-embedding
-	url = https://github.com/fastly/spidermonkey-wasi-embedding.git
 [submodule "deps/js-compute-runtime"]
 	path = deps/js-compute-runtime
 	url = https://github.com/fastly/js-compute-runtime
+	shallow = true
 [submodule "preview2-prototyping"]
 	path = preview2-prototyping
 	url = git@github.com:bytecodealliance/preview2-prototyping
