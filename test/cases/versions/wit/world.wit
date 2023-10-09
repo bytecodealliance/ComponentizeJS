@@ -1,0 +1,8 @@
+package test:test
+
+world hello {
+  import local:hello/hello@1.0.0
+  export local:hello/hello@1.0.0
+  import local:hello/hello@2.0.0
+  export local:hello/hello@2.0.0
+}

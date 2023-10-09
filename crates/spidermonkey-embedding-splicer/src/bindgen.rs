@@ -110,8 +110,7 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         // this import binding order matters
         let binding_name = match &item.iface_name {
             Some(iface_name) => {
-                let iface_camel_name = iface_name.to_lower_camel_case();
-                format!("{iface_camel_name}${}", item.name.to_lower_camel_case())
+                format!("{iface_name}${}", item.name.to_lower_camel_case())
             }
             None => item.name.to_lower_camel_case(),
         };
@@ -132,8 +131,7 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         {
             let binding_name = match &iface_name {
                 Some(iface_name) => {
-                    let iface_camel_name = iface_name.to_lower_camel_case();
-                    format!("{iface_camel_name}${}", name.to_lower_camel_case())
+                    format!("{iface_name}${}", name.to_lower_camel_case())
                 }
                 None => name.to_lower_camel_case(),
             };
@@ -242,7 +240,7 @@ impl JsBindgen<'_> {
                         self.export_bindgen(
                             true,
                             name.into(),
-                            iface.name.to_owned(),
+                            interface_name(self.resolve, *id),
                             func.name.to_string(),
                             &local_name,
                             StringEncoding::UTF8,
@@ -286,19 +284,18 @@ impl JsBindgen<'_> {
                 WorldItem::Interface(i) => {
                     let iface = &self.resolve.interfaces[*i];
                     for (func_name, func) in &iface.functions {
-                        let binding_name = match &iface.name {
-                            Some(iface_name) => format!(
-                                "$import_{}${}",
-                                iface_name.to_lower_camel_case(),
-                                func_name.to_lower_camel_case()
-                            ),
+                        let iface_name = interface_name(self.resolve, *i);
+                        let binding_name = match iface_name.as_ref() {
+                            Some(iface_name) => {
+                                format!("$import_{iface_name}${}", func_name.to_lower_camel_case())
+                            }
                             None => format!("$import_{}", import_name.to_lower_camel_case()),
                         };
                         self.import_bindgen(
                             import_name.clone(),
                             func,
                             true,
-                            iface.name.clone(),
+                            iface_name,
                             func_name.clone(),
                             binding_name,
                         );
@@ -319,11 +316,7 @@ impl JsBindgen<'_> {
         callee_name: String,
     ) {
         let binding_name = match &iface_name {
-            Some(iface_name) => format!(
-                "import_{}${}",
-                iface_name.to_lower_camel_case(),
-                name.to_lower_camel_case()
-            ),
+            Some(iface_name) => format!("import_{iface_name}${}", name.to_lower_camel_case()),
             None => format!("import_{}", name.to_lower_camel_case()),
         };
 
@@ -437,11 +430,7 @@ impl JsBindgen<'_> {
         func: &Function,
     ) {
         let binding_name = match &iface_name {
-            Some(iface_name) => format!(
-                "export_{}${}",
-                iface_name.to_lower_camel_case(),
-                fn_name.to_lower_camel_case()
-            ),
+            Some(iface_name) => format!("export_{iface_name}${}", fn_name.to_lower_camel_case()),
             None => format!("export_{}", fn_name.to_lower_camel_case()),
         };
         uwrite!(self.src, "\nexport function {binding_name}");
@@ -559,13 +548,11 @@ impl EsmBindgen {
     /// names that do not collide with kebab names or other interface names
     pub fn populate_export_aliases(&mut self) {
         for expt_name in self.exports.keys() {
-            if let Some(path_idx) = expt_name.rfind('/') {
-                let alias = &expt_name[path_idx + 1..].to_lower_camel_case();
-                if !self.exports.contains_key(alias)
-                    && !self.export_aliases.values().any(|_alias| alias == _alias)
+            if let Some(alias) = interface_name_from_string(expt_name) {
+                if !self.exports.contains_key(&alias)
+                    && !self.export_aliases.values().any(|_alias| &alias == _alias)
                 {
-                    self.export_aliases
-                        .insert(expt_name.to_string(), alias.to_string());
+                    self.export_aliases.insert(expt_name.to_string(), alias);
                 }
             }
         }
@@ -678,4 +665,20 @@ impl EsmBindgen {
             }
         }
     }
+}
+
+fn interface_name(resolve: &Resolve, interface: InterfaceId) -> Option<String> {
+    interface_name_from_string(&resolve.id_of(interface)?)
+}
+
+fn interface_name_from_string(name: &str) -> Option<String> {
+    let path_idx = name.rfind('/')?;
+    let name = &name[path_idx + 1..];
+    let at_idx = name.rfind('@');
+    let alias = name[..at_idx.unwrap_or_else(|| name.len())].to_lower_camel_case();
+    Some(if let Some(at_idx) = at_idx {
+        format!("{alias}_{}", name[at_idx + 1..].replace('.', "_"))
+    } else {
+        alias
+    })
 }
