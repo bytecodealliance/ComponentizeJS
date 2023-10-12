@@ -45,8 +45,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cranelift-entity"
-version = "0.102.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#3176f03ad50e43711e7400f0585ad9b6629c53ca"
+version = "0.101.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3f23d3cf3afa7e45f239702612c76d87964f652a55e28d13ed6d7e20f3479dd"
 dependencies = [
  "serde",
  "serde_derive",
@@ -170,16 +171,15 @@ checksum = "af150ab688ff2122fcef229be89cb50dd66af9e01a4ff320cc137eecc9bacc38"
 [[package]]
 name = "js-component-bindgen"
 version = "0.11.0"
-source = "git+https://github.com/bytecodealliance/jco#3b853008450dc6a46f5bf4b3042568cb5b1c83e8"
 dependencies = [
  "anyhow",
  "base64",
  "heck 0.4.1",
  "indexmap 2.0.0",
- "wasm-encoder 0.33.1",
+ "wasm-encoder 0.35.0",
  "wasmtime-environ",
- "wit-bindgen-core",
- "wit-component",
+ "wit-bindgen-core 0.13.0",
+ "wit-component 0.16.0",
  "wit-parser",
 ]
 
@@ -306,8 +306,8 @@ dependencies = [
  "wasm-encoder 0.33.1",
  "wasmparser 0.113.1",
  "wit-bindgen",
- "wit-bindgen-core",
- "wit-component",
+ "wit-bindgen-core 0.12.0",
+ "wit-component 0.15.0",
  "wit-parser",
 ]
 
@@ -504,13 +504,15 @@ dependencies = [
 
 [[package]]
 name = "wasmtime-component-util"
-version = "15.0.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#3176f03ad50e43711e7400f0585ad9b6629c53ca"
+version = "14.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c182d089edf8798f334442be4a72b93a47bbb2a4fce01323fa0936b72d6fecfd"
 
 [[package]]
 name = "wasmtime-environ"
-version = "15.0.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#3176f03ad50e43711e7400f0585ad9b6629c53ca"
+version = "14.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f07170a1d9be1e1d0a4e1532783c8e5c1734f86871c2ff9af6f713a189810ba7"
 dependencies = [
  "anyhow",
  "cranelift-entity",
@@ -531,8 +533,9 @@ dependencies = [
 
 [[package]]
 name = "wasmtime-types"
-version = "15.0.0"
-source = "git+https://github.com/bytecodealliance/wasmtime#3176f03ad50e43711e7400f0585ad9b6629c53ca"
+version = "14.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c17af844f80ac4c7afb35f338e705e3484a4d9f2fa53dcc9bb26a5a90591e96d"
 dependencies = [
  "cranelift-entity",
  "serde",
@@ -577,7 +580,18 @@ version = "0.12.0"
 source = "git+https://github.com/bytecodealliance/wit-bindgen?rev=2405a79c74c5d61b9bc88c378d475c6c21ed6a9f#2405a79c74c5d61b9bc88c378d475c6c21ed6a9f"
 dependencies = [
  "anyhow",
- "wit-component",
+ "wit-component 0.15.0",
+ "wit-parser",
+]
+
+[[package]]
+name = "wit-bindgen-core"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "565b945ae074886071eccf9cdaf8ccd7b959c2b0d624095bea5fe62003e8b3e0"
+dependencies = [
+ "anyhow",
+ "wit-component 0.16.0",
  "wit-parser",
 ]
 
@@ -589,8 +603,8 @@ dependencies = [
  "anyhow",
  "heck 0.4.1",
  "wasm-metadata",
- "wit-bindgen-core",
- "wit-component",
+ "wit-bindgen-core 0.12.0",
+ "wit-component 0.15.0",
 ]
 
 [[package]]
@@ -602,9 +616,9 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.37",
- "wit-bindgen-core",
+ "wit-bindgen-core 0.12.0",
  "wit-bindgen-rust",
- "wit-component",
+ "wit-component 0.15.0",
 ]
 
 [[package]]
@@ -628,10 +642,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "wit-parser"
-version = "0.12.0"
+name = "wit-component"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d08c9557c65c428ac18a3cce80bf2527dbec24ab06639642c7db73f2c7613f93"
+checksum = "e87488b57a08e2cbbd076b325acbe7f8666965af174d69d5929cd373bd54547f"
+dependencies = [
+ "anyhow",
+ "bitflags",
+ "indexmap 2.0.0",
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "wasm-encoder 0.35.0",
+ "wasm-metadata",
+ "wasmparser 0.115.0",
+ "wat",
+ "wit-parser",
+]
+
+[[package]]
+name = "wit-parser"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6ace9943d89bbf3dbbc71b966da0e7302057b311f36a4ac3d65ddfef17b52cf"
 dependencies = [
  "anyhow",
  "id-arena",

@@ -137,6 +137,8 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
 
     bindgen.imports_bindgen();
 
+    bindgen.imports_bindgen();
+
     bindgen.exports_bindgen();
     bindgen.esm_bindgen.populate_export_aliases();
 
