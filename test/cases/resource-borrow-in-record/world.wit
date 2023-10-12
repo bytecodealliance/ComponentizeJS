@@ -1,0 +1,19 @@
+package test:test
+
+interface resource-borrow-in-record {
+  resource thing {
+    constructor(s: string)
+    get: func() -> string
+  }
+
+  record foo {
+    thing: borrow<thing>
+  }
+
+  test: func(a: list<foo>) -> list<thing>
+}
+
+world test {
+  import resource-borrow-in-record
+  export resource-borrow-in-record
+}

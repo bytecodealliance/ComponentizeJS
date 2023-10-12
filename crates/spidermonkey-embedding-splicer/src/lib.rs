@@ -196,11 +196,12 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             },
         ) in &componentized.exports
         {
-            let mut expt = export_name.to_string();
-            if *iface {
-                expt.push('#');
-            }
-            expt.push_str(&resource.canon_string(&name));
+            let expt = if *iface {
+                let name = resource.canon_string(&name);
+                format!("{export_name}#{name}")
+            } else {
+                export_name.clone()
+            };
             exports.push((expt, map_core_fn(func)));
         }
 
@@ -208,14 +209,18 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         for (
             specifier,
             BindingItem {
-                name, func, iface, ..
+                name,
+                func,
+                iface,
+                resource,
+                ..
             },
         ) in &componentized.imports
         {
             if *iface {
                 imports.push((
                     specifier.to_string(),
-                    name.to_string(),
+                    resource.canon_string(&name),
                     map_core_fn(func),
                     if func.retsize > 0 {
                         Some(func.retsize as i32)
@@ -235,6 +240,25 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
                     },
                 ));
             }
+        }
+
+        for (key, name, return_count) in &componentized.resource_imports {
+            imports.push((
+                key.clone(),
+                name.clone(),
+                CoreFn {
+                    params: vec![CoreTy::I32],
+                    ret: if *return_count == 0 {
+                        None
+                    } else {
+                        Some(CoreTy::I32)
+                    },
+                    retptr: false,
+                    retsize: 0,
+                    paramptr: false,
+                },
+                Some(i32::try_from(*return_count).unwrap()),
+            ));
         }
 
         // println!("{:?}", &imports);
@@ -268,7 +292,11 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
                     |(
                         specifier,
                         BindingItem {
-                            name, iface, func, ..
+                            name,
+                            iface,
+                            func,
+                            resource,
+                            ..
                         },
                     )| {
                         (
@@ -278,7 +306,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
                                 "$root".into()
                             },
                             if *iface {
-                                name.to_string()
+                                resource.canon_string(&name)
                             } else {
                                 specifier.to_string()
                             },
@@ -286,6 +314,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
                         )
                     },
                 )
+                .chain(componentized.resource_imports)
                 .collect(),
             import_wrappers: componentized.import_wrappers,
             js_bindings: generated_bindings,

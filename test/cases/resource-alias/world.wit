@@ -1,7 +1,9 @@
 package my:resources
 
 interface e1 {
-  resource x
+  resource x {
+    constructor(v: u32)
+  }
 
   record foo { x: x }
 

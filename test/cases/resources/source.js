@@ -1,4 +1,4 @@
-// import { Y } from 'imports';
+import { Y } from 'imports';
 
 class X {
   constructor (a) {
@@ -17,8 +17,11 @@ class X {
 }
 
 class Z {
-  constructor (a) {
+    constructor (a) {
     this.a = a;
+  }
+  getA () {
+    return this.a;
   }
 }
 
@@ -33,5 +36,20 @@ export const exports = {
   Z,
   add (a, b) {
     return new Z(a.getA() + b.getA());
+  },
+  testImports () {
+    let y = new Y(3);
+    const sum1 = Y.add(y, 4).getA();
+    if (sum1 != 7) {
+      return { tag: 'err', value: `expected 7; got ${sum1}` };
+    }
+
+    y.setA(5);
+    const sum2 = Y.add(y, 4).getA();
+    if (sum2 != 9) {
+      return { tag: 'err', value: `expected 9; got ${sum2}` };
+    }
+
+    return { tag: 'ok' };
   }
 };

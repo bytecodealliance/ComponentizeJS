@@ -18,7 +18,7 @@ export async function componentize(
     witWorld = opts?.witWorld;
   }
   const {
-    debug = true,
+    debug = false,
     sourceName = "source.js",
     engine = fileURLToPath(
       new URL('../lib/spidermonkey_embedding.wasm', import.meta.url)
@@ -38,6 +38,8 @@ export async function componentize(
   );
 
   if (debug) {
+    console.log('--- JS Source ---');
+    console.log(jsSource);
     console.log('--- JS Bindings ---');
     console.log(jsBindings);
     console.log('--- JS Imports ---');

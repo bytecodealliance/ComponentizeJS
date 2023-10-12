@@ -1,12 +1,12 @@
 use crate::{uwrite, uwriteln};
 use heck::*;
 use js_component_bindgen::function_bindgen::{
-    ErrHandling, FunctionBindgen, ResourceMap, ResourceTable,
+    ErrHandling, FunctionBindgen, ResourceData, ResourceMap, ResourceTable,
 };
 use js_component_bindgen::intrinsics::{render_intrinsics, Intrinsic};
 use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write;
 use wit_bindgen_core::abi::{self, LiftLower};
 use wit_component::StringEncoding;
@@ -28,6 +28,21 @@ impl Resource {
             Resource::Constructor(name) => format!("[constructor]{name}"),
             Resource::Static(name) => format!("[static]{name}.{fn_name}"),
             Resource::Method(name) => format!("[method]{name}.{fn_name}"),
+        }
+    }
+
+    fn func_name(&self, fn_name: &str) -> String {
+        match self {
+            Resource::None => fn_name.to_lower_camel_case(),
+            Resource::Constructor(name) => {
+                format!("{name}${}", fn_name.to_lower_camel_case())
+            }
+            Resource::Method(name) => {
+                format!("{name}$method${}", fn_name.to_lower_camel_case())
+            }
+            Resource::Static(name) => {
+                format!("{name}$static${}", fn_name.to_lower_camel_case())
+            }
         }
     }
 }
@@ -65,6 +80,10 @@ struct JsBindgen<'a> {
     exports: Vec<(String, BindingItem)>,
     // imports "specifier"
     imports: Vec<(String, BindingItem)>,
+
+    resource_directions: HashMap<TypeId, AbiVariant>,
+
+    imported_resources: BTreeSet<TypeId>,
 }
 
 #[derive(Debug)]
@@ -90,6 +109,7 @@ pub struct Componentization {
     pub exports: Vec<(String, BindingItem)>,
     pub imports: Vec<(String, BindingItem)>,
     pub import_wrappers: Vec<(String, String)>,
+    pub resource_imports: Vec<(String, String, u32)>,
 }
 
 pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Componentization {
@@ -105,63 +125,78 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         realloc: "$realloc".to_string(),
         exports: Vec::new(),
         imports: Vec::new(),
+        resource_directions: HashMap::new(),
+        imported_resources: BTreeSet::new(),
     };
 
     bindgen.sizes.fill(resolve);
 
     bindgen
         .local_names
-        .exclude_intrinsics(Intrinsic::get_all_names());
+        .exclude_globals(Intrinsic::get_global_names());
+
+    bindgen.imports_bindgen();
 
     bindgen.exports_bindgen();
     bindgen.esm_bindgen.populate_export_aliases();
 
-    bindgen.imports_bindgen();
-
     // consolidate import specifiers and generate wrappers
     // we do this separately because function index order matters
     let mut import_bindings = Vec::new();
-    let mut import_wrappers = Vec::new();
-    let mut imports = BTreeMap::new();
-    for (specifier, item) in bindgen.imports.iter() {
-        if !imports.contains_key(specifier) {
-            imports.insert(specifier.to_string(), Vec::new());
-        }
-        let impt_list = imports.get_mut(specifier).unwrap();
-
+    for (_, item) in bindgen.imports.iter() {
         // this import binding order matters
-        let binding_name = match &item.iface_name {
-            Some(iface_name) => {
-                format!("{iface_name}${}", item.name.to_lower_camel_case())
-            }
-            None => item.name.to_lower_camel_case(),
-        };
-        import_bindings.push(binding_name);
-
-        impt_list.push(item);
-        // let import_name = if item.iface_name.is_some() { name } else { "".into() };
+        import_bindings.push(binding_name(
+            &item.resource.func_name(&item.name),
+            &item.iface_name,
+        ));
     }
 
-    for (specifier, impt_list) in imports.iter() {
+    let by_specifier_by_resource = bindgen.imports.iter().fold(
+        BTreeMap::<_, BTreeMap<_, Vec<_>>>::new(),
+        |mut map, (specifier, item)| {
+            map.entry(specifier)
+                .or_default()
+                .entry(match &item.resource {
+                    Resource::None => None,
+                    Resource::Method(name)
+                    | Resource::Static(name)
+                    | Resource::Constructor(name) => Some(name),
+                })
+                .or_default()
+                .push(item);
+            map
+        },
+    );
+
+    let mut import_wrappers = Vec::new();
+    for (specifier, by_resource) in by_specifier_by_resource {
         let mut specifier_list = Vec::new();
-        for BindingItem {
-            iface,
-            iface_name,
-            name,
-            ..
-        } in impt_list.iter()
-        {
-            let binding_name = match &iface_name {
-                Some(iface_name) => {
-                    format!("{iface_name}${}", name.to_lower_camel_case())
+        for (resource, items) in by_resource {
+            let item = items.iter().next().unwrap();
+            if let Some(resource) = resource {
+                let export_name = resource.to_upper_camel_case();
+                let binding_name = binding_name(&export_name, &item.iface_name);
+                if item.iface {
+                    specifier_list.push(format!("import_{binding_name} as {export_name}"));
+                } else {
+                    specifier_list.push(format!("import_{binding_name} as default"));
                 }
-                None => name.to_lower_camel_case(),
-            };
-            let binding_camel = name.to_lower_camel_case();
-            if *iface {
-                specifier_list.push(format!("import_{binding_name} as {binding_camel}"));
             } else {
-                specifier_list.push(format!("import_{binding_name} as default"));
+                for BindingItem {
+                    iface,
+                    iface_name,
+                    name,
+                    ..
+                } in items
+                {
+                    let export_name = name.to_lower_camel_case();
+                    let binding_name = binding_name(&export_name, iface_name);
+                    if *iface {
+                        specifier_list.push(format!("import_{binding_name} as {export_name}"));
+                    } else {
+                        specifier_list.push(format!("import_{binding_name} as default"));
+                    }
+                }
             }
         }
         let joined_bindings = specifier_list.join(", ");
@@ -171,6 +206,93 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         ));
     }
 
+    let mut resource_bindings = Vec::new();
+    let mut resource_imports = Vec::new();
+    let mut finalization_registries = Vec::new();
+    for (key, export) in &resolve.worlds[id].exports {
+        let key_name = resolve.name_world_key(key);
+        if let WorldItem::Interface(iface_id) = export {
+            let iface = &resolve.interfaces[*iface_id];
+            for ty_id in iface.types.values() {
+                let ty = &resolve.types[*ty_id];
+                if let TypeDefKind::Resource = &ty.kind {
+                    let iface_prefix = interface_name(resolve, *iface_id)
+                        .map(|s| format!("{s}$"))
+                        .unwrap_or_else(String::new);
+                    let resource_name = ty.name.as_ref().unwrap().to_lower_camel_case();
+                    let module_name = format!("[export]{key_name}");
+                    resource_bindings.push(format!("{iface_prefix}new${resource_name}"));
+                    resource_imports.push((
+                        module_name.clone(),
+                        format!("[resource-new]{resource_name}"),
+                        1,
+                    ));
+                    resource_bindings.push(format!("{iface_prefix}rep${resource_name}"));
+                    resource_imports.push((
+                        module_name.clone(),
+                        format!("[resource-rep]{resource_name}"),
+                        1,
+                    ));
+                    resource_bindings.push(format!("export${iface_prefix}drop${resource_name}"));
+                    resource_imports.push((
+                        module_name.clone(),
+                        format!("[resource-drop]{resource_name}"),
+                        0,
+                    ));
+                    finalization_registries.push(format!(
+                        "const finalizationRegistry_export${iface_prefix}{resource_name} = \
+                         new FinalizationRegistry((handle) => {{
+                             $resource_export${iface_prefix}drop${resource_name}(handle);
+                         }});
+                        "
+                    ));
+                }
+            }
+        }
+    }
+
+    let mut imported_resource_modules = HashMap::new();
+    for (key, import) in &resolve.worlds[id].imports {
+        let key_name = resolve.name_world_key(key);
+        if let WorldItem::Interface(iface_id) = import {
+            let iface = &resolve.interfaces[*iface_id];
+            for ty_id in iface.types.values() {
+                let ty = &resolve.types[*ty_id];
+                if let TypeDefKind::Resource = &ty.kind {
+                    imported_resource_modules.insert(*ty_id, key_name.clone());
+                }
+            }
+        }
+    }
+
+    for &id in &bindgen.imported_resources {
+        let ty = &resolve.types[id];
+        let prefix = match &ty.owner {
+            TypeOwner::World(_) => todo!("handle resources with world owners"),
+            TypeOwner::Interface(id) => interface_name(resolve, *id).map(|s| format!("{s}$")),
+            TypeOwner::None => unreachable!(),
+        };
+        let resource_name = ty.name.as_deref().unwrap();
+        let prefix = prefix.as_deref().unwrap_or("");
+        let resource_name_camel = resource_name.to_lower_camel_case();
+
+        finalization_registries.push(format!(
+            "const finalizationRegistry_import${prefix}{resource_name_camel} = \
+             new FinalizationRegistry((handle) => {{
+                 $resource_import${prefix}drop${resource_name_camel}(handle);
+             }});
+            "
+        ));
+        resource_bindings.push(format!("import${prefix}drop${resource_name_camel}"));
+        resource_imports.push((
+            imported_resource_modules.get(&id).unwrap().clone(),
+            format!("[resource-drop]{resource_name}"),
+            0,
+        ));
+    }
+
+    let finalization_registries = finalization_registries.concat();
+
     let mut output = Source::default();
 
     uwrite!(
@@ -178,37 +300,43 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         "
             import * as $source_mod from '{name}';
 
-            let handleCnt0 = 0;
-            let handleTable0 = new Map();
-            const finalizationRegistry0 = new FinalizationRegistry(handle => {{
-                const handleEntry = handleTable0.get(handle);
-                if (handleEntry) {{
-                    handleTable0.delete(handle);
-                    // TODO: generic dtor goes here
-                }}
-            }});
+            let repCnt = 0;
+            let repTable = new Map();
 
             let $memory, $realloc{};
             export function $initBindings (_memory, _realloc{}) {{
                 $memory = _memory;
                 $realloc = _realloc;{}
             }}
+
+            {finalization_registries}
         ",
         import_bindings
             .iter()
             .map(|impt| format!(", $import_{impt}"))
+            .chain(
+                resource_bindings
+                    .iter()
+                    .map(|name| format!(", $resource_{name}"))
+            )
             .collect::<Vec<_>>()
-            .join(""),
+            .concat(),
         import_bindings
             .iter()
+            .chain(&resource_bindings)
             .map(|impt| format!(", _{impt}"))
             .collect::<Vec<_>>()
-            .join(""),
+            .concat(),
         import_bindings
             .iter()
             .map(|impt| format!("\n$import_{impt} = _{impt};"))
+            .chain(
+                resource_bindings
+                    .iter()
+                    .map(|name| format!("\n$resource_{name} = _{name}"))
+            )
             .collect::<Vec<_>>()
-            .join(""),
+            .concat(),
     );
 
     bindgen.esm_bindgen.render_export_imports(
@@ -227,6 +355,7 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         exports: bindgen.exports,
         imports: bindgen.imports,
         import_wrappers,
+        resource_imports,
     }
 }
 
@@ -253,8 +382,11 @@ impl JsBindgen<'_> {
                 }
                 WorldItem::Interface(id) => {
                     let iface = &self.resolve.interfaces[*id];
-                    for _ty in &iface.types {
-                        // ... type exports
+                    for id in iface.types.values() {
+                        if let TypeDefKind::Resource = &self.resolve.types[*id].kind {
+                            self.resource_directions
+                                .insert(*id, AbiVariant::GuestExport);
+                        }
                     }
                     for (func_name, func) in &iface.functions {
                         let local_name = self
@@ -321,34 +453,60 @@ impl JsBindgen<'_> {
             let import_name = self.resolve.name_world_key(key);
             match &impt {
                 WorldItem::Function(f) => {
-                    let binding_name = format!("$import_{}", f.name.to_lower_camel_case());
-                    self.import_bindgen(
-                        import_name,
-                        f,
-                        false,
-                        None,
-                        f.name.to_string(),
-                        binding_name,
-                    );
+                    self.import_bindgen(import_name, f, false, None);
                 }
                 WorldItem::Interface(i) => {
                     let iface = &self.resolve.interfaces[*i];
-                    for (func_name, func) in &iface.functions {
-                        let iface_name = interface_name(self.resolve, *i);
-                        let binding_name = match iface_name.as_ref() {
-                            Some(iface_name) => {
-                                format!("$import_{iface_name}${}", func_name.to_lower_camel_case())
-                            }
-                            None => format!("$import_{}", import_name.to_lower_camel_case()),
-                        };
-                        self.import_bindgen(
-                            import_name.clone(),
-                            func,
-                            true,
-                            iface_name,
-                            func_name.clone(),
-                            binding_name,
-                        );
+                    for id in iface.types.values() {
+                        if let TypeDefKind::Resource = &self.resolve.types[*id].kind {
+                            self.resource_directions
+                                .insert(*id, AbiVariant::GuestImport);
+                        }
+                    }
+
+                    let by_resource = iface.functions.iter().fold(
+                        BTreeMap::<_, Vec<_>>::new(),
+                        |mut map, (name, func)| {
+                            map.entry(match &func.kind {
+                                FunctionKind::Freestanding => None,
+                                FunctionKind::Method(ty)
+                                | FunctionKind::Static(ty)
+                                | FunctionKind::Constructor(ty) => Some(*ty),
+                            })
+                            .or_default()
+                            .push((name, func));
+                            map
+                        },
+                    );
+
+                    let iface_name = interface_name(self.resolve, *i);
+
+                    for (resource, functions) in by_resource {
+                        if let Some(ty) = resource {
+                            let name = binding_name(
+                                &self.resolve.types[ty]
+                                    .name
+                                    .as_ref()
+                                    .unwrap()
+                                    .to_upper_camel_case(),
+                                &iface_name,
+                            );
+
+                            uwriteln!(self.src, "\nexport class import_{name} {{");
+                        }
+
+                        for (_, func) in functions {
+                            self.import_bindgen(
+                                import_name.clone(),
+                                func,
+                                true,
+                                iface_name.clone(),
+                            );
+                        }
+
+                        if resource.is_some() {
+                            uwriteln!(self.src, "}}");
+                        }
                     }
                 }
                 WorldItem::Type(_) => {}
@@ -362,73 +520,71 @@ impl JsBindgen<'_> {
         func: &Function,
         iface: bool,
         iface_name: Option<String>,
-        name: String,
-        callee_name: String,
     ) {
-        let binding_name = match &iface_name {
-            Some(iface_name) => format!("import_{iface_name}${}", name.to_lower_camel_case()),
-            None => {
-                match &func.kind {
-                    FunctionKind::Freestanding => {
-                        let binding_name = format!("import_{}", name.to_lower_camel_case());
-                        // imports are canonicalized as exports because
-                        // the function bindgen as currently written still makes this assumption
-                        uwrite!(self.src, "\nexport function {binding_name}");
-                        binding_name
-                    }
-                    FunctionKind::Method(ty) => {
-                        let ty = &self.resolve.types[*ty];
-                        let name = ty.name.as_ref().unwrap().to_upper_camel_case();
-                        let method = func.item_name();
-                        let binding_name = format!(
-                            "import_{}_{}",
-                            name.to_lower_camel_case(),
-                            method.to_lower_camel_case()
-                        );
-                        uwrite!(self.src, "\nfunction {binding_name}");
-                        uwrite!(self.src, "\nexport function {binding_name}");
-                        binding_name
-                    }
-                    FunctionKind::Static(ty) => {
-                        let ty = &self.resolve.types[*ty];
-                        let name = ty.name.as_ref().unwrap().to_upper_camel_case();
-                        let method = func.item_name();
-                        let binding_name = format!(
-                            "import_{}_{}",
-                            name.to_lower_camel_case(),
-                            method.to_lower_camel_case()
-                        );
-                        uwrite!(self.src, "\nfunction {binding_name}");
-                        uwrite!(self.src, "\nexport function {binding_name}");
-                        binding_name
-                    }
-                    FunctionKind::Constructor(ty) => {
-                        let ty = &self.resolve.types[*ty];
-                        let name = ty.name.as_ref().unwrap().to_upper_camel_case();
-                        let method = func.item_name();
-                        let binding_name = format!(
-                            "import_{}_{}",
-                            name.to_lower_camel_case(),
-                            method.to_lower_camel_case()
-                        );
-                        uwrite!(self.src, "\nfunction {binding_name}");
-                        uwrite!(self.src, "\nexport function {binding_name}");
-                        binding_name
-                    }
-                }
+        let fn_name = func.item_name();
+        let fn_camel_name = fn_name.to_lower_camel_case();
+
+        use binding_name as binding_name_fn;
+
+        let (binding_name, resource) = match &func.kind {
+            FunctionKind::Freestanding => {
+                let binding_name = binding_name(&fn_camel_name, &iface_name);
+
+                uwrite!(self.src, "\nexport function import_{binding_name}");
+
+                (binding_name, Resource::None)
+            }
+            FunctionKind::Method(ty) => {
+                let args = (0..(func.params.len() - 1))
+                    .map(|n| format!("arg{n}"))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                uwrite!(self.src, "{fn_camel_name}({args}) {{\nfunction helper");
+
+                (
+                    "<<INVALID>>".to_string(),
+                    Resource::Method(self.resolve.types[*ty].name.clone().unwrap()),
+                )
+            }
+            FunctionKind::Static(ty) => {
+                uwrite!(self.src, "static {fn_camel_name}");
+                (
+                    "<<INVALID>>".to_string(),
+                    Resource::Static(self.resolve.types[*ty].name.clone().unwrap()),
+                )
+            }
+            FunctionKind::Constructor(ty) => {
+                uwrite!(self.src, "constructor");
+                (
+                    "<<INVALID>>".to_string(),
+                    Resource::Constructor(self.resolve.types[*ty].name.clone().unwrap()),
+                )
             }
         };
 
-        let resource = Resource::None;
-
+        // imports are canonicalized as exports because
+        // the function bindgen as currently written still makes this assumption
         self.bindgen(
             func.params.len(),
-            &callee_name,
+            &format!(
+                "$import_{}",
+                binding_name_fn(&resource.func_name(fn_name), &iface_name)
+            ),
             StringEncoding::UTF8,
             func,
             AbiVariant::GuestExport,
         );
         self.src.push_str("\n");
+
+        if let FunctionKind::Method(_) = &func.kind {
+            let args = (0..(func.params.len() - 1))
+                .map(|n| format!(", arg{n}"))
+                .collect::<Vec<_>>()
+                .concat();
+
+            uwriteln!(self.src, "return helper(this{args});\n}}");
+        }
 
         let sig = self.resolve.wasm_signature(AbiVariant::GuestImport, func);
 
@@ -438,7 +594,7 @@ impl JsBindgen<'_> {
                 binding_name,
                 iface_name: Some(iface_name),
                 resource,
-                name,
+                name: fn_name.to_string(),
                 func: self.core_fn(func, &sig),
             }
         } else {
@@ -447,7 +603,7 @@ impl JsBindgen<'_> {
                 binding_name,
                 iface_name: None,
                 resource,
-                name,
+                name: fn_name.to_string(),
                 func: self.core_fn(func, &sig),
             }
         };
@@ -476,11 +632,28 @@ impl JsBindgen<'_> {
                 }
             }
             TypeDefKind::Handle(Handle::Own(t) | Handle::Borrow(t)) => {
+                let resource = js_component_bindgen::dealias(self.resolve, *t);
+
+                let abi = self.resource_directions[&resource];
+
+                let ty = &self.resolve.types[resource];
+
+                let prefix = match &ty.owner {
+                    TypeOwner::World(_) => todo!("handle resources with world owners"),
+                    TypeOwner::Interface(id) => {
+                        interface_name(self.resolve, *id).map(|s| format!("{s}$"))
+                    }
+                    TypeOwner::None => unreachable!(),
+                };
+
                 map.insert(
-                    *t,
+                    resource,
                     ResourceTable {
-                        id: 0,
-                        imported: true,
+                        imported: abi == AbiVariant::GuestImport,
+                        data: ResourceData::Guest {
+                            resource_name: ty.name.clone().unwrap(),
+                            prefix,
+                        },
                     },
                 );
             }
@@ -540,6 +713,12 @@ impl JsBindgen<'_> {
 
         let resource_map = self.create_resource_map(func);
 
+        for (id, table) in &resource_map {
+            if table.imported {
+                self.imported_resources.insert(*id);
+            }
+        }
+
         let mut f = FunctionBindgen {
             tracing_prefix: None,
             intrinsics: &mut self.all_intrinsics,
@@ -569,6 +748,7 @@ impl JsBindgen<'_> {
             src: Source::default(),
             resource_map: &resource_map,
             cur_resource_borrows: Vec::new(),
+            resolve: self.resolve,
         };
         abi::call(
             self.resolve,
@@ -593,36 +773,29 @@ impl JsBindgen<'_> {
         string_encoding: StringEncoding,
         func: &Function,
     ) {
-        let mut binding_name = match &iface_name {
-            Some(iface_name) => format!("export_{iface_name}$"),
-            None => "export_".to_string(),
-        };
-
         let fn_name = func.item_name();
+        let fn_camel_name = fn_name.to_lower_camel_case();
 
         let (resource, callee) = match &func.kind {
             FunctionKind::Freestanding => (Resource::None, callee.to_string()),
-            FunctionKind::Method(ty) => {
-                let resource = self.resolve.types[*ty].name.as_ref().unwrap().to_string();
-                binding_name.push_str(&format!("{}$method$", &resource));
-                (
-                    Resource::Method(resource),
-                    format!("{callee}.prototype.METHOD"),
-                )
-            }
-            FunctionKind::Static(ty) => {
-                let resource = self.resolve.types[*ty].name.as_ref().unwrap().to_string();
-                binding_name.push_str(&format!("{}$static$", &resource));
-                (Resource::Static(resource), format!("{callee}.METHOD"))
-            }
-            FunctionKind::Constructor(ty) => {
-                let resource = self.resolve.types[*ty].name.as_ref().unwrap().to_string();
-                binding_name.push_str(&format!("{}$", &resource));
-                (Resource::Constructor(resource), format!("new {callee}"))
-            }
+            FunctionKind::Method(ty) => (
+                Resource::Method(self.resolve.types[*ty].name.clone().unwrap()),
+                format!("{callee}.prototype.{fn_camel_name}.call"),
+            ),
+            FunctionKind::Static(ty) => (
+                Resource::Static(self.resolve.types[*ty].name.clone().unwrap()),
+                format!("{callee}.{fn_camel_name}"),
+            ),
+            FunctionKind::Constructor(ty) => (
+                Resource::Constructor(self.resolve.types[*ty].name.clone().unwrap()),
+                format!("new {callee}"),
+            ),
         };
 
-        binding_name.push_str(&fn_name.to_lower_camel_case());
+        let binding_name = format!(
+            "export_{}",
+            binding_name(&resource.func_name(fn_name), &iface_name)
+        );
 
         uwrite!(self.src, "\nexport function {binding_name}");
 
@@ -931,4 +1104,11 @@ fn interface_name_from_string(name: &str) -> Option<String> {
     } else {
         alias
     })
+}
+
+fn binding_name(func_name: &str, iface_name: &Option<String>) -> String {
+    match iface_name {
+        Some(iface_name) => format!("{iface_name}${func_name}"),
+        None => format!("{func_name}"),
+    }
 }

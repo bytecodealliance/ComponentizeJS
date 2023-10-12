@@ -1,45 +1,17 @@
-import {
-  addOneInteger,
-  addOneFloat,
-  replaceFirstChar,
-  identifyInteger,
-  identifyFloat,
-  identifyText,
-  addOneDuplicated,
-  identifyDuplicated,
-  addOneDistinguishableNum,
-  identifyDistinguishableNum,
-} from "local:unions/unions";
+export const e1 = {
+    X: class {
+        constructor(value) {
+            this.value = value
+        }
+    },
+    
+    a: function(f) {
+        return [f.x]
+    }
+}
 
-export const unions = {
-  addOneInteger(num) {
-    return addOneInteger(num);
-  },
-  addOneFloat(num) {
-    return addOneFloat(num);
-  },
-  replaceFirstChar(text, letter) {
-    return replaceFirstChar(text, letter);
-  },
-  identifyInteger(num) {
-    return identifyInteger(num);
-  },
-  identifyFloat(num) {
-    return identifyFloat(num);
-  },
-  identifyText(text) {
-    return identifyText(text);
-  },
-  addOneDuplicated(num) {
-    return addOneDuplicated(num);
-  },
-  identifyDuplicated(num) {
-    return identifyDuplicated(num);
-  },
-  addOneDistinguishableNum(num) {
-    return addOneDistinguishableNum(num);
-  },
-  identifyDistinguishableNum(num) {
-    return identifyDistinguishableNum(num);
-  },
-};
+export const e2 = {
+    a: function(f, g) {
+        return [f.x, g.x]
+    }
+}
