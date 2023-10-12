@@ -13,4 +13,7 @@ export const floats = {
   float64Result () {
     return float64Result();
   },
+  float64Result2 () {
+    return 3;
+  },
 };

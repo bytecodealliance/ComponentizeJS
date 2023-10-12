@@ -15,3 +15,7 @@ export function float32Result () {
 export function float64Result () {
   return float64;
 }
+
+export function float64Result2 () {
+  return 3;
+}
