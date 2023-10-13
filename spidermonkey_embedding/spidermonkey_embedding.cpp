@@ -951,10 +951,10 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx, void *argptr
       }
       break;
     case CoreVal::F32:
-      *((float *)retptr) = static_cast<float>(r.toDouble());
+      *((float *)retptr) = r.isInt32() ? static_cast<float>(r.toInt32()) : static_cast<float>(r.toDouble());
       break;
     case CoreVal::F64:
-      *((double *)retptr) = r.toDouble();
+      *((double *)retptr) = r.isInt32() ? static_cast<double>(r.toInt32()) : r.toDouble();
       break;
     }
   }
