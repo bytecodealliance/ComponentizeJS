@@ -1,9 +1,6 @@
 use anyhow::Result;
 use walrus::{
-    ir::{
-        BinaryOp, Binop, Call, Const, Load, LoadKind, MemArg, Store, StoreKind, UnaryOp, Unop,
-        Value,
-    },
+    ir::{BinaryOp, Binop, Const, LoadKind, MemArg, Store, StoreKind, UnaryOp, Unop, Value},
     ir::{Instr, LocalGet, LocalSet, LocalTee},
     ExportId, ExportItem, FunctionBuilder, FunctionId, LocalId, ValType,
 };
@@ -102,7 +99,6 @@ fn synthesize_import_functions(
         .id();
 
     // Sets the return value on args from the stack
-    // TODO: Inline the float logic from spidermonkey_embedding.cpp here like for arguments
     let args_ret_i32: Vec<Instr> = vec![
         Instr::Unop(Unop {
             op: UnaryOp::I64ExtendUI32,
@@ -131,49 +127,6 @@ fn synthesize_import_functions(
         .find(|expt| expt.name.as_str() == "coreabi_to_bigint64")
         .unwrap()
         .id();
-    let args_ret_i64: Vec<Instr> = vec![
-        Instr::Call(Call {
-            func: get_export_fid(&module, &coreabi_to_bigint64),
-        }),
-        Instr::Unop(Unop {
-            op: UnaryOp::I64ExtendUI32,
-        }),
-        Instr::Const(Const {
-            value: Value::I64(-511101108224),
-        }),
-        Instr::Binop(Binop {
-            op: BinaryOp::I64Or,
-        }),
-        Instr::Store(Store {
-            memory,
-            kind: StoreKind::I64 { atomic: false },
-            arg: MemArg {
-                align: 8,
-                offset: 0,
-            },
-        }),
-    ];
-    let args_ret_f32: Vec<Instr> = vec![
-        Instr::Unop(Unop {
-            op: UnaryOp::F64PromoteF32,
-        }),
-        Instr::Store(Store {
-            memory,
-            kind: StoreKind::F64,
-            arg: MemArg {
-                align: 8,
-                offset: 0,
-            },
-        }),
-    ];
-    let args_ret_f64: Vec<Instr> = vec![Instr::Store(Store {
-        memory,
-        kind: StoreKind::F64,
-        arg: MemArg {
-            align: 8,
-            offset: 0,
-        },
-    })];
 
     // create the import functions
     // All JS wrapper function bindings have the same type, the
@@ -300,22 +253,18 @@ fn synthesize_import_functions(
                 func_body.binop(BinaryOp::I32Add);
                 match arg {
                     CoreTy::I32 => {
-                        func_body.instr(Instr::Load(Load {
+                        func_body.load(
                             memory,
-                            kind: LoadKind::I64 { atomic: false },
-                            arg: MemArg {
+                            LoadKind::I64 { atomic: false },
+                            MemArg {
                                 align: 8,
                                 offset: 0,
                             },
-                        }));
-                        func_body.instr(Instr::Unop(Unop {
-                            op: UnaryOp::I32WrapI64,
-                        }));
+                        );
+                        func_body.unop(UnaryOp::I32WrapI64);
                     }
                     CoreTy::I64 => {
-                        func_body.instr(Instr::Call(Call {
-                            func: get_export_fid(&module, &coreabi_from_bigint64),
-                        }));
+                        func_body.call(get_export_fid(&module, &coreabi_from_bigint64));
                     }
                     CoreTy::F32 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
@@ -417,15 +366,41 @@ fn synthesize_import_functions(
                 Some(CoreTy::I32) => args_ret_i32.iter().for_each(|instr| {
                     func_body.instr(instr.clone());
                 }),
-                Some(CoreTy::I64) => args_ret_i64.iter().for_each(|instr| {
-                    func_body.instr(instr.clone());
-                }),
-                Some(CoreTy::F32) => args_ret_f32.iter().for_each(|instr| {
-                    func_body.instr(instr.clone());
-                }),
-                Some(CoreTy::F64) => args_ret_f64.iter().for_each(|instr| {
-                    func_body.instr(instr.clone());
-                }),
+                Some(CoreTy::I64) => {
+                    func_body.call(get_export_fid(&module, &coreabi_to_bigint64));
+                    func_body.unop(UnaryOp::I64ExtendUI32);
+                    func_body.i64_const(-511101108224);
+                    func_body.binop(BinaryOp::I64Or);
+                    func_body.store(
+                        memory,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 8,
+                            offset: 0,
+                        },
+                    );
+                }
+                Some(CoreTy::F32) => {
+                    func_body.unop(UnaryOp::F64PromoteF32);
+                    func_body.store(
+                        memory,
+                        StoreKind::F64,
+                        MemArg {
+                            align: 8,
+                            offset: 0,
+                        },
+                    );
+                }
+                Some(CoreTy::F64) => {
+                    func_body.store(
+                        memory,
+                        StoreKind::F64,
+                        MemArg {
+                            align: 8,
+                            offset: 0,
+                        },
+                    );
+                }
             }
 
             // return true

@@ -951,8 +951,6 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx, void *argptr
       }
       break;
     case CoreVal::F32:
-      // TODO: lower these checks into the splicing Wasm generation itself so that these are direct floats and doubles
-      //       (like we do for arguments)
       *((float *)retptr) = (r.asRawBits() >> 32) == 0xFFFFFF81 ? static_cast<float>(r.toInt32()) : static_cast<float>(r.toDouble());
       break;
     case CoreVal::F64:
