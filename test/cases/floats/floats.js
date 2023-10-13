@@ -19,3 +19,7 @@ export function float64Result () {
 export function float64Result2 () {
   return 3;
 }
+
+export function float32Result2 () {
+  return 3;
+}
