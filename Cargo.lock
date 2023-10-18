@@ -171,6 +171,7 @@ checksum = "af150ab688ff2122fcef229be89cb50dd66af9e01a4ff320cc137eecc9bacc38"
 [[package]]
 name = "js-component-bindgen"
 version = "0.11.0"
+source = "git+https://github.com/bytecodealliance/jco#cb155f0037a7a8518bb2a1c8644f60918e9af027"
 dependencies = [
  "anyhow",
  "base64",
