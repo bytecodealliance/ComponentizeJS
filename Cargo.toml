@@ -19,11 +19,11 @@ heck =  { version = "0.4", features = ["unicode"] }
 js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", no-default-features = ["transpile-bindgen"] }
 pulldown-cmark = { version = "0.8", default-features = false }
 walrus = "0.20.1"
-wasm-encoder = "0.33.1"
-wasmparser = "0.113.1"
-wasmprinter = "0.2.66"
-wat = "1.0.73"
-wit-bindgen = { git = "https://github.com/bytecodealliance/wit-bindgen", rev = "2405a79c74c5d61b9bc88c378d475c6c21ed6a9f" }
-wit-bindgen-core = { git = "https://github.com/bytecodealliance/wit-bindgen", rev = "2405a79c74c5d61b9bc88c378d475c6c21ed6a9f" }
-wit-component = { version = "0.15", features = ["dummy-module"] }
-wit-parser = "0.12"
+wasm-encoder = "0.35.0"
+wasmparser = "0.115.0"
+wasmprinter = "0.2.70"
+wat = "1.0.77"
+wit-bindgen = { version = "0.13.0" }
+wit-bindgen-core = { version = "0.13.0" }
+wit-component = { version = "0.16", features = ["dummy-module"] }
+wit-parser = "0.12.1"

@@ -35,13 +35,25 @@ impl Resource {
         match self {
             Resource::None => fn_name.to_lower_camel_case(),
             Resource::Constructor(name) => {
-                format!("{name}${}", fn_name.to_lower_camel_case())
+                format!(
+                    "{}${}",
+                    name.to_lower_camel_case(),
+                    fn_name.to_lower_camel_case()
+                )
             }
             Resource::Method(name) => {
-                format!("{name}$method${}", fn_name.to_lower_camel_case())
+                format!(
+                    "{}$method${}",
+                    name.to_lower_camel_case(),
+                    fn_name.to_lower_camel_case()
+                )
             }
             Resource::Static(name) => {
-                format!("{name}$static${}", fn_name.to_lower_camel_case())
+                format!(
+                    "{}$static${}",
+                    name.to_lower_camel_case(),
+                    fn_name.to_lower_camel_case()
+                )
             }
         }
     }
@@ -134,8 +146,6 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
     bindgen
         .local_names
         .exclude_globals(Intrinsic::get_global_names());
-
-    bindgen.imports_bindgen();
 
     bindgen.imports_bindgen();
 
@@ -948,7 +958,12 @@ impl EsmBindgen {
     /// names that do not collide with kebab names or other interface names
     pub fn populate_export_aliases(&mut self) {
         for expt_name in self.exports.keys() {
-            if let Some(alias) = interface_name_from_string(expt_name) {
+            let expt_name_sans_version = if let Some(version_idx) = expt_name.find('@') {
+                &expt_name[0..version_idx]
+            } else {
+                &expt_name
+            };
+            if let Some(alias) = interface_name_from_string(expt_name_sans_version) {
                 if !self.exports.contains_key(&alias)
                     && !self.export_aliases.values().any(|_alias| &alias == _alias)
                 {
@@ -1101,11 +1116,15 @@ fn interface_name_from_string(name: &str) -> Option<String> {
     let name = &name[path_idx + 1..];
     let at_idx = name.rfind('@');
     let alias = name[..at_idx.unwrap_or_else(|| name.len())].to_lower_camel_case();
-    Some(if let Some(at_idx) = at_idx {
-        format!("{alias}_{}", name[at_idx + 1..].replace('.', "_"))
+    let iface_name = Some(if let Some(at_idx) = at_idx {
+        format!(
+            "{alias}_{}",
+            name[at_idx + 1..].replace('.', "_").replace('-', "_")
+        )
     } else {
         alias
-    })
+    });
+    iface_name
 }
 
 fn binding_name(func_name: &str, iface_name: &Option<String>) -> String {
