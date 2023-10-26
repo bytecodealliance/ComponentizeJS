@@ -66,12 +66,23 @@ suite('Bindings', () => {
     test(name, async () => {
       const source = await readFile(new URL(`./cases/${name}/source.js`, import.meta.url), 'utf8');
 
-      let witWorld, witPath;
+      let witWorld, witPath, worldName;
       try {
         witWorld = await readFile(new URL(`./cases/${name}/world.wit`, import.meta.url), 'utf8');
       } catch (e) {
         if (e?.code == 'ENOENT') {
-          witPath = fileURLToPath(new URL(`./cases/${name}/wit`, import.meta.url));
+          try {
+            witPath = fileURLToPath(new URL(`./cases/${name}/wit`, import.meta.url));
+            await readdir(witPath);
+          }
+          catch (e) {
+            if (e?.code === 'ENOENT') {
+              witPath = fileURLToPath(new URL('./wit', import.meta.url));
+              worldName = 'test2';
+            } else {
+              throw e;
+            }
+          }
         } else {
           throw e;
         }
@@ -84,6 +95,7 @@ suite('Bindings', () => {
           sourceName: `${name}.js`,
           witWorld,
           witPath,
+          worldName,
           enableStdout: true,
         });
 
@@ -99,6 +111,8 @@ suite('Bindings', () => {
           'wasi:sockets/*': '@bytecodealliance/preview2-shim/sockets#*'
         };
         for (const [impt] of imports) {
+          if (impt.startsWith('wasi:'))
+            continue;
           let importName = impt.split('/').pop();
           if (importName === 'test') importName = 'imports';
           map[impt] = `../../cases/${name}/${importName}.js`;
