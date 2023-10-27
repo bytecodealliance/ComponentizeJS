@@ -23,10 +23,9 @@ export function getResult () {
   incomingResponse = futureIncomingResponse.get().val.val;
 
   const status = incomingResponse.status();
-  // const responseHeaders = incomingResponse.headers().entries();
+  const responseHeaders = incomingResponse.headers().entries();
 
-  // const headers = Object.fromEntries(responseHeaders.map(([k, v]) => [k, decoder.decode(v)]));
-  const headers = {};
+  const headers = Object.fromEntries(responseHeaders.map(([k, v]) => [k, decoder.decode(v)]));
 
   let responseBody;
   const incomingBody = incomingResponse.consume();
