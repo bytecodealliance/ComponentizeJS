@@ -172,8 +172,7 @@ checksum = "af150ab688ff2122fcef229be89cb50dd66af9e01a4ff320cc137eecc9bacc38"
 [[package]]
 name = "js-component-bindgen"
 version = "0.13.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17d196a847c0c695c96f5f804b19253cb544e57b7f81b01ecd0574e3523e346d"
+source = "git+https://github.com/bytecodealliance/jco#b8f32cf3f24e28f643da23e96766c74d88f638f6"
 dependencies = [
  "anyhow",
  "base64",
@@ -620,9 +619,9 @@ dependencies = [
 
 [[package]]
 name = "wit-parser"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6ace9943d89bbf3dbbc71b966da0e7302057b311f36a4ac3d65ddfef17b52cf"
+checksum = "43771ee863a16ec4ecf9da0fc65c3bbd4a1235c8e3da5f094b562894843dfa76"
 dependencies = [
  "anyhow",
  "id-arena",
