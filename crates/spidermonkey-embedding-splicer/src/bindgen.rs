@@ -372,6 +372,11 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
 }
 
 impl JsBindgen<'_> {
+    fn intrinsic(&mut self, intrinsic: Intrinsic) -> String {
+        self.all_intrinsics.insert(intrinsic);
+        return intrinsic.name().to_string();
+    }
+
     fn exports_bindgen(&mut self) {
         for (key, export) in &self.resolve.worlds[self.world].exports {
             let name = self.resolve.name_world_key(key);
@@ -516,8 +521,32 @@ impl JsBindgen<'_> {
                             );
                         }
 
-                        if resource.is_some() {
-                            uwriteln!(self.src, "}}");
+                        if let Some(ty) = resource {
+                            let lower_camel = &self.resolve.types[ty]
+                                .name
+                                .as_ref()
+                                .unwrap()
+                                .to_lower_camel_case();
+
+                            let prefix = iface_name
+                                .as_deref()
+                                .map(|s| format!("{s}$"))
+                                .unwrap_or(String::new());
+
+                            let resource_symbol = self.intrinsic(Intrinsic::SymbolResourceHandle);
+                            let dispose_symbol = self.intrinsic(Intrinsic::SymbolDispose);
+
+                            uwriteln!(
+                                self.src,
+                                "
+                                    [{dispose_symbol}]() {{
+                                        finalizationRegistry_import${prefix}{lower_camel}.unregister(this);
+                                        $resource_import${prefix}drop${lower_camel}(this[{resource_symbol}]);
+                                        this[{resource_symbol}] = null;
+                                    }}
+                               }}
+                               "
+                            );
                         }
                     }
                 }

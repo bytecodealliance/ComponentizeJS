@@ -16,7 +16,8 @@ base64 = "0.21.2"
 bitflags = "1.3.2"
 env_logger = "0.10.0"
 heck =  { version = "0.4", features = ["unicode"] }
-js-component-bindgen = { version = "0.13.2", no-default-features = ["transpile-bindgen"] }
+# TODO: switch this back to a release once https://github.com/bytecodealliance/jco/pull/237 has been released
+js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", no-default-features = ["transpile-bindgen"] }
 pulldown-cmark = { version = "0.8", default-features = false }
 walrus = "0.20.1"
 wasm-encoder = "0.35.0"
@@ -26,4 +27,4 @@ wat = "1.0.77"
 wit-bindgen = { version = "0.13.0" }
 wit-bindgen-core = { version = "0.13.0" }
 wit-component = { version = "0.16", features = ["dummy-module"] }
-wit-parser = "0.12.1"
+wit-parser = "0.12.2"
