@@ -5,11 +5,11 @@
   "type": "module",
   "exports": "./src/componentize.js",
   "devDependencies": {
-    "@bytecodealliance/preview2-shim": "^0.0.20",
+    "@bytecodealliance/preview2-shim": "^0.14.0",
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "^0.13.2",
+    "@bytecodealliance/jco": "^0.14.0",
     "@bytecodealliance/wizer": "^3.0.1"
   },
   "scripts": {
