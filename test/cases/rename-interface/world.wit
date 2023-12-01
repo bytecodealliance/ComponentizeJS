@@ -1,4 +1,4 @@
-package local:rename-interface
+package local:rename-interface;
 
 interface foo {
   record bar {
@@ -7,10 +7,10 @@ interface foo {
 }
 
 world the-world {
-  import foo
+  import foo;
   import other-name: interface {
-    use foo.{bar}
+    use foo.{bar};
 
-    a: func() -> bar
+    a: func() -> bar;
   }
 }

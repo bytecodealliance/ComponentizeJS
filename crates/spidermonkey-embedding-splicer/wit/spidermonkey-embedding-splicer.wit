@@ -1,4 +1,4 @@
-package local:spidermonkey-embedding-splicer
+package local:spidermonkey-embedding-splicer;
 
 world spidermonkey-embedding-splicer {
   enum core-ty {
@@ -24,7 +24,7 @@ world spidermonkey-embedding-splicer {
     imports: list<tuple<string, string, u32>>,
   }
 
-  export stub-wasi: func(engine: list<u8>, stdout: bool) -> result<list<u8>, string>
+  export stub-wasi: func(engine: list<u8>, stdout: bool) -> result<list<u8>, string>;
 
-  export splice-bindings: func(source-name: option<string>, spidermonkey-engine: list<u8>, wit-world: option<string>, wit-path: option<string>, world-name: option<string>) -> result<splice-result, string>
+  export splice-bindings: func(source-name: option<string>, spidermonkey-engine: list<u8>, wit-world: option<string>, wit-path: option<string>, world-name: option<string>) -> result<splice-result, string>;
 }

@@ -1,7 +1,7 @@
-package local:count
+package local:count;
 
 world count {
   export exports: interface {
-    count-a: func(str: string) -> u32
+    count-a: func(str: string) -> u32;
   }
 }

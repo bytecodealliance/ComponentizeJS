@@ -1,7 +1,7 @@
-package example:protocol
+package example:protocol;
 
 world my-world {
-  import print: func(msg: string)
+  import print: func(msg: string);
 
-  export run: func()
+  export run: func();
 }

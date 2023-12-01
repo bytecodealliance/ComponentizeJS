@@ -1,4 +1,4 @@
-package local:b
+package local:b;
 
 interface foo {
   record bar {

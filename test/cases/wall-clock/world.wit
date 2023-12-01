@@ -1,9 +1,9 @@
-package local:wall-clock
+package local:wall-clock;
 
 interface random-t {
-  get-random-bytes: func(len: u64) -> list<u8>
-  get-random-u64: func() -> u64
-  insecure-random: func() -> tuple<u64, u64>
+  get-random-bytes: func(len: u64) -> list<u8>;
+  get-random-u64: func() -> u64;
+  insecure-random: func() -> tuple<u64, u64>;
 }
 
 interface wall-clock-t {
@@ -12,12 +12,12 @@ interface wall-clock-t {
     nanoseconds: u32,
   }
 
-  now: func() -> datetime
+  now: func() -> datetime;
 }
 
 world wall-clock-world {
-  import wall-clock-t
-  import random-t
+  import wall-clock-t;
+  import random-t;
 
-  export test: func() -> string
+  export test: func() -> string;
 }

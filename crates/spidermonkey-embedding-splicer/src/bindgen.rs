@@ -422,7 +422,7 @@ impl JsBindgen<'_> {
                                     &func,
                                 );
                                 self.esm_bindgen.add_export_func(
-                                    Some(&name),
+                                    Some(name),
                                     local_name,
                                     func.name.to_lower_camel_case(),
                                 );
