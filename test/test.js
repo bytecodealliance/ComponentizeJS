@@ -5,9 +5,6 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { strictEqual } from 'node:assert';
 
-// import { setLevel } from './wasi/logging.js';
-// setLevel('debug');
-
 const builtinsCases = await readdir(new URL('./builtins', import.meta.url));
 suite('Builtins', () => {
   for (const filename of builtinsCases) {
@@ -16,9 +13,9 @@ suite('Builtins', () => {
       const { source, test: runTest } = await import(`./builtins/${filename}`);
 
       const { component } = await componentize(source, `
-        package local:runworld
+        package local:runworld;
         world runworld {
-          export run: func() -> ()
+          export run: func() -> ();
         }
       `, {
         sourceName: `${name}.js`,
@@ -145,8 +142,8 @@ suite('Bindings', () => {
 suite('WASI', () => {
   test('basic app', async () => {
     const { component } = await componentize(`
-      import { now } from 'wasi:clocks/wall-clock@0.2.0-rc-2023-11-05';
-      import { getRandomBytes } from 'wasi:random/random@0.2.0-rc-2023-11-05';
+      import { now } from 'wasi:clocks/wall-clock@0.2.0-rc-2023-11-10';
+      import { getRandomBytes } from 'wasi:random/random@0.2.0-rc-2023-11-10';
 
       let result;
       export const run = {

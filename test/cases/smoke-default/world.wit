@@ -1,5 +1,5 @@
-package local:smoke-default
+package local:smoke-default;
 
 world the-world {
-  export y: func()
+  export y: func();
 }

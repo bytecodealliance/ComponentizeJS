@@ -6,7 +6,9 @@ import { resolve, join } from "node:path";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { spliceBindings, stubWasi } from "../lib/spidermonkey-embedding-splicer.js";
 import { fileURLToPath } from "node:url";
+import { stdout, stderr, exit, platform } from "node:process";
 const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+const isWindows = platform === 'win32';
 
 export async function componentize(
   jsSource,
@@ -33,7 +35,7 @@ export async function componentize(
     sourceName,
     await readFile(engine),
     witWorld,
-    witPath ? resolve(witPath) : null,
+    witPath ? (isWindows ? '//?/' : '') + resolve(witPath) : null,
     worldName
   );
 
@@ -105,7 +107,7 @@ export async function componentize(
         input,
       ],
       {
-        stdio: [null, process.stdout, process.stderr],
+        stdio: [null, stdout, stderr],
         env,
         input: wizerInput,
         shell: true,
@@ -124,7 +126,7 @@ export async function componentize(
     } else {
       await unlink(input);
     }
-    process.exit(1);
+    exit(1);
   }
 
   const bin = await readFile(output);
@@ -308,7 +310,7 @@ export async function componentize(
     if (stderr) {
       console.error(stderr);
     }
-    process.exit(1);
+    exit(1);
   }
 
   // after wizering, stub out the wasi imports

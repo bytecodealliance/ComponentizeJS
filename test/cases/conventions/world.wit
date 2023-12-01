@@ -1,4 +1,4 @@
-package local:conventions
+package local:conventions;
 
 // hello 🐱 world
 
@@ -10,7 +10,7 @@ interface conventions {
     i-am-going-extremely-slow: u64,
   }
 
-  foo: func(x: ludicrous-speed)
+  foo: func(x: ludicrous-speed);
   // %function-with-dashes: func()
   // %function-with-no-weird-characters: func()
 
@@ -35,6 +35,6 @@ interface conventions {
 }
 
 world the-world {
-  import conventions
-  export conventions
+  import conventions;
+  export conventions;
 }

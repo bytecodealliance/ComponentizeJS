@@ -1,15 +1,15 @@
-package test:test
+package test:test;
 
 interface resource-with-lists {
   resource thing {
-    constructor(l: list<u8>)
-    foo: func() -> list<u8>
-    bar: func(l: list<u8>)
-    baz: static func(l: list<u8>) -> list<u8>
+    constructor(l: list<u8>);
+    foo: func() -> list<u8>;
+    bar: func(l: list<u8>);
+    baz: static func(l: list<u8>) -> list<u8>;
  }
 }
 
 world test {
-  import resource-with-lists
-  export resource-with-lists  
+  import resource-with-lists;
+  export resource-with-lists; 
 }

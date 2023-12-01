@@ -1,22 +1,22 @@
-package local:use-across-interfaces
+package local:use-across-interfaces;
 
 interface foo {
   record a {
     dummy: bool
   }
-  x: func() -> a
+  x: func() -> a;
 }
 
 interface bar {
-  use foo.{a}
-  x: func() -> a
+  use foo.{a};
+  x: func() -> a;
 }
 
 world baz {
-  import foo
-  import bar
+  import foo;
+  import bar;
   import baz: interface {
-    use foo.{a}
-    x: func() -> a
+    use foo.{a};
+    x: func() -> a;
   }
 }

@@ -1,11 +1,11 @@
-package local:hello
+package local:hello;
 
 world hello {
   import get-num: interface {
-    get-num: func(text: string) -> string
+    get-num: func(text: string) -> string;
   }
 
   export exports: interface {
-    hello: func(name: string) -> string
+    hello: func(name: string) -> string;
   }
 }
