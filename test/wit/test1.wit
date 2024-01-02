@@ -17,18 +17,18 @@ world test1 {
   import wasi:random/insecure-seed@0.2.0-rc-2023-11-10;
   import wasi:io/poll@0.2.0-rc-2023-11-10;
   import wasi:io/streams@0.2.0-rc-2023-11-10;
-  import wasi:cli/environment@0.2.0-rc-2023-11-10;
-  import wasi:cli/exit@0.2.0-rc-2023-11-10;
-  import wasi:cli/stdin@0.2.0-rc-2023-11-10;
-  import wasi:cli/stdout@0.2.0-rc-2023-11-10;
-  import wasi:cli/stderr@0.2.0-rc-2023-11-10;
-  import wasi:cli/terminal-input@0.2.0-rc-2023-11-10;
-  import wasi:cli/terminal-output@0.2.0-rc-2023-11-10;
-  import wasi:cli/terminal-stdin@0.2.0-rc-2023-11-10;
-  import wasi:cli/terminal-stdout@0.2.0-rc-2023-11-10;
-  import wasi:cli/terminal-stderr@0.2.0-rc-2023-11-10;
+  import wasi:cli/environment@0.2.0-rc-2023-12-05;
+  import wasi:cli/exit@0.2.0-rc-2023-12-05;
+  import wasi:cli/stdin@0.2.0-rc-2023-12-05;
+  import wasi:cli/stdout@0.2.0-rc-2023-12-05;
+  import wasi:cli/stderr@0.2.0-rc-2023-12-05;
+  import wasi:cli/terminal-input@0.2.0-rc-2023-12-05;
+  import wasi:cli/terminal-output@0.2.0-rc-2023-12-05;
+  import wasi:cli/terminal-stdin@0.2.0-rc-2023-12-05;
+  import wasi:cli/terminal-stdout@0.2.0-rc-2023-12-05;
+  import wasi:cli/terminal-stderr@0.2.0-rc-2023-12-05;
 
-  export wasi:cli/run@0.2.0-rc-2023-11-10;
+  export wasi:cli/run@0.2.0-rc-2023-12-05;
 
   export get-result: func() -> string;
 }
@@ -50,17 +50,17 @@ world test2 {
   import wasi:random/insecure-seed@0.2.0-rc-2023-11-10;
   import wasi:io/poll@0.2.0-rc-2023-11-10;
   import wasi:io/streams@0.2.0-rc-2023-11-10;
-  import wasi:cli/environment@0.2.0-rc-2023-11-10;
-  import wasi:cli/exit@0.2.0-rc-2023-11-10;
-  import wasi:cli/stdin@0.2.0-rc-2023-11-10;
-  import wasi:cli/stdout@0.2.0-rc-2023-11-10;
-  import wasi:cli/stderr@0.2.0-rc-2023-11-10;
-  import wasi:cli/terminal-input@0.2.0-rc-2023-11-10;
-  import wasi:cli/terminal-output@0.2.0-rc-2023-11-10;
-  import wasi:cli/terminal-stdin@0.2.0-rc-2023-11-10;
-  import wasi:cli/terminal-stdout@0.2.0-rc-2023-11-10;
-  import wasi:cli/terminal-stderr@0.2.0-rc-2023-11-10;
-  import wasi:http/outgoing-handler@0.2.0-rc-2023-11-10;
+  import wasi:cli/environment@0.2.0-rc-2023-12-05;
+  import wasi:cli/exit@0.2.0-rc-2023-12-05;
+  import wasi:cli/stdin@0.2.0-rc-2023-12-05;
+  import wasi:cli/stdout@0.2.0-rc-2023-12-05;
+  import wasi:cli/stderr@0.2.0-rc-2023-12-05;
+  import wasi:cli/terminal-input@0.2.0-rc-2023-12-05;
+  import wasi:cli/terminal-output@0.2.0-rc-2023-12-05;
+  import wasi:cli/terminal-stdin@0.2.0-rc-2023-12-05;
+  import wasi:cli/terminal-stdout@0.2.0-rc-2023-12-05;
+  import wasi:cli/terminal-stderr@0.2.0-rc-2023-12-05;
+  import wasi:http/outgoing-handler@0.2.0-rc-2023-12-05;
 
   export get-result: func() -> string;
 }
