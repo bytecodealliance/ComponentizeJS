@@ -4,8 +4,8 @@ world spidermonkey-embedding-splicer {
   enum core-ty {
     i32,
     i64,
-    f32,
-    f64
+    %f32,
+    %f64
   }
 
   record core-fn {

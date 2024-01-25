@@ -128,7 +128,6 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             world,
             StringEncoding::UTF8,
             None,
-            Some(true),
         )
         .map_err(|e| e.to_string())?;
 

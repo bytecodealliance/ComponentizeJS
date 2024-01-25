@@ -40,6 +40,5 @@ import { WasiFilesystemTypes } from './interfaces/wasi-filesystem-types.js';
 import { WasiIoError } from './interfaces/wasi-io-error.js';
 import { WasiIoStreams } from './interfaces/wasi-io-streams.js';
 import { WasiRandomRandom } from './interfaces/wasi-random-random.js';
-import { WasiSocketsTcp } from './interfaces/wasi-sockets-tcp.js';
 export function stubWasi(engine: Uint8Array, stdout: boolean): Uint8Array;
 export function spliceBindings(sourceName: string | undefined, spidermonkeyEngine: Uint8Array, witWorld: string | undefined, witPath: string | undefined, worldName: string | undefined): SpliceResult;
