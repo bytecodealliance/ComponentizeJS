@@ -123,13 +123,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             .select_world(id, world_name.as_deref())
             .map_err(|e| e.to_string())?;
 
-        let encoded = wit_component::metadata::encode(
-            &resolve,
-            world,
-            StringEncoding::UTF8,
-            None,
-        )
-        .map_err(|e| e.to_string())?;
+        let encoded = wit_component::metadata::encode(&resolve, world, StringEncoding::UTF8, None)
+            .map_err(|e| e.to_string())?;
 
         let section = wasm_encoder::CustomSection {
             name: "component-type".into(),
