@@ -75,10 +75,13 @@ import { componentize } from '@bytecodealliance/componentize-js';
 import { writeFile } from 'node:fs/promises';
 
 const { component } = await componentize(`
-  export function fn () {}
+  export function hello (name) {
+    return \`Hello \${name}\`;
+  }
 `, `
-  default world test {
-    export fn: func()
+  package local:hello;
+  world hello {
+    export hello: func(name: string) -> string;
   }
 `);
 
