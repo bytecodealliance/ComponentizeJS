@@ -38,6 +38,7 @@ export function getResult() {
     const buf = bodyStream.blockingRead(500n);
     // TODO: actual streaming
     responseBody = buf.length > 0 ? decoder.decode(buf) : undefined;
+    bodyStream[Symbol.dispose]();
   }
 
   return `
