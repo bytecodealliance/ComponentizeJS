@@ -43,7 +43,7 @@ export async function componentize(
     console.log('--- JS Source ---');
     console.log(jsSource);
     console.log('--- JS Bindings ---');
-    console.log(jsBindings);
+    console.log(jsBindings.split('\n').map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`).join('\n'));
     console.log('--- JS Imports ---');
     console.log(imports);
     console.log(importWrappers);

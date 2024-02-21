@@ -12,45 +12,71 @@ suite('Builtins', () => {
     test(name, async () => {
       const { source, test: runTest } = await import(`./builtins/${filename}`);
 
-      const { component } = await componentize(source, `
+      const { component } = await componentize(
+        source,
+        `
         package local:runworld;
         world runworld {
           export run: func() -> ();
         }
-      `, {
-        sourceName: `${name}.js`,
-        enableStdout: true,
-      });
-    
+      `,
+        {
+          sourceName: `${name}.js`,
+          enableStdout: true,
+        }
+      );
+
       const { files } = await transpile(component, { name, wasiShim: true });
 
-      await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), { recursive: true });
-    
-      await writeFile(new URL(`./output/${name}.component.wasm`, import.meta.url), component);
-    
+      await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), {
+        recursive: true,
+      });
+
+      await writeFile(
+        new URL(`./output/${name}.component.wasm`, import.meta.url),
+        component
+      );
+
       for (const file of Object.keys(files)) {
-        await writeFile(new URL(`./output/${name}/${file}`, import.meta.url), files[file]);
+        await writeFile(
+          new URL(`./output/${name}/${file}`, import.meta.url),
+          files[file]
+        );
       }
-  
-      await writeFile(new URL(`./output/${name}/run.js`, import.meta.url), `
+
+      await writeFile(
+        new URL(`./output/${name}/run.js`, import.meta.url),
+        `
         import { run } from './${name}.js';
         run();
-      `);
-  
-      await runTest(async function run () {
-        let stdout = '', stderr = '';
+      `
+      );
+
+      await runTest(async function run() {
+        let stdout = '',
+          stderr = '';
         await new Promise((resolve, reject) => {
-          const cp = spawn(process.argv[0], [fileURLToPath(new URL(`./output/${name}/run.js`, import.meta.url))], { stdio: 'pipe' });
-          cp.stdout.on('data', chunk => {
+          const cp = spawn(
+            process.argv[0],
+            [
+              fileURLToPath(
+                new URL(`./output/${name}/run.js`, import.meta.url)
+              ),
+            ],
+            { stdio: 'pipe' }
+          );
+          cp.stdout.on('data', (chunk) => {
             stdout += chunk;
           });
-          cp.stderr.on('data', chunk => {
+          cp.stderr.on('data', (chunk) => {
             stderr += chunk;
           });
           cp.on('error', reject);
-          cp.on('exit', code => code === 0 ? resolve() : reject(new Error(stderr || stdout)));
+          cp.on('exit', (code) =>
+            code === 0 ? resolve() : reject(new Error(stderr || stdout))
+          );
         });
-      
+
         return { stdout, stderr };
       });
     });
@@ -61,18 +87,25 @@ const bindingsCases = await readdir(new URL('./cases', import.meta.url));
 suite('Bindings', () => {
   for (const name of bindingsCases) {
     test(name, async () => {
-      const source = await readFile(new URL(`./cases/${name}/source.js`, import.meta.url), 'utf8');
+      const source = await readFile(
+        new URL(`./cases/${name}/source.js`, import.meta.url),
+        'utf8'
+      );
 
       let witWorld, witPath, worldName;
       try {
-        witWorld = await readFile(new URL(`./cases/${name}/world.wit`, import.meta.url), 'utf8');
+        witWorld = await readFile(
+          new URL(`./cases/${name}/world.wit`, import.meta.url),
+          'utf8'
+        );
       } catch (e) {
         if (e?.code == 'ENOENT') {
           try {
-            witPath = fileURLToPath(new URL(`./cases/${name}/wit`, import.meta.url));
+            witPath = fileURLToPath(
+              new URL(`./cases/${name}/wit`, import.meta.url)
+            );
             await readdir(witPath);
-          }
-          catch (e) {
+          } catch (e) {
             if (e?.code === 'ENOENT') {
               witPath = fileURLToPath(new URL('./wit', import.meta.url));
               worldName = 'test2';
@@ -105,25 +138,37 @@ suite('Bindings', () => {
           'wasi:logging/*': '@bytecodealliance/preview2-shim/logging#*',
           'wasi:poll/*': '@bytecodealliance/preview2-shim/poll#*',
           'wasi:random/*': '@bytecodealliance/preview2-shim/random#*',
-          'wasi:sockets/*': '@bytecodealliance/preview2-shim/sockets#*'
+          'wasi:sockets/*': '@bytecodealliance/preview2-shim/sockets#*',
         };
         for (const [impt] of imports) {
-          if (impt.startsWith('wasi:'))
-            continue;
+          if (impt.startsWith('wasi:')) continue;
           let importName = impt.split('/').pop();
           if (importName === 'test') importName = 'imports';
           map[impt] = `../../cases/${name}/${importName}.js`;
         }
 
-        const { files } = await transpile(component, { name, map, wasiShim: true });
+        const { files } = await transpile(component, {
+          name,
+          map,
+          wasiShim: true,
+          validLiftingOptimization: true,
+        });
 
-        await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), { recursive: true });
+        await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), {
+          recursive: true,
+        });
 
-        await writeFile(new URL(`./output/${name}.component.wasm`, import.meta.url), component);
+        await writeFile(
+          new URL(`./output/${name}.component.wasm`, import.meta.url),
+          component
+        );
 
         for (const file of Object.keys(files)) {
           let source = files[file];
-          await writeFile(new URL(`./output/${name}/${file}`, import.meta.url), source);
+          await writeFile(
+            new URL(`./output/${name}/${file}`, import.meta.url),
+            source
+          );
         }
 
         var instance = await import(`./output/${name}/${name}.js`);
@@ -141,7 +186,8 @@ suite('Bindings', () => {
 
 suite('WASI', () => {
   test('basic app', async () => {
-    const { component } = await componentize(`
+    const { component } = await componentize(
+      `
       import { now } from 'wasi:clocks/wall-clock@0.2.0';
       import { getRandomBytes } from 'wasi:random/random@0.2.0';
 
@@ -153,19 +199,29 @@ suite('WASI', () => {
       };
 
       export const getResult = () => result;
-    `, {
-      witPath: fileURLToPath(new URL('./wit', import.meta.url)),
-      worldName: 'test1'
-    });
+    `,
+      {
+        witPath: fileURLToPath(new URL('./wit', import.meta.url)),
+        worldName: 'test1',
+      }
+    );
 
-    await writeFile(new URL(`./output/wasi.component.wasm`, import.meta.url), component);
+    await writeFile(
+      new URL(`./output/wasi.component.wasm`, import.meta.url),
+      component
+    );
 
     const { files } = await transpile(component);
 
-    await mkdir(new URL(`./output/wasi/interfaces`, import.meta.url), { recursive: true });
+    await mkdir(new URL(`./output/wasi/interfaces`, import.meta.url), {
+      recursive: true,
+    });
 
     for (const file of Object.keys(files)) {
-      await writeFile(new URL(`./output/wasi/${file}`, import.meta.url), files[file]);
+      await writeFile(
+        new URL(`./output/wasi/${file}`, import.meta.url),
+        files[file]
+      );
     }
 
     var instance = await import(`./output/wasi/component.js`);
