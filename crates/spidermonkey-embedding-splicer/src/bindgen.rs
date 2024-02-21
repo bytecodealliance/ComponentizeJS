@@ -315,6 +315,8 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
             let repCnt = 0;
             let repTable = new Map();
 
+            Symbol.dispose = Symbol.for('dispose');
+
             let $memory, $realloc{};
             export function $initBindings (_memory, _realloc{}) {{
                 $memory = _memory;
