@@ -3,7 +3,7 @@ use wasmtime::{
     component::{Component, Linker},
     Config, Engine, Store, WasmBacktraceDetails,
 };
-use wasmtime_wasi::preview2::{WasiCtxBuilder, Table, WasiCtx, WasiView, command::add_to_linker};
+use wasmtime_wasi::preview2::{WasiCtxBuilder, ResourceTable, WasiCtx, WasiView, command::add_to_linker};
 
 wasmtime::component::bindgen!({
     world: "hello",
@@ -15,7 +15,7 @@ wasmtime::component::bindgen!({
 async fn main() -> Result<()> {
     let mut builder = WasiCtxBuilder::new();
     builder.inherit_stdio();
-    let table = Table::new();
+    let table = ResourceTable::new();
     let wasi = builder.build();
 
     let mut config = Config::new();
@@ -30,14 +30,14 @@ async fn main() -> Result<()> {
     let component = Component::from_file(&engine, "hello.component.wasm").unwrap();
 
     struct CommandCtx {
-        table: Table,
+        table: ResourceTable,
         wasi: WasiCtx,
     }
     impl WasiView for CommandCtx {
-        fn table(&self) -> &Table {
+        fn table(&self) -> &ResourceTable {
             &self.table
         }
-        fn table_mut(&mut self) -> &mut Table {
+        fn table_mut(&mut self) -> &mut ResourceTable {
             &mut self.table
         }
         fn ctx(&self) -> &WasiCtx {
