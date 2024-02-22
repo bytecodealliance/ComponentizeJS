@@ -151,7 +151,7 @@ suite('Bindings', () => {
           name,
           map,
           wasiShim: true,
-          validLiftingOptimization: true,
+          validLiftingOptimization: false,
         });
 
         await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), {
