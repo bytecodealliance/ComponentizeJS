@@ -6,9 +6,9 @@ Given a world that descibes a component interface:
 
 hello.wit
 ```
-package local:hello
+package local:hello;
 world hello {
-  export hello: func(name: string) -> string
+  export hello: func(name: string) -> string;
 }
 ```
 
