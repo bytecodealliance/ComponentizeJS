@@ -17,7 +17,7 @@ void builtin_impl_console_log(Console::LogType log_ty, const char *msg)
   fflush(stdio);
 }
 
-static bool DEBUG = false;
+static bool DEBUG = true;
 
 void log(const char *msg)
 {
@@ -256,6 +256,7 @@ __attribute__((export_name("cabi_realloc_adapter"))) void *cabi_realloc_adapter(
 
 __attribute__((export_name("cabi_realloc"))) void *cabi_realloc(void *ptr, size_t orig_size, size_t org_align, size_t new_size)
 {
+  log("(cabi_realloc) Calling realloc");
   void *ret = JS_realloc(R.cx, ptr, orig_size, new_size);
   // track all allocations during a function "call" for freeing
   R.free_list.push_back(ret);
@@ -983,7 +984,7 @@ __attribute__((export_name("post_call"))) void post_call(uint32_t fn_idx)
     cabi_free(ptr);
   }
   R.free_list.clear();
-  js::RunJobs(R.cx);
-  JS_MaybeGC(R.cx);
+  // js::RunJobs(R.cx);
+  // JS_MaybeGC(R.cx);
   log("(post_call) end");
 }

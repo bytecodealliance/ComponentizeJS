@@ -669,6 +669,7 @@ fn synthesize_export_functions(
             }
 
             let fid = func.finish(args, &mut module.funcs);
+            module.funcs.get_mut(fid).name = Some("EXPORT".into());
 
             module.exports.add(&expt_name, ExportItem::Function(fid));
         }

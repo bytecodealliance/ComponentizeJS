@@ -365,7 +365,7 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
     output.push_str(&bindgen.src);
 
     Componentization {
-        js_bindings: output.to_string(),
+        js_bindings: output.to_string().replace("const ret = exportsHello();", "console.log('calling hello'); const ret = exportsHello(); console.log('called hello');"),
         exports: bindgen.exports,
         imports: bindgen.imports,
         import_wrappers,
