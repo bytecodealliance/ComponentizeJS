@@ -5,7 +5,7 @@
 Given a world that descibes a component interface:
 
 hello.wit
-```
+```wit
 package local:hello;
 world hello {
   export hello: func(name: string) -> string;
@@ -38,7 +38,7 @@ await writeFile('hello.component.wasm', component);
 
 Run this with Node to build `hello.component.wasm`:
 
-```
+```shell
 node componentize.mjs
 ```
 
@@ -50,7 +50,7 @@ Set up [`src/main.rs`](example/src/main.rs) as in the example directory.
 
 Building and running the binary should print the result:
 
-```
+```shell
 cargo build --release
 ./target/release/wasmtime-test
 > Hello ComponentizeJS
@@ -60,20 +60,20 @@ cargo build --release
 
 To run the component in Node.js, we need to first transpile the component with `jco`:
 
-```
+```shell
 npm install -g @bytecodealliance/jco
 ```
 
 Transpile the component:
 
-```
+```shell
 jco transpile hello.component.wasm -o hello --map 'wasi-*=@bytecodealliance/preview2-shim/*'
 ```
 
 Set up a Node.js package.json:
 
 package.json
-```
+```json
 {
   "type": "module"
 }
@@ -83,18 +83,19 @@ The custom WASI mapping argument allows us to direct the WASI component imports 
 
 We can install this shim itself from npm as well:
 
-```
+```shell
 npm install @bytecodealliance/preview2-shim
 ```
 
 Create package.json in the *hello* folder
 
-```npm init
+```shell
+npm init
 ```
 
 Append the below line to the package.json file that was just created.
 
-```
+```json
 "type": "module",
 ```
 
@@ -104,7 +105,7 @@ In the absence of this, you may receive the following error SyntaxError: Cannot 
 
 To test the component:
 
-```
+```shell
 node -e "import('./hello/hello.component.js').then(m => console.log(m.hello('ComponentizeJS')))"
 > Hello ComponentizeJS
 ```
