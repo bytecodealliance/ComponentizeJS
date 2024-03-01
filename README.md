@@ -83,7 +83,11 @@ const { component } = await componentize(`
   world hello {
     export hello: func(name: string) -> string;
   }
-`);
+`, {
+  // recommended to get error debugging
+  // disable to get a "pure component" without WASI imports
+  enableStdout: true
+});
 
 await writeFile('test.component.wasm', component);
 ```
