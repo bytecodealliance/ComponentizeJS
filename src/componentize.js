@@ -1,27 +1,32 @@
-import wizer from "@bytecodealliance/wizer";
-import { componentNew, metadataAdd, preview1AdapterReactorPath } from "@bytecodealliance/jco";
-import { spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
-import { resolve, join } from "node:path";
-import { readFile, unlink, writeFile } from "node:fs/promises";
-import { spliceBindings, stubWasi } from "../lib/spidermonkey-embedding-splicer.js";
-import { fileURLToPath } from "node:url";
-import { stdout, stderr, exit, platform } from "node:process";
-const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+import wizer from '@bytecodealliance/wizer';
+import {
+  componentNew,
+  metadataAdd,
+  preview1AdapterReactorPath,
+} from '@bytecodealliance/jco';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { resolve, join } from 'node:path';
+import { readFile, unlink, writeFile } from 'node:fs/promises';
+import {
+  spliceBindings,
+  stubWasi,
+} from '../lib/spidermonkey-embedding-splicer.js';
+import { fileURLToPath } from 'node:url';
+import { stdout, stderr, exit, platform } from 'node:process';
+const { version } = JSON.parse(
+  await readFile(new URL('../package.json', import.meta.url), 'utf8')
+);
 const isWindows = platform === 'win32';
 
-export async function componentize(
-  jsSource,
-  witWorld,
-  opts
-) {
+export async function componentize(jsSource, witWorld, opts) {
   if (typeof witWorld === 'object') {
     opts = witWorld;
     witWorld = opts?.witWorld;
   }
   const {
     debug = false,
-    sourceName = "source.js",
+    sourceName = 'source.js',
     engine = fileURLToPath(
       new URL('../lib/spidermonkey_embedding.wasm', import.meta.url)
     ),
@@ -43,7 +48,12 @@ export async function componentize(
     console.log('--- JS Source ---');
     console.log(jsSource);
     console.log('--- JS Bindings ---');
-    console.log(jsBindings.split('\n').map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`).join('\n'));
+    console.log(
+      jsBindings
+        .split('\n')
+        .map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`)
+        .join('\n')
+    );
     console.log('--- JS Imports ---');
     console.log(imports);
     console.log(importWrappers);
@@ -209,26 +219,28 @@ export async function componentize(
   }
 
   // convert CABI import conventiosn to ESM import conventions
-  imports = imports.map(([specifier, impt]) => specifier === '$root' ? [impt, 'default'] : [specifier, impt]);
+  imports = imports.map(([specifier, impt]) =>
+    specifier === '$root' ? [impt, 'default'] : [specifier, impt]
+  );
 
-  const INIT_OK =  0;
-  const INIT_JSINIT =  1;
-  const INIT_INTRINSICS =  2;
-  const INIT_CUSTOM_INTRINSICS =  3;
-  const INIT_SOURCE_STDIN =  4;
-  const INIT_SOURCE_COMPILE =  5;
-  const INIT_BINDINGS_COMPILE =  6;
-  const INIT_IMPORT_WRAPPER_COMPILE =  7;
-  const INIT_SOURCE_LINK =  8;
-  const INIT_SOURCE_EXEC =  9;
-  const INIT_BINDINGS_EXEC =  10;
-  const INIT_FN_LIST =  11;
-  const INIT_MEM_BUFFER =  12;
-  const INIT_REALLOC_FN =  13;
-  const INIT_MEM_BINDINGS =  14;
-  const INIT_PROMISE_REJECTIONS =  15;
-  const INIT_IMPORT_FN =  16;
-  const INIT_TYPE_PARSE =  17;
+  const INIT_OK = 0;
+  const INIT_JSINIT = 1;
+  const INIT_INTRINSICS = 2;
+  const INIT_CUSTOM_INTRINSICS = 3;
+  const INIT_SOURCE_STDIN = 4;
+  const INIT_SOURCE_COMPILE = 5;
+  const INIT_BINDINGS_COMPILE = 6;
+  const INIT_IMPORT_WRAPPER_COMPILE = 7;
+  const INIT_SOURCE_LINK = 8;
+  const INIT_SOURCE_EXEC = 9;
+  const INIT_BINDINGS_EXEC = 10;
+  const INIT_FN_LIST = 11;
+  const INIT_MEM_BUFFER = 12;
+  const INIT_REALLOC_FN = 13;
+  const INIT_MEM_BINDINGS = 14;
+  const INIT_PROMISE_REJECTIONS = 15;
+  const INIT_IMPORT_FN = 16;
+  const INIT_TYPE_PARSE = 17;
 
   const status = check_init();
   let err = null;
@@ -257,10 +269,28 @@ export async function componentize(
       err = `Unable to compile the dependency wrapper code`;
       break;
     case INIT_SOURCE_LINK:
-      err = `Unable to link the source code. Imports should be:\n\n  ${Object.entries(imports.reduce((impts, [specifier, impt]) => {
-        (impts[specifier] = impts[specifier] || []).push(impt.split('-').map((x, i) => i === 0 ? x : x[0].toUpperCase() + x.slice(1)).join(''));
-        return impts;
-      }, {})).map(([specifier, impts]) => `import { ${impts.join(', ')} } from "${specifier}";`).join('\n . ')}\n`;
+      err = `Unable to link the source code. Imports should be:\n\n  ${Object.entries(
+        imports.reduce((impts, [specifier, impt]) => {
+          (impts[specifier] = impts[specifier] || []).push(
+            impt
+              .split('-')
+              .map((x, i) =>
+                i === 0
+                  ? x === 'default'
+                    ? 'default as $func'
+                    : x
+                  : x[0].toUpperCase() + x.slice(1)
+              )
+              .join('')
+          );
+          return impts;
+        }, {})
+      )
+        .map(
+          ([specifier, impts]) =>
+            `import { ${impts.join(', ')} } from "${specifier}";`
+        )
+        .join('\n . ')}\n`;
       break;
     case INIT_SOURCE_EXEC:
       err = `Unable to execute the JS source code`;
