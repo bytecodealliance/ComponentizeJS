@@ -9,22 +9,26 @@ ifndef WASM_OPT
 	WASM_OPT = $(error No Binaryen wasm-opt in PATH)
 endif
 
-all: lib/spidermonkey-embedding-splicer.js lib/starlingmonkey_embedding.debug.wasm
+all: release
+debug: lib/starlingmonkey_embedding.debug.wasm lib/spidermonkey-embedding-splicer.js
+release: lib/starlingmonkey_embedding.wasm lib/spidermonkey-embedding-splicer.js
 
 lib/spidermonkey-embedding-splicer.js: target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj
-	$(JCO) new target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm --wasi-reactor
-	$(JCO) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o lib -- -O1
+	@$(JCO) new target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm --wasi-reactor
+	@$(JCO) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o lib -- -O1
 
 target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/*.rs
 	cargo build --release --target wasm32-wasi
 
-lib/starlingmonkey_embedding.debug.wasm: $(wildcard embedding/*) $(wildcard StarlingMonkey/runtime/*) $(wildcard StarlingMonkey/builtins/*) $(wildcard StarlingMonkey/builtins/**/*) $(wildcard StarlingMonkey/include/*)
-	cmake -B build -DCMAKE_BUILD_TYPE=Release
-	make -j16 -C build
-	@cp build/starling.wasm/starling.wasm $@
+lib/starlingmonkey_embedding.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/**/* StarlingMonkey/include/*
+	cmake -B build-release -DCMAKE_BUILD_TYPE=Release
+	make -j16 -C build-release
+	@cp build-release/starling.wasm/starling.wasm $@
 
-lib/starlingmonkey_embedding.wasm: lib/starlingmonkey_embedding.debug.wasm
-	$(WASM_OPT) --strip-debug lib/starlingmonkey_embedding.debug.wasm -o $@ -O3
+lib/starlingmonkey_embedding.debug.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/**/* StarlingMonkey/include/*
+	cmake -B build-debug -DCMAKE_BUILD_TYPE=RelWithDebInfo
+	make -j16 -C build-debug
+	@cp build-debug/starling.wasm/starling.wasm $@
 
 obj:
 	mkdir -p obj

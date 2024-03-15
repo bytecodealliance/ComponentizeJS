@@ -261,7 +261,7 @@ extern "C"
 
   __attribute__((export_name("post_call"))) void post_call(uint32_t fn_idx)
   {
-    LOG("(post_call) Function [%d]\n", fn_idx);
+    LOG("(post_call) Function [%d]", fn_idx);
     if (Runtime.cur_fn_idx != fn_idx)
     {
       LOG("(post_call) Unexpected call state, post_call must only be called immediately after call");
@@ -418,7 +418,7 @@ namespace componentize::embedding
 
   void cabi_free(void *ptr)
   {
-    LOG("(cabi_free) %d\n", (uint32_t)ptr);
+    LOG("(cabi_free) %d", (uint32_t)ptr);
     JS_free(Runtime.cx, ptr);
   }
 
@@ -465,7 +465,13 @@ namespace componentize::embedding
     if (sbrk(0) != LAST_SBRK)
     {
       LAST_SBRK = sbrk(0);
-      AB = JS::RootedObject(Runtime.cx, JS::NewArrayBufferWithUserOwnedContents(Runtime.cx, (size_t)LAST_SBRK, (void *)0));
+      #ifdef DEBUG
+        void* base = (void*)64;
+      #else
+        void* base = 0;
+      #endif
+      JS::RootedObject mem_buffer(cx, JS::NewArrayBufferWithUserOwnedContents(cx, (size_t)LAST_SBRK, base));
+      AB.init(cx, mem_buffer);
     }
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     args.rval().setObject(*AB);
@@ -505,7 +511,7 @@ namespace componentize::embedding
     JS::RootedObject function_obj(Runtime.cx, JS_GetFunctionObject(realloc_fn));
     JS_SetElement(Runtime.cx, import_bindings, 1, function_obj);
 
-    LOG("(wizer) create the import JS functions");
+    LOG("(wizer) create the %d import JS functions", import_cnt);
     for (size_t i = 0; i < import_cnt; i++)
     {
       sprintf(&env_name[0], "IMPORT%zu_NAME", i);

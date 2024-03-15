@@ -188,12 +188,17 @@ fn synthesize_import_functions(
 
             // copy the prelude instructions from the sample function (first block)
             let coreabi_sample_i32 = module.funcs.get(coreabi_sample_fid).kind.unwrap_local();
-            let prelude_seq = coreabi_sample_i32
+            let prelude_block = &coreabi_sample_i32
                 .block(coreabi_sample_i32.entry_block())
                 .instrs[0]
-                .0
-                .unwrap_block()
-                .seq;
+                .0;
+            let prelude_seq = match prelude_block {
+                Instr::Block(prelude_block) => prelude_block.seq,
+                _ => {
+                    eprintln!("Splicer error: unable to read prelude sequence, continuing for debug build but note binding functions will not work!");
+                    return Ok(());
+                }
+            };
 
             let prelude_block = coreabi_sample_i32.block(prelude_seq);
             func_body.block(None, |prelude| {
@@ -450,18 +455,21 @@ fn synthesize_import_functions(
 
         let mut func_body = builder.func_body();
 
-        // walk until we get to the const 1
+        // walk until we get to the const representing the table index
         let mut table_instr_idx = 0;
         for (idx, (instr, _)) in func_body.instrs_mut().iter_mut().enumerate() {
             if let Instr::Const(Const {
                 value: Value::I32(ref mut v),
             }) = instr
             {
-                if *v == 1 {
-                    *v = import_fn_table_start_idx;
-                    table_instr_idx = idx;
-                    break;
+                // we specifically need the const "around" 3393
+                // which is the coreabi_sample_i32 table offset
+                if *v < 1000 || *v > 5000 {
+                    continue;
                 }
+                *v = import_fn_table_start_idx;
+                table_instr_idx = idx;
+                break;
             }
         }
         func_body.local_get_at(table_instr_idx, arg_idx);
@@ -473,7 +481,7 @@ fn synthesize_import_functions(
     module.exports.delete(coreabi_from_bigint64);
     module.exports.delete(coreabi_get_import.unwrap());
     for id in coreabi_sample_ids {
-        module.exports.delete(id);
+        module.exports.delete(id); // 3394
     }
 
     Ok(())

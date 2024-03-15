@@ -31,7 +31,7 @@ export async function componentize(jsSource, witWorld, opts) {
     debug = false,
     sourceName = 'source.js',
     engine = fileURLToPath(
-      new URL('../lib/starlingmonkey_embedding.debug.wasm', import.meta.url)
+      new URL('../lib/starlingmonkey_embedding.wasm', import.meta.url)
     ),
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
@@ -93,6 +93,11 @@ export async function componentize(jsSource, witWorld, opts) {
 
   // write the source files into the source dir
   const sourceDir = join(tmpDir, 'sources');
+
+  if (debug) {
+    console.log(`> Writing sources to ${tmpDir}/sources`);
+  }
+  
   await mkdir(sourceDir);
   await Promise.all(
     [
@@ -170,7 +175,7 @@ export async function componentize(jsSource, witWorld, opts) {
 
   const bin = await readFile(output);
 
-  const tmpdirRemovePromise = rm(tmpDir, { recursive: true });
+  const tmpdirRemovePromise = debug ? Promise.resolve() : rm(tmpDir, { recursive: true });
 
   // Check for initialization errors
   // By actually executing the binary in a mini sandbox to get back

@@ -334,7 +334,7 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
                     .map(|name| format!(", $resource_{name}"))
             )
             .collect::<Vec<_>>()
-            .concat()
+            .concat(),
     );
 
     bindgen.esm_bindgen.render_export_imports(
