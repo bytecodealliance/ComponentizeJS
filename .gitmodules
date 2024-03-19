@@ -1,4 +1,3 @@
-[submodule "deps/js-compute-runtime"]
-	path = deps/js-compute-runtime
-	url = https://github.com/fastly/js-compute-runtime
-	shallow = true
+[submodule "StarlingMonkey"]
+	path = StarlingMonkey
+	url = git@github.com:guybedford/StarlingMonkey

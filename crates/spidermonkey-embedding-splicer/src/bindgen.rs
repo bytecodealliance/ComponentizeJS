@@ -214,7 +214,10 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         let joined_bindings = specifier_list.join(", ");
         import_wrappers.push((
             specifier.to_string(),
-            format!("export {{ {joined_bindings} }} from 'internal:bindings';"),
+            format!(
+                "export {{ {joined_bindings} }} from './{}.bindings.js';",
+                &name[0..name.len() - 3]
+            ),
         ));
     }
 
@@ -317,11 +320,8 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
 
             Symbol.dispose = Symbol.for('dispose');
 
-            let $memory, $realloc{};
-            export function $initBindings (_memory, _realloc{}) {{
-                $memory = _memory;
-                $realloc = _realloc;{}
-            }}
+            let [$memory, $realloc{}] = $bindings;
+            delete globalThis.$bindings;
 
             {finalization_registries}
         ",
@@ -332,22 +332,6 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
                 resource_bindings
                     .iter()
                     .map(|name| format!(", $resource_{name}"))
-            )
-            .collect::<Vec<_>>()
-            .concat(),
-        import_bindings
-            .iter()
-            .chain(&resource_bindings)
-            .map(|impt| format!(", _{impt}"))
-            .collect::<Vec<_>>()
-            .concat(),
-        import_bindings
-            .iter()
-            .map(|impt| format!("\n$import_{impt} = _{impt};"))
-            .chain(
-                resource_bindings
-                    .iter()
-                    .map(|name| format!("\n$resource_{name} = _{name}"))
             )
             .collect::<Vec<_>>()
             .concat(),

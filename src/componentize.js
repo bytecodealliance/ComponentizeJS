@@ -7,13 +7,16 @@ import {
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
-import { readFile, unlink, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import {
   spliceBindings,
   stubWasi,
 } from '../lib/spidermonkey-embedding-splicer.js';
 import { fileURLToPath } from 'node:url';
 import { stdout, stderr, exit, platform } from 'node:process';
+import { init as lexerInit, parse } from 'es-module-lexer';
 const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8')
 );
@@ -28,7 +31,7 @@ export async function componentize(jsSource, witWorld, opts) {
     debug = false,
     sourceName = 'source.js',
     engine = fileURLToPath(
-      new URL('../lib/spidermonkey_embedding.wasm', import.meta.url)
+      new URL('../lib/starlingmonkey_embedding.wasm', import.meta.url)
     ),
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
@@ -61,19 +64,57 @@ export async function componentize(jsSource, witWorld, opts) {
     console.log(exports);
   }
 
-  const input = join(tmpdir(), 'in.wasm');
-  const output = join(tmpdir(), 'out.wasm');
+  const tmpDir = join(
+    tmpdir(),
+    createHash('sha256')
+      .update(Math.random().toString())
+      .digest('hex')
+      .slice(0, 12)
+  );
+  await mkdir(tmpDir);
+
+  const input = join(tmpDir, 'in.wasm');
+  const output = join(tmpDir, 'out.wasm');
 
   await writeFile(input, Buffer.from(wasm));
 
-  // we concatenate the sources into stdin for wizering, communicating the offsets via env vars
-  let wizerInput = jsSource + jsBindings;
+  // rewrite the JS source import specifiers to reference import wrappers
+  await lexerInit;
+  const [jsImports] = parse(jsSource);
+  let source = '',
+    curIdx = 0;
+  for (const jsImpt of jsImports) {
+    const specifier = jsSource.slice(jsImpt.s, jsImpt.e);
+    source += jsSource.slice(curIdx, jsImpt.s);
+    source += `./${specifier.replace(':', '__').replace('/', '$')}.js`;
+    curIdx = jsImpt.e;
+  }
+  source += jsSource.slice(curIdx);
+
+  // write the source files into the source dir
+  const sourceDir = join(tmpDir, 'sources');
+
+  if (debug) {
+    console.log(`> Writing sources to ${tmpDir}/sources`);
+  }
+  
+  await mkdir(sourceDir);
+  await Promise.all(
+    [
+      [sourceName, source],
+      [sourceName.slice(0, -3) + '.bindings.js', jsBindings],
+      ...importWrappers.map(([sourceName, source]) => [
+        `./${sourceName.replace(':', '__').replace('/', '$')}.js`,
+        source,
+      ]),
+    ].map(async ([sourceName, source]) =>
+      writeFile(join(sourceDir, sourceName), source)
+    )
+  );
 
   const env = {
     DEBUG: debug ? '1' : '',
     SOURCE_NAME: sourceName,
-    SOURCE_LEN: new TextEncoder().encode(jsSource).byteLength.toString(),
-    BINDINGS_LEN: new TextEncoder().encode(jsBindings).byteLength.toString(),
     IMPORT_WRAPPER_CNT: Object.keys(importWrappers).length.toString(),
     EXPORT_CNT: exports.length.toString(),
   };
@@ -84,14 +125,6 @@ export async function componentize(jsSource, witWorld, opts) {
       (expt.paramptr ? '*' : '') + expt.params.join(',');
     env[`EXPORT${idx}_RET`] = (expt.retptr ? '*' : '') + (expt.ret || '');
     env[`EXPORT${idx}_RETSIZE`] = String(expt.retsize);
-  }
-
-  for (const [idx, [name, importWrapper]] of importWrappers.entries()) {
-    env[`IMPORT_WRAPPER${idx}_NAME`] = name;
-    env[`IMPORT_WRAPPER${idx}_LEN`] = new TextEncoder()
-      .encode(importWrapper)
-      .byteLength.toString();
-    wizerInput += importWrapper;
   }
 
   for (let i = 0; i < imports.length; i++) {
@@ -110,7 +143,9 @@ export async function componentize(jsSource, witWorld, opts) {
       wizer,
       [
         '--allow-wasi',
-        `--dir=.`,
+        '--init-func',
+        'componentize.wizer',
+        `--dir=${sourceDir}`,
         `--wasm-bulk-memory=true`,
         '--inherit-env=true',
         `-o=${output}`,
@@ -119,7 +154,7 @@ export async function componentize(jsSource, witWorld, opts) {
       {
         stdio: [null, stdout, stderr],
         env,
-        input: wizerInput,
+        input: join(sourceDir, sourceName.slice(0, -3) + '.bindings.js'),
         shell: true,
         encoding: 'utf-8',
       }
@@ -127,23 +162,20 @@ export async function componentize(jsSource, witWorld, opts) {
     if (wizerProcess.status !== 0)
       throw new Error('Wizering failed to complete');
   } catch (error) {
-    console.error(
-      `Error: Failed to initialize the compiled Wasm binary with Wizer:\n`,
-      error.message
-    );
+    let err =
+      `Failed to initialize the compiled Wasm binary with Wizer:\n` +
+      error.message;
     if (debug) {
-      console.error(`Binary available for debugging at ${input}`);
+      err += `\nBinary and sources available for debugging at ${tmpDir}\n`;
     } else {
-      await unlink(input);
+      rmSync(tmpDir, { recursive: true });
     }
-    exit(1);
+    throw new Error(err);
   }
 
   const bin = await readFile(output);
 
-  const unlinkPromises = Promise.all([unlink(input), unlink(output)]).catch(
-    () => {}
-  );
+  const tmpdirRemovePromise = debug ? Promise.resolve() : rm(tmpDir, { recursive: true });
 
   // Check for initialization errors
   // By actually executing the binary in a mini sandbox to get back
@@ -153,7 +185,7 @@ export async function componentize(jsSource, witWorld, opts) {
     getStderr,
   } = await initWasm(bin);
 
-  await unlinkPromises;
+  await tmpdirRemovePromise;
 
   async function initWasm(bin) {
     const eep = (name) => () => {
@@ -163,7 +195,7 @@ export async function componentize(jsSource, witWorld, opts) {
     };
 
     let stderr = '';
-    const module = await WebAssembly.compile(bin);
+    const wasmModule = await WebAssembly.compile(bin);
 
     const mockImports = {
       // "wasi-logging2": {
@@ -185,31 +217,15 @@ export async function componentize(jsSource, witWorld, opts) {
           mem.setUint32(nwritten, written, true);
           return 1;
         },
-        environ_get: eep('environ_get'),
-        environ_sizes_get: eep('environ_sizes_get'),
-        clock_res_get: eep('clock_res_get'),
-        clock_time_get: eep('clock_time_get'),
-        fd_close: eep('fd_close'),
-        fd_fdstat_get: eep('fd_fdstat_get'),
-        fd_fdstat_set_flags: eep('fd_fdstat_set_flags'),
-        fd_prestat_get: eep('fd_prestat_get'),
-        fd_prestat_dir_name: eep('fd_prestat_dir_name'),
-        fd_read: eep('fd_read'),
-        fd_seek: eep('fd_seek'),
-        path_open: eep('path_open'),
-        path_remove_directory: eep('path_remove_directory'),
-        path_unlink_file: eep('path_unlink_file'),
-        proc_exit: eep('proc_exit'),
-        random_get: eep('random_get'),
       },
     };
 
-    for (const [importName, binding] of imports) {
-      mockImports[importName] = mockImports[importName] || {};
-      mockImports[importName][binding] = eep(binding);
+    for (const { module, name } of WebAssembly.Module.imports(wasmModule)) {
+      mockImports[module] = mockImports[module] || {};
+      if (!mockImports[module][name]) mockImports[module][name] = eep(name);
     }
 
-    const { exports } = await WebAssembly.instantiate(module, mockImports);
+    const { exports } = await WebAssembly.instantiate(wasmModule, mockImports);
     return {
       exports,
       getStderr() {
@@ -343,7 +359,7 @@ export async function componentize(jsSource, witWorld, opts) {
     exit(1);
   }
 
-  // after wizering, stub out the wasi imports
+  // after wizering, stub out the wasi preview1 imports
   const finalBin = stubWasi(bin, enableStdout);
 
   const component = await metadataAdd(

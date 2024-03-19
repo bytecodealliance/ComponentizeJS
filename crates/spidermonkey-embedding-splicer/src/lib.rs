@@ -9,8 +9,11 @@ mod stub_wasi;
 use crate::stub_wasi::stub_wasi;
 
 use wasm_encoder::{Encode, Section};
-use wit_component::StringEncoding;
-use wit_parser::{self, PackageId, Resolve, UnresolvedPackage};
+use wit_component::{
+    metadata::{decode, Bindgen},
+    StringEncoding,
+};
+use wit_parser::{PackageId, Resolve, UnresolvedPackage};
 
 wit_bindgen::generate!({
     world: "spidermonkey-embedding-splicer",
@@ -107,7 +110,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
     ) -> Result<SpliceResult, String> {
         let source_name = source_name.unwrap_or("source.js".to_string());
 
-        let (resolve, id) = if let Some(wit_source) = wit_source {
+        let (mut resolve, id) = if let Some(wit_source) = wit_source {
             let mut resolve = Resolve::default();
             let path = PathBuf::from("component.wit");
             let pkg = UnresolvedPackage::parse(&path, &wit_source).map_err(|e| e.to_string())?;
@@ -123,8 +126,67 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             .select_world(id, world_name.as_deref())
             .map_err(|e| e.to_string())?;
 
-        let encoded = wit_component::metadata::encode(&resolve, world, StringEncoding::UTF8, None)
-            .map_err(|e| e.to_string())?;
+        // merge the engine world with the target world, retaining the engine producers
+        let producers = if let Ok((
+            _,
+            Bindgen {
+                resolve: mut engine_resolve,
+                world: engine_world,
+                metadata: _,
+                producers,
+            },
+        )) = decode(&engine)
+        {
+            // we disable the engine run and incoming handler as we recreate these exports
+            // when needed, so remove these from the world before initiating the merge
+            let maybe_run = engine_resolve.worlds[engine_world]
+                .exports
+                .iter()
+                .find(|(key, _)| engine_resolve.name_world_key(key) == "wasi:cli/run@0.2.0")
+                .map(|(key, _)| key.clone());
+            if let Some(run) = maybe_run {
+                engine_resolve.worlds[engine_world]
+                    .exports
+                    .shift_remove(&run)
+                    .unwrap();
+            }
+            let maybe_serve = engine_resolve.worlds[engine_world]
+                .exports
+                .iter()
+                .find(|(key, _)| {
+                    engine_resolve.name_world_key(key) == "wasi:http/incoming-handler@0.2.0"
+                })
+                .map(|(key, _)| key.clone());
+
+            if let Some(serve) = maybe_serve {
+                engine_resolve.worlds[engine_world]
+                    .exports
+                    .shift_remove(&serve)
+                    .unwrap();
+            }
+            resolve
+                .merge(engine_resolve)
+                .expect("unable to merge with engine world");
+            let (engine_world, _) = resolve
+                .worlds
+                .iter()
+                .find(|(world, _)| resolve.worlds[*world].name == "root")
+                .unwrap();
+            resolve
+                .merge_worlds(engine_world, world)
+                .expect("unable to merge with engine world");
+            producers
+        } else {
+            None
+        };
+
+        let encoded = wit_component::metadata::encode(
+            &resolve,
+            world,
+            StringEncoding::UTF8,
+            producers.as_ref(),
+        )
+        .map_err(|e| e.to_string())?;
 
         let section = wasm_encoder::CustomSection {
             name: "component-type".into(),

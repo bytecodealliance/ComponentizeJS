@@ -1,75 +1,40 @@
-WASI_SDK ?= /opt/wasi-sdk
-WASI_CXX ?= $(WASI_SDK)/bin/clang++
-WASI_CC ?= $(WASI_SDK)/bin/clang
-WASM_TOOLS ?= $(shell which wasm-tools)
-WASM_OPT ?= $(shell rm node_modules/.bin/wasm-opt ; which wasm-opt)
+# WASM_OPT ?= $(shell rm node_modules/.bin/wasm-opt ; which wasm-opt)
 JCO ?= ./node_modules/.bin/jco
-WIT_BINDGEN := $(shell which wit-bindgen)
-
-ifndef WIT_BINDGEN
-	WIT_BINDGEN = $(error No wit-bindgen in PATH, consider doing cargo install --git https://github.com/bytecodealliance/wit-bindgen wit-bindgen-cli)
-endif
 
 ifndef JCO
 	JCO = $(error No jco in PATH. Run npm install -g @bytecodealliance/jco)
 endif
 
-ifndef WASM_OPT
-	WASM_OPT = $(error No Binaryen wasm-opt in PATH)
-endif
+# ifndef WASM_OPT
+#   WASM_OPT = $(error No Binaryen wasm-opt in PATH)
+# endif
 
-ifndef WASM_TOOLS
-	WASM_TOOLS = $(error No wasm-tools in PATH. First run "cargo install wasm-tools")
-endif
+all: release
+debug: lib/starlingmonkey_embedding.debug.wasm lib/spidermonkey-embedding-splicer.js
+release: lib/starlingmonkey_embedding.wasm lib/spidermonkey-embedding-splicer.js
 
-SM_SRC := deps/js-compute-runtime/runtime/spidermonkey/release
-JSCR_SRC := deps/js-compute-runtime/runtime/js-compute-runtime
+lib/spidermonkey-embedding-splicer.js: target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj lib
+	@$(JCO) new target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm --wasi-reactor
+	@$(JCO) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o lib -- -O1
 
-CXX_FLAGS := -std=gnu++20 -Wall -Werror -Qunused-arguments
-CXX_FLAGS += -fno-sized-deallocation -fno-aligned-new -mthread-model single
-CXX_FLAGS += -fPIC -fno-rtti -fno-exceptions -fno-math-errno -pipe
-CXX_FLAGS += -fno-omit-frame-pointer -funwind-tables -I$(SM_SRC/include)
-CXX_FLAGS += --sysroot=$(WASI_SDK)/share/wasi-sysroot# -DDEBUG
-
-CXX_OPT ?= -O2
-
-CFLAGS := -Wall -Werror -Wno-unknown-attributes -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
-
-LD_FLAGS := -Wl,-z,stack-size=1048576 -Wl,--stack-first -lwasi-emulated-getpid# -Wl,--export-table
-
-DEFINES ?= 
-
-INCLUDES := -I $(JSCR_SRC)
-
-OBJS := $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/**/*.cpp)) $(patsubst spidermonkey_embedding/%.cpp,obj/%.o,$(wildcard spidermonkey_embedding/*.cpp))
-
-all: lib/spidermonkey-embedding-splicer.js lib/spidermonkey_embedding.wasm
-
-lib/spidermonkey-embedding-splicer.js: target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj
-	$(JCO) new target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm --wasi-reactor
-	$(JCO) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o lib -- -O1
-
-target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/lib.rs
+target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm: crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/*.rs
 	cargo build --release --target wasm32-wasi
 
-lib/spidermonkey_embedding.wasm: $(OBJS) | $(SM_SRC)
-	-make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) $(abspath $(JSCR_SRC)/js-compute-runtime.wasm) $(abspath $(JSCR_SRC)/js-compute-runtime-component.wasm) -j16
-	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) -j16
-	make --makefile=$(JSCR_SRC)/Makefile -I $(JSCR_SRC) $(abspath $(JSCR_SRC)/build/release/shared.a) -j16
-	PATH="$(FSM_SRC)/scripts:$$PATH" $(WASI_CXX) $(CXX_FLAGS) $(CXX_OPT) $(DEFINES) $(LD_FLAGS) -o $@ $^ deps/js-compute-runtime/runtime/js-compute-runtime/build/release/*.a $(wildcard $(SM_SRC)/lib/*.a) $(wildcard $(SM_SRC)/lib/*.o)
-	$(WASM_OPT) --strip-debug $@ -o $@ -O3
+lib/starlingmonkey_embedding.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/**/* StarlingMonkey/include/* | lib
+	cmake -B build-release -DCMAKE_BUILD_TYPE=Release
+	make -j16 -C build-release
+	@cp build-release/starling.wasm/starling.wasm $@
 
-obj/%.o: spidermonkey_embedding/%.cpp Makefile | $(SM_SRC) obj obj/builtins
-	$(WASI_CXX) $(CXX_FLAGS) -O2 $(DEFINES) $(INCLUDES) -I $(SM_SRC)/include -MMD -MP -c -o $@ $<
+lib/starlingmonkey_embedding.debug.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/**/* StarlingMonkey/include/* | lib
+	cmake -B build-debug -DCMAKE_BUILD_TYPE=RelWithDebInfo
+	make -j16 -C build-debug
+	@cp build-debug/starling.wasm/starling.wasm $@
 
 obj:
 	mkdir -p obj
 
 lib:
 	mkdir -p lib
-
-$(SM_SRC):
-	cd deps/js-compute-runtime/runtime/spidermonkey && ./build-engine.sh release
 
 obj/builtins:
 	mkdir -p obj/builtins

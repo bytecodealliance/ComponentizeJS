@@ -2,7 +2,9 @@
 members = ["crates/spidermonkey-embedding-splicer"]
 exclude = [
   "deps/js-compute-runtime/runtime/js-compute-runtime/rust-url",
-  "deps/js-compute-runtime/runtime/js-compute-runtime/rust-encoding"
+  "deps/js-compute-runtime/runtime/js-compute-runtime/rust-encoding",
+  "StarlingMonkey/crates/rust-encoding",
+  "StarlingMonkey/crates/rust-url"
 ]
 resolver = "2"
 

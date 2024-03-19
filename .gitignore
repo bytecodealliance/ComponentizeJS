@@ -8,3 +8,6 @@ target/
 /shared
 example/package-lock.json
 example/hello.component.wasm
+/build-debug
+/build-release
+.vscode

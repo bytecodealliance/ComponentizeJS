@@ -50,6 +50,6 @@ export const source = `
 
 export async function test (run) {
   const { stdout, stderr } = await run();
-  strictEqual(stdout, `{ a: { value: "a" }, b: { c: "d" }, e: ["f"], g: [{ g: "i" }], l: [Function l], m: [Getter], n: [Getter], o: [Function], p: [Function], q: 5, s: 29879287298374924, t: Set(3) { 1, 2, 3 }, u: Map(3) { 1 => 2, 3 => 4, [Function foo] => {} }, v: Symbol.for("blah"), w: Symbol(), x: undefined, y: null, z: URL { hash: "", host: "site.com", hostname: "site.com", href: "https://site.com/x?a&b", origin: "https://site.com", password: "", pathname: "/x", port: "", protocol: "https:", search: "?a&b", searchParams: {}, username: "" }, zz: Uint8Array [1, 2, 3], zzz: Z {} }\n`);
+  strictEqual(stdout, `{ a: { value: "a" }, b: { c: "d" }, e: ["f"], g: [{ g: "i" }], l: [Function l], m: [Getter], n: [Getter], o: [Function], p: [Function], q: 5, s: 29879287298374924, t: Set(3) { 1, 2, 3 }, u: Map(3) { 1 => 2, 3 => 4, [Function foo] => {} }, v: Symbol.for("blah"), w: Symbol(), x: undefined, y: null, z: URL { hash: "", host: "site.com", hostname: "site.com", href: "https://site.com/x?a&b", origin: "https://site.com", password: "", pathname: "/x", port: "", protocol: "https:", search: "?a&b", searchParams: URLSearchParams {}, username: "" }, zz: Uint8Array [1, 2, 3], zzz: Z {} }\n`);
   strictEqual(stderr, '');
 }
