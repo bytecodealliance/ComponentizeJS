@@ -49,6 +49,13 @@ jobs:
     - name: Install NPM packages
       run: npm install
 
+    - name: Cache StarlingMonkey
+      uses: actions/cache@v3
+      id: starlingmonkey-build
+      with:
+        path: build-release
+        key: engine-build-${{ hashFiles('.git/modules/StarlingMonkey/FETCH_HEAD') }}
+
     - name: Build
       run: npm run build
 
