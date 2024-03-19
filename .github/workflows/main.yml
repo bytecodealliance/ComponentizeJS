@@ -80,32 +80,32 @@ jobs:
       if: steps.wasm-tools-cache.outputs.cache-hit != 'true'
       run: cargo install wasm-tools
 
-    - name: gecko-dev hash
-      id: gecko-dev-hash
-      run: cd deps/js-compute-runtime/runtime/spidermonkey/gecko-dev && echo "GECKO_DEV_HASH=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      shell: bash
+    # - name: gecko-dev hash
+    #   id: gecko-dev-hash
+    #   run: cd deps/js-compute-runtime/runtime/spidermonkey/gecko-dev && echo "GECKO_DEV_HASH=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+    #   shell: bash
 
-    - name: Cache Spidermonkey
-      uses: actions/cache@v3
-      id: sm-cache
-      with:
-        path: deps/js-compute-runtime/runtime/spidermonkey/release
-        key: cache-${{ hashFiles(
-            'deps/js-compute-runtime/runtime/spidermonkey/build-engine.sh',
-            'deps/js-compute-runtime/runtime/spidermonkey/object-files.list'
-          ) }}-${{ steps.gecko-dev-hash.outputs.GECKO_DEV_HASH }}
+    # - name: Cache Spidermonkey
+    #   uses: actions/cache@v3
+    #   id: sm-cache
+    #   with:
+    #     path: deps/js-compute-runtime/runtime/spidermonkey/release
+    #     key: cache-${{ hashFiles(
+    #         'deps/js-compute-runtime/runtime/spidermonkey/build-engine.sh',
+    #         'deps/js-compute-runtime/runtime/spidermonkey/object-files.list'
+    #       ) }}-${{ steps.gecko-dev-hash.outputs.GECKO_DEV_HASH }}
 
-    - name: js-compute-runtime hash
-      id: js-compute-runtime-hash
-      run: cd deps/js-compute-runtime/runtime/js-compute-runtime && echo "JS_COMPUTE_RUNTIME_HASH=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      shell: bash
+    # - name: js-compute-runtime hash
+    #   id: js-compute-runtime-hash
+    #   run: cd deps/js-compute-runtime/runtime/js-compute-runtime && echo "JS_COMPUTE_RUNTIME_HASH=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+    #   shell: bash
 
-    - name: Cache js-compute-runtime
-      uses: actions/cache@v3
-      id: js-compute-runtime
-      with:
-        path: deps/js-compute-runtime/runtime/js-compute-runtime/build
-        key: cache-${{ steps.js-compute-runtime-hash.outputs.GECKO_DEV_HASH }}-${{ steps.js-compute-runtime-hash.outputs.JS_COMPUTE_RUNTIME_HASH }}
+    # - name: Cache js-compute-runtime
+    #   uses: actions/cache@v3
+    #   id: js-compute-runtime
+    #   with:
+    #     path: deps/js-compute-runtime/runtime/js-compute-runtime/build
+    #     key: cache-${{ steps.js-compute-runtime-hash.outputs.GECKO_DEV_HASH }}-${{ steps.js-compute-runtime-hash.outputs.JS_COMPUTE_RUNTIME_HASH }}
 
     - name: Cache Rust dependencies
       uses: actions/cache@v3
