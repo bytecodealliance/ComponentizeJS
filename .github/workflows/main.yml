@@ -28,12 +28,12 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Install Rust
+    - name: Install Rust 1.68.2, 1.76.0
       run: |
-        rustup update stable --no-self-update
-        rustup default 1.68.2
-        rustup target add wasm32-unknown-unknown
-        rustup target add wasm32-wasi
+        rustup toolchain install 1.68.2
+        rustup toolchain install 1.76.0
+        rustup target add wasm32-unknown-unknown --toolchain 1.76.0
+        rustup target add wasm32-wasi --toolchain 1.68.2
 
     - uses: actions/setup-node@v2
       with:
@@ -69,10 +69,7 @@ jobs:
         key: engine-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
 
     - name: Test Example
-      run: |
-        rustup default stable
-        rustup target add wasm32-unknown-unknown
-        cd example && npm run build && ./test.sh
+      run: cd example && npm run build && ./test.sh
 
   rustfmt:
     name: Rustfmt
