@@ -359,7 +359,7 @@ export async function componentize(jsSource, witWorld, opts) {
     exit(1);
   }
 
-  // after wizering, stub out the wasi imports
+  // after wizering, stub out the wasi preview1 imports
   const finalBin = stubWasi(bin, enableStdout);
 
   const component = await metadataAdd(

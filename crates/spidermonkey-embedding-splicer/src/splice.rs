@@ -1,7 +1,9 @@
 use anyhow::Result;
 use walrus::{
-    ir::{BinaryOp, Binop, Const, LoadKind, MemArg, Store, StoreKind, UnaryOp, Unop, Value},
-    ir::{Instr, LocalGet, LocalSet, LocalTee},
+    ir::{
+        BinaryOp, Binop, Const, Instr, LoadKind, LocalGet, LocalSet, LocalTee, MemArg, Store,
+        StoreKind, UnaryOp, Unop, Value,
+    },
     ExportId, ExportItem, FunctionBuilder, FunctionId, LocalId, ValType,
 };
 
@@ -38,6 +40,34 @@ pub fn splice(
 ) -> Result<Vec<u8>> {
     let config = walrus::ModuleConfig::new();
     let mut module = config.parse(&engine)?;
+
+    // since StarlingMonkey implements CLI Run and incoming handler,
+    // we override these in ComponentizeJS, removing them from the
+    // core function exports
+    if let Ok(run) = module.exports.get_func("wasi:cli/run@0.2.0#run") {
+        let expt = module.exports.get_exported_func(run).unwrap();
+        module.exports.delete(expt.id());
+        module.funcs.delete(run);
+    }
+    if let Ok(serve) = module
+        .exports
+        .get_func("wasi:http/incoming-handler@0.2.0#handle")
+    {
+        let expt = module.exports.get_exported_func(serve).unwrap();
+        module.exports.delete(expt.id());
+        module.funcs.delete(serve);
+    }
+
+    // we reencode the WASI world component data, so strip it out from the
+    // custom section
+    let maybe_component_section_id = module
+        .customs
+        .iter()
+        .find(|(_, section)| section.name() == "component-type:bindings")
+        .map(|(id, _)| id);
+    if let Some(component_section_id) = maybe_component_section_id {
+        module.customs.delete(component_section_id);
+    }
 
     // extract the native instructions from sample functions
     // then inline the imported functions and main import gating function
@@ -174,8 +204,15 @@ fn synthesize_import_functions(
                 None => vec![],
             };
             let import_fn_type = module.types.add(&params, &ret);
-            let (import_fn_fid, _) =
-                module.add_import_func(&impt_specifier, &impt_name, import_fn_type);
+
+            let import_fn_fid =
+                if let Ok(existing) = module.imports.get_func(&impt_specifier, &impt_name) {
+                    existing
+                } else {
+                    module
+                        .add_import_func(&impt_specifier, &impt_name, import_fn_type)
+                        .0
+                };
 
             // create the native JS binding function
             let mut func = FunctionBuilder::new(
@@ -481,7 +518,7 @@ fn synthesize_import_functions(
     module.exports.delete(coreabi_from_bigint64);
     module.exports.delete(coreabi_get_import.unwrap());
     for id in coreabi_sample_ids {
-        module.exports.delete(id); // 3394
+        module.exports.delete(id);
     }
 
     Ok(())
