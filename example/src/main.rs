@@ -3,7 +3,7 @@ use wasmtime::{
     component::{Component, Linker},
     Config, Engine, Store, WasmBacktraceDetails,
 };
-use wasmtime_wasi::preview2::{WasiCtxBuilder, ResourceTable, WasiCtx, WasiView, command::add_to_linker};
+use wasmtime_wasi::preview2::{WasiCtxBuilder, ResourceTable, WasiCtx, WasiView, command};
 
 wasmtime::component::bindgen!({
     world: "hello",
@@ -42,7 +42,7 @@ async fn main() -> Result<()> {
         }
     }
 
-    add_to_linker(&mut linker)?;
+    command::add_to_linker(&mut linker)?;
     let mut store = Store::new(
         &engine,
         CommandCtx {
