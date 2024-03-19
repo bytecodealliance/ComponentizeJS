@@ -29,9 +29,10 @@ jobs:
         submodules: recursive
 
     - name: Install Rust
-      run: rustup update stable --no-self-update |
-        rustup default 1.68.2 |
-        rustup target add wasm32-unknown-unknown |
+      run: |
+        rustup update stable --no-self-update
+        rustup default 1.68.2
+        rustup target add wasm32-unknown-unknown
         rustup target add wasm32-wasi
 
     - uses: actions/setup-node@v2
@@ -62,9 +63,9 @@ jobs:
 
     - name: Test Example
       run: |
-        rustup default stable |
-        rustup target add wasm32-unknown-unknown |
-        cd example && npm run build && ./test.sh |
+        rustup default stable
+        rustup target add wasm32-unknown-unknown
+        cd example && npm run build && ./test.sh
 
   rustfmt:
     name: Rustfmt
