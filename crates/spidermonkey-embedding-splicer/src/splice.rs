@@ -1,4 +1,3 @@
-use anyhow::Result;
 use walrus::{
     ir::{
         BinaryOp, Binop, Const, Instr, LoadKind, LocalGet, LocalSet, LocalTee, MemArg, Store,

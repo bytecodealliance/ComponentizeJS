@@ -13,7 +13,7 @@ use wit_component::{
     metadata::{decode, Bindgen},
     StringEncoding,
 };
-use wit_parser::{self, PackageId, Resolve, UnresolvedPackage};
+use wit_parser::{PackageId, Resolve, UnresolvedPackage};
 
 wit_bindgen::generate!({
     world: "spidermonkey-embedding-splicer",
@@ -126,6 +126,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             .select_world(id, world_name.as_deref())
             .map_err(|e| e.to_string())?;
 
+        // merge the engine world with the target world, retaining the engine producers
         let producers = if let Ok((
             _,
             Bindgen {
@@ -136,6 +137,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             },
         )) = decode(&engine)
         {
+            // we disable the engine run and incoming handler as we recreate these exports
+            // when needed, so remove these from the world before initiating the merge
             let maybe_run = engine_resolve.worlds[engine_world]
                 .exports
                 .iter()
@@ -144,7 +147,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             if let Some(run) = maybe_run {
                 engine_resolve.worlds[engine_world]
                     .exports
-                    .shift_remove(&run);
+                    .shift_remove(&run)
+                    .unwrap();
             }
             let maybe_serve = engine_resolve.worlds[engine_world]
                 .exports
@@ -156,7 +160,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             if let Some(serve) = maybe_serve {
                 engine_resolve.worlds[engine_world]
                     .exports
-                    .shift_remove(&serve);
+                    .shift_remove(&serve)
+                    .unwrap();
             }
             resolve
                 .merge(engine_resolve)
