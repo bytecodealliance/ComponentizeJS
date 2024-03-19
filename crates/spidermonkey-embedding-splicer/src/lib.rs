@@ -157,6 +157,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
                     engine_resolve.name_world_key(key) == "wasi:http/incoming-handler@0.2.0"
                 })
                 .map(|(key, _)| key.clone());
+
             if let Some(serve) = maybe_serve {
                 engine_resolve.worlds[engine_world]
                     .exports
