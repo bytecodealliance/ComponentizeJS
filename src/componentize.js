@@ -259,22 +259,7 @@ export async function componentize(jsSource, witWorld, opts) {
   );
 
   const INIT_OK = 0;
-  const INIT_JSINIT = 1;
-  const INIT_INTRINSICS = 2;
-  const INIT_CUSTOM_INTRINSICS = 3;
-  const INIT_SOURCE_STDIN = 4;
-  const INIT_SOURCE_COMPILE = 5;
-  const INIT_BINDINGS_COMPILE = 6;
-  const INIT_IMPORT_WRAPPER_COMPILE = 7;
-  const INIT_SOURCE_LINK = 8;
-  const INIT_SOURCE_EXEC = 9;
-  const INIT_BINDINGS_EXEC = 10;
   const INIT_FN_LIST = 11;
-  const INIT_MEM_BUFFER = 12;
-  const INIT_REALLOC_FN = 13;
-  const INIT_MEM_BINDINGS = 14;
-  const INIT_PROMISE_REJECTIONS = 15;
-  const INIT_IMPORT_FN = 16;
   const INIT_TYPE_PARSE = 17;
 
   const status = check_init();
@@ -282,74 +267,8 @@ export async function componentize(jsSource, witWorld, opts) {
   switch (status) {
     case INIT_OK:
       break;
-    case INIT_JSINIT:
-      err = `JS environment could not be initialized`;
-      break;
-    case INIT_INTRINSICS:
-      err = `JS intrinsics could not be defined`;
-      break;
-    case INIT_CUSTOM_INTRINSICS:
-      err = `Platform intrinsics could not be defined`;
-      break;
-    case INIT_SOURCE_STDIN:
-      err = `Unable to populate source code into Wasm`;
-      break;
-    case INIT_SOURCE_COMPILE:
-      err = `Unable to compile JS source code`;
-      break;
-    case INIT_BINDINGS_COMPILE:
-      err = `Unable to compile JS bindings code`;
-      break;
-    case INIT_IMPORT_WRAPPER_COMPILE:
-      err = `Unable to compile the dependency wrapper code`;
-      break;
-    case INIT_SOURCE_LINK:
-      err = `Unable to link the source code. Imports should be:\n\n  ${Object.entries(
-        imports.reduce((impts, [specifier, impt]) => {
-          (impts[specifier] = impts[specifier] || []).push(
-            impt
-              .split('-')
-              .map((x, i) =>
-                i === 0
-                  ? x === 'default'
-                    ? 'default as $func'
-                    : x
-                  : x[0].toUpperCase() + x.slice(1)
-              )
-              .join('')
-          );
-          return impts;
-        }, {})
-      )
-        .map(
-          ([specifier, impts]) =>
-            `import { ${impts.join(', ')} } from "${specifier}";`
-        )
-        .join('\n . ')}\n`;
-      break;
-    case INIT_SOURCE_EXEC:
-      err = `Unable to execute the JS source code`;
-      break;
-    case INIT_BINDINGS_EXEC:
-      err = `Unable to execute the JS bindings code`;
-      break;
     case INIT_FN_LIST:
       err = `Unable to extract expected exports list`;
-      break;
-    case INIT_MEM_BUFFER:
-      err = `Unable to initialize JS binding memory buffer`;
-      break;
-    case INIT_REALLOC_FN:
-      err = `Unable to create JS binding realloc function`;
-      break;
-    case INIT_MEM_BINDINGS:
-      err = `Unable to initialize JS bindings.`;
-      break;
-    case INIT_PROMISE_REJECTIONS:
-      err = `Unable to initialize promise rejection handler`;
-      break;
-    case INIT_IMPORT_FN:
-      err = `Unable to initialize imported bindings`;
       break;
     case INIT_TYPE_PARSE:
       err = `Unable to parse the core ABI export types`;

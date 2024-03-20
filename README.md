@@ -104,8 +104,8 @@ The set of enabled features in the engine can be customized depending on the tar
 The default set of features includes:
 
 * `'stdio'`: Output to stderr and stdout for errors and console logging, depends on `wasi:cli` and `wasi:io`.
-* `'random'`: Support for cryptographic random, depends on `wasi:random`. **When disabled, random numbers generated will not be random but fully deterministic.**
-* `'clocks'`: Support for clocks and duration polls, depends on `wasi:clocks`.
+* `'random'`: Support for cryptographic random, depends on `wasi:random`. **When disabled, random numbers will still be generated but will not be random and instead fully deterministic.**
+* `'clocks'`: Support for clocks and duration polls, depends on `wasi:clocks` and `wasi:io`. **When disabled, using any timer functions like setTimeout or setInterval will panic.**
 
 Setting `disableFeatures: ['random', 'stdio', 'clocks']` will disable all features creating a minimal "pure component", that does not depend on any WASI APIs at all and just the target world.
 
