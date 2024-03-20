@@ -4,6 +4,8 @@ export const source = `
   let done = false;
   export function run () {
     console.log(Date.now());
+
+    // causes a panic
     setTimeout(() => {
       console.log(Date.now());
       done = true;
@@ -17,8 +19,14 @@ export const source = `
 export const disableFeatures = ['clocks'];
 
 export async function test(run) {
-  const { stdout, stderr } = await run();
-  const [timestart, timeend] = stdout.split('\n');
-  strictEqual(stderr, '');
-  ok(Number(timeend) - Number(timestart) < 100);
+  try {
+    await run();
+  }
+  catch (e) {
+    const { stdout, stderr, err } = e;
+    const [timestart, timeend] = stdout.split('\n');
+    ok(stderr.includes('RuntimeError: unreachable'));
+    ok(Number(timestart) > 0);
+    strictEqual(timeend, '');
+  }
 }

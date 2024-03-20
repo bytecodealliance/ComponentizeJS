@@ -64,31 +64,38 @@ suite('Builtins', () => {
         let stdout = '',
           stderr = '',
           timeout;
-        await new Promise((resolve, reject) => {
-          const cp = spawn(
-            process.argv[0],
-            [
-              fileURLToPath(
-                new URL(`./output/${name}/run.js`, import.meta.url)
-              ),
-            ],
-            { stdio: 'pipe' }
-          );
-          cp.stdout.on('data', (chunk) => {
-            stdout += chunk;
+        try {
+          await new Promise((resolve, reject) => {
+            const cp = spawn(
+              process.argv[0],
+              [
+                fileURLToPath(
+                  new URL(`./output/${name}/run.js`, import.meta.url)
+                ),
+              ],
+              { stdio: 'pipe' }
+            );
+            cp.stdout.on('data', (chunk) => {
+              stdout += chunk;
+            });
+            cp.stderr.on('data', (chunk) => {
+              stderr += chunk;
+            });
+            cp.on('error', reject);
+            cp.on('exit', (code) =>
+              code === 0 ? resolve() : reject(new Error(stderr || stdout))
+            );
+            timeout = setTimeout(() => {
+              reject(new Error("test timed out with output:\n" + stdout + '\n\nstderr:\n' + stderr));
+            }, 10_000);
           });
-          cp.stderr.on('data', (chunk) => {
-            stderr += chunk;
-          });
-          cp.on('error', reject);
-          cp.on('exit', (code) =>
-            code === 0 ? resolve() : reject(new Error(stderr || stdout))
-          );
-          timeout = setTimeout(() => {
-            reject(new Error("test timed out with output:\n" + stdout + '\n\nstderr:\n' + stderr));
-          }, 10_000);
-        });
-        clearTimeout(timeout);
+        }
+        catch (err) {
+          throw { err, stdout, stderr };
+        }
+        finally {
+          clearTimeout(timeout);
+        }
 
         return { stdout, stderr };
       });

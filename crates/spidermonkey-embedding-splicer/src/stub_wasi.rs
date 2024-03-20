@@ -273,12 +273,10 @@ fn stub_clocks(module: &mut Module) -> Result<()> {
         Ok(vec![clock_id, precision, time_ptr])
     })?;
 
-    stub_import(
-        module,
-        "wasi:clocks/monotonic-clock@0.2.0",
-        "now",
-        unreachable_stub,
-    )?;
+    stub_import(module, "wasi:clocks/monotonic-clock@0.2.0", "now", |body| {
+        body.i64_const(i64::try_from(unix_time.as_nanos())?);
+        Ok(vec![])
+    })?;
     stub_import(
         module,
         "wasi:clocks/monotonic-clock@0.2.0",
