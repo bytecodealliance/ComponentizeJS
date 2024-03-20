@@ -49,28 +49,28 @@ export async function componentize(jsSource, witWorld, opts) {
     false
   );
 
-  // we never stub out a feature that is already in the target world usage
+  // we never disable a feature that is already in the target world usage
   const features = [];
   if (!disableFeatures.includes('stdio')) {
-    if (imports.some(([module]) => module.startsWith('wasi:io/')))
-      throw new Error(
-        'Cannot disable "stdio" as it is already an import in the target world.'
-      );
     features.push('stdio');
+  } else if (imports.some(([module]) => module.startsWith('wasi:cli/std') || module.startsWith('wasi:cli/terminal'))) {
+    throw new Error(
+      'Cannot disable "stdio" as it is already an import in the target world.'
+    );
   }
   if (!disableFeatures.includes('random')) {
-    if (imports.some(([module]) => module.startsWith('wasi:random/')))
-      throw new Error(
-        'Cannot disable "random" as it is already an import in the target world.'
-      );
     features.push('random');
+  } else if (imports.some(([module]) => module.startsWith('wasi:random/'))) {
+    throw new Error(
+      'Cannot disable "random" as it is already an import in the target world.'
+    );
   }
   if (!disableFeatures.includes('clocks')) {
-    if (imports.some(([module]) => module.startsWith('wasi:clocks/')))
-      throw new Error(
-        'Cannot disable "clocks" as it is already an import in the target world.'
-      );
     features.push('clocks');
+  } else if (imports.some(([module]) => module.startsWith('wasi:clocks/'))) {
+    throw new Error(
+      'Cannot disable "clocks" as it is already an import in the target world.'
+    );
   }
   if (
     enableFeatures.includes('http') ||

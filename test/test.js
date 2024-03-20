@@ -112,7 +112,7 @@ suite('Bindings', () => {
         'utf8'
       );
 
-      let witWorld, witPath, worldName;
+      let witWorld, witPath, worldName, isWasiTarget = false;
       try {
         witWorld = await readFile(
           new URL(`./cases/${name}/world.wit`, import.meta.url),
@@ -121,6 +121,7 @@ suite('Bindings', () => {
       } catch (e) {
         if (e?.code == 'ENOENT') {
           try {
+            isWasiTarget = true;
             witPath = fileURLToPath(
               new URL(`./cases/${name}/wit`, import.meta.url)
             );
@@ -146,7 +147,7 @@ suite('Bindings', () => {
           witWorld,
           witPath,
           worldName,
-          disableFeatures: ['random', 'clocks']
+          disableFeatures: isWasiTarget ? [] : ['random', 'clocks']
         });
 
         const map = {
