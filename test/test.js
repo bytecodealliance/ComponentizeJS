@@ -17,7 +17,7 @@ suite('Builtins', () => {
         disableFeatures,
       } = await import(`./builtins/${filename}`);
 
-      const { component } = await componentize(
+      const { component, imports } = await componentize(
         source,
         `
         package local:runworld;
@@ -139,7 +139,7 @@ suite('Bindings', () => {
           witWorld,
           witPath,
           worldName,
-          enableStdout: true,
+          disableFeatures: ['random', 'clocks']
         });
 
         const map = {

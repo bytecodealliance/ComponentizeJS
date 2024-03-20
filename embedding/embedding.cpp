@@ -273,8 +273,8 @@ extern "C"
       cabi_free(ptr);
     }
     Runtime.free_list.clear();
-    js::RunJobs(Runtime.cx);
-    JS_MaybeGC(Runtime.cx);
+    RootedValue result(Runtime.cx);
+    Runtime.engine->run_event_loop(&result);
     LOG("(post_call) end");
   }
 
