@@ -127,6 +127,9 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             .select_world(id, world_name.as_deref())
             .map_err(|e| e.to_string())?;
 
+        let mut wasm_bytes = wit_component::dummy_module(&resolve, world);
+        let componentized = bindgen::componentize_bindgen(&resolve, world, &source_name);
+
         // merge the engine world with the target world, retaining the engine producers
         let producers = if let Ok((
             _,
@@ -194,11 +197,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             data: encoded.into(),
         };
 
-        let mut wasm_bytes = wit_component::dummy_module(&resolve, world);
         wasm_bytes.push(section.id());
         section.encode(&mut wasm_bytes);
-
-        let componentized = bindgen::componentize_bindgen(&resolve, world, &source_name);
 
         let mut generated_bindings = componentized.js_bindings;
 

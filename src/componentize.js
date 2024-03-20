@@ -31,24 +31,14 @@ export async function componentize(jsSource, witWorld, opts) {
   const {
     sourceName = 'source.js',
     engine = fileURLToPath(
-      new URL(
-        `../lib/starlingmonkey_embedding.wasm`,
-        import.meta.url
-      )
+      new URL(`../lib/starlingmonkey_embedding.wasm`, import.meta.url)
     ),
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
     worldName,
     disableFeatures = [],
+    enableFeatures = [],
   } = opts || {};
-
-  const features = [];
-  if (!disableFeatures.includes('stdio'))
-    features.push('stdio');
-  if (!disableFeatures.includes('random'))
-    features.push('random');
-  if (!disableFeatures.includes('clocks'))
-    features.push('clocks');
 
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
     sourceName,
@@ -58,6 +48,36 @@ export async function componentize(jsSource, witWorld, opts) {
     worldName,
     false
   );
+
+  // we never stub out a feature that is already in the target world usage
+  const features = [];
+  if (!disableFeatures.includes('stdio')) {
+    if (imports.some(([module]) => module.startsWith('wasi:io/')))
+      throw new Error(
+        'Cannot disable "stdio" as it is already an import in the target world.'
+      );
+    features.push('stdio');
+  }
+  if (!disableFeatures.includes('random')) {
+    if (imports.some(([module]) => module.startsWith('wasi:random/')))
+      throw new Error(
+        'Cannot disable "random" as it is already an import in the target world.'
+      );
+    features.push('random');
+  }
+  if (!disableFeatures.includes('clocks')) {
+    if (imports.some(([module]) => module.startsWith('wasi:clocks/')))
+      throw new Error(
+        'Cannot disable "clocks" as it is already an import in the target world.'
+      );
+    features.push('clocks');
+  }
+  if (
+    enableFeatures.includes('http') ||
+    imports.some(([module]) => module.startsWith('wasi:http/'))
+  ) {
+    features.push('http');
+  }
 
   if (DEBUG_INTERNAL) {
     console.log('--- JS Source ---');
@@ -94,7 +114,7 @@ export async function componentize(jsSource, witWorld, opts) {
   await lexerInit;
   let jsImports = [];
   try {
-    ([jsImports] = parse(jsSource));
+    [jsImports] = parse(jsSource);
   } catch {
     // ignore parser errors - will show up as engine parse errors shortly
   }

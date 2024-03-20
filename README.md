@@ -111,6 +111,9 @@ Setting `disableFeatures: ['random', 'stdio', 'clocks']` will disable all featur
 
 Note that pure components **will not report errors and will instead trap**, so that this should only be enabled after very careful testing.
 
+Note that features explicitly imported by the target world cannot be disabled - if you target a component to a world
+that imports `wasi:clocks`, then `disableFeatures: ['clocks']` will not be supported.
+
 ## API
 
 ```ts

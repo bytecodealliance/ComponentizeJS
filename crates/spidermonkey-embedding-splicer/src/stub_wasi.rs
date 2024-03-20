@@ -13,12 +13,12 @@ fn stub_import<StubFn>(
     import: &str,
     name: &str,
     stub: StubFn,
-) -> Result<FunctionId>
+) -> Result<Option<FunctionId>>
 where
     StubFn: Fn(&mut InstrSeqBuilder) -> Result<Vec<LocalId>>,
 {
     let Some(iid) = module.imports.find(import, name) else {
-        bail!("Cannot find '{import}#{name}' to stub.");
+        return Ok(None);
     };
 
     let ImportKind::Function(fid) = module.imports.get(iid).kind else {
@@ -44,7 +44,7 @@ where
     module.funcs.get_mut(fid).kind = FunctionKind::Local(local_func);
 
     module.imports.delete(iid);
-    Ok(fid)
+    Ok(Some(fid))
 }
 
 fn unreachable_stub(body: &mut InstrSeqBuilder) -> Result<Vec<LocalId>> {
@@ -138,7 +138,8 @@ fn stub_random(module: &mut Module) -> Result<()> {
             body.binop(BinaryOp::I64Mul);
             Ok(vec![])
         },
-    )?;
+    )?
+    .expect("get-random-u64 not found");
 
     let num_bytes = module.locals.add(ValType::I64);
     let retptr = module.locals.add(ValType::I32);
