@@ -21,6 +21,7 @@ const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8')
 );
 const isWindows = platform === 'win32';
+const DEBUG_INTERNAL = false;
 
 export async function componentize(jsSource, witWorld, opts) {
   if (typeof witWorld === 'object') {
@@ -28,26 +29,37 @@ export async function componentize(jsSource, witWorld, opts) {
     witWorld = opts?.witWorld;
   }
   const {
-    debug = false,
     sourceName = 'source.js',
     engine = fileURLToPath(
-      new URL('../lib/starlingmonkey_embedding.wasm', import.meta.url)
+      new URL(
+        `../lib/starlingmonkey_embedding.wasm`,
+        import.meta.url
+      )
     ),
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
     worldName,
-    enableStdout = false,
+    disableFeatures = [],
   } = opts || {};
+
+  const features = [];
+  if (!disableFeatures.includes('stdio'))
+    features.push('stdio');
+  if (!disableFeatures.includes('random'))
+    features.push('random');
+  if (!disableFeatures.includes('clocks'))
+    features.push('clocks');
 
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
     sourceName,
     await readFile(engine),
     witWorld,
     witPath ? (isWindows ? '//?/' : '') + resolve(witPath) : null,
-    worldName
+    worldName,
+    false
   );
 
-  if (debug) {
+  if (DEBUG_INTERNAL) {
     console.log('--- JS Source ---');
     console.log(jsSource);
     console.log('--- JS Bindings ---');
@@ -80,7 +92,12 @@ export async function componentize(jsSource, witWorld, opts) {
 
   // rewrite the JS source import specifiers to reference import wrappers
   await lexerInit;
-  const [jsImports] = parse(jsSource);
+  let jsImports = [];
+  try {
+    ([jsImports] = parse(jsSource));
+  } catch {
+    // ignore parser errors - will show up as engine parse errors shortly
+  }
   let source = '',
     curIdx = 0;
   for (const jsImpt of jsImports) {
@@ -94,10 +111,10 @@ export async function componentize(jsSource, witWorld, opts) {
   // write the source files into the source dir
   const sourceDir = join(tmpDir, 'sources');
 
-  if (debug) {
+  if (DEBUG_INTERNAL) {
     console.log(`> Writing sources to ${tmpDir}/sources`);
   }
-  
+
   await mkdir(sourceDir);
   await Promise.all(
     [
@@ -113,7 +130,7 @@ export async function componentize(jsSource, witWorld, opts) {
   );
 
   const env = {
-    DEBUG: debug ? '1' : '',
+    DEBUG: DEBUG_INTERNAL ? '1' : '',
     SOURCE_NAME: sourceName,
     IMPORT_WRAPPER_CNT: Object.keys(importWrappers).length.toString(),
     EXPORT_CNT: exports.length.toString(),
@@ -133,7 +150,7 @@ export async function componentize(jsSource, witWorld, opts) {
   }
   env['IMPORT_CNT'] = imports.length;
 
-  if (debug) {
+  if (DEBUG_INTERNAL) {
     console.log('--- Wizer Env ---');
     console.log(env);
   }
@@ -165,7 +182,7 @@ export async function componentize(jsSource, witWorld, opts) {
     let err =
       `Failed to initialize the compiled Wasm binary with Wizer:\n` +
       error.message;
-    if (debug) {
+    if (DEBUG_INTERNAL) {
       err += `\nBinary and sources available for debugging at ${tmpDir}\n`;
     } else {
       rmSync(tmpDir, { recursive: true });
@@ -175,7 +192,9 @@ export async function componentize(jsSource, witWorld, opts) {
 
   const bin = await readFile(output);
 
-  const tmpdirRemovePromise = debug ? Promise.resolve() : rm(tmpDir, { recursive: true });
+  const tmpdirRemovePromise = DEBUG_INTERNAL
+    ? Promise.resolve()
+    : rm(tmpDir, { recursive: true });
 
   // Check for initialization errors
   // By actually executing the binary in a mini sandbox to get back
@@ -341,7 +360,7 @@ export async function componentize(jsSource, witWorld, opts) {
 
   // in debug mode, log the generated bindings for bindings errors
   if (
-    debug &&
+    DEBUG_INTERNAL &&
     (status === INIT_BINDINGS_COMPILE || status === INIT_MEM_BINDINGS)
   ) {
     err += `\n\nGenerated bindings:\n_____\n${jsBindings
@@ -359,8 +378,8 @@ export async function componentize(jsSource, witWorld, opts) {
     exit(1);
   }
 
-  // after wizering, stub out the wasi preview1 imports
-  const finalBin = stubWasi(bin, enableStdout);
+  // after wizering, stub out the wasi imports depending on what features are enabled
+  const finalBin = stubWasi(bin, features);
 
   const component = await metadataAdd(
     await componentNew(

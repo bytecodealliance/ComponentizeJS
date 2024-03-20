@@ -1,16 +1,16 @@
-import { strictEqual } from 'node:assert';
+import { strictEqual, ok } from 'node:assert';
 
 export const source = `
   export function run () {
-    console.log('test');
+    console.log(Math.random());
   }
   export function ready () {
     return true;
   }
 `;
 
-export async function test (run) {
+export async function test(run) {
   const { stdout, stderr } = await run();
-  strictEqual(stdout, 'test\n');
   strictEqual(stderr, '');
+  ok(Number(stdout) > 0 && Number(stdout) < 1);
 }

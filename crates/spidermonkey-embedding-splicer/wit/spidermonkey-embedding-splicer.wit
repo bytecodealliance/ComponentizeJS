@@ -8,6 +8,13 @@ world spidermonkey-embedding-splicer {
     %f64
   }
 
+  enum features {
+    stdio,
+    clocks,
+    random,
+    http,
+  }
+
   record core-fn {
     params: list<core-ty>,
     ret: option<core-ty>,
@@ -24,7 +31,7 @@ world spidermonkey-embedding-splicer {
     imports: list<tuple<string, string, u32>>,
   }
 
-  export stub-wasi: func(engine: list<u8>, stdout: bool) -> result<list<u8>, string>;
+  export stub-wasi: func(engine: list<u8>, features: list<features>) -> result<list<u8>, string>;
 
-  export splice-bindings: func(source-name: option<string>, spidermonkey-engine: list<u8>, wit-world: option<string>, wit-path: option<string>, world-name: option<string>) -> result<splice-result, string>;
+  export splice-bindings: func(source-name: option<string>, spidermonkey-engine: list<u8>, wit-world: option<string>, wit-path: option<string>, world-name: option<string>, debug: bool) -> result<splice-result, string>;
 }
