@@ -33,24 +33,7 @@ namespace componentize::embedding
     enum class InitError
     {
       OK,
-      JSInit,
-      Intrinsics,
-      CustomIntrinsics,
-      SourceStdin,
-      SourceCompile,
-      BindingsCompile,
-      ImportWrapperCompile,
-      SourceLink,
-      SourceExec,
-      BindingsExec,
-      // Deprecated
       FnList,
-      MemBuffer,
-      ReallocFn,
-      // Deprecated
-      MemBindings,
-      PromiseRejections,
-      ImportFn,
       TypeParse
     };
 

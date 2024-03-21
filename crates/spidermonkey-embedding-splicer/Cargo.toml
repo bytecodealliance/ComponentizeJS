@@ -13,6 +13,7 @@ crate-type = ["cdylib"]
 anyhow = { workspace = true }
 heck = { workspace = true }
 js-component-bindgen = { workspace = true }
+rand = { workspace = true }
 walrus = { workspace = true }
 wasmparser = { workspace = true }
 wasm-encoder = { workspace = true }

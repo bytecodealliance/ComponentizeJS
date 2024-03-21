@@ -41,7 +41,7 @@ As a result, at runtime - only the  bytecode is being executed, without any init
 
 As a dynamic language with quirks, JavaScript cannot be compiled directly into bytecode without including a comprehensive ECMA-262 spec-compliant runtime engine. Componentization of JavaScript thus involves embedding the JS runtime engine into the component itself.
 
-SpiderMonkey is chosen here as a JS engine with first-class WASI build support. The total embedding size is around 5MB.
+SpiderMonkey is chosen here as a JS engine with first-class WASI build support, using an embedding of the [StarlingMonkey Wasm engine](https://github.com/fermyon/StarlingMonkey). The total embedding size is around 8MB.
 
 One of the security benefits of the component model is complete code isolation apart from the shared-nothing code boundaries between components. By fully encapsulating the engine embedding for each individual component, this maintains comprehensive per-component isolation.
 
@@ -49,18 +49,21 @@ As more components are written in JavaScript, and there exist scenarios where mu
 
 Establishing this initial prototype as a singular flexible engine foundation that can be turned into a shared library is therefore the focus for this project.
 
-## Native Functions
+## Platform APIs
 
-In addition to the spec-compliant JS engine intrinsics, the following non-JS global APIs are also available:
+The following APIs are available:
 
-* `console`
-* `TextEncoder`
-* `TextDecoder`
-* `URL`
-
-Extending support for standard globals is a work-in-progress.
-
-Custom globals can be custom implemented via a JS prelude script to set up any custom globals as part of the JS code being componentized. These global functions can in turn call component imports if underlying host-native functions are needed. Since JS code is pre-initialized any top-level prelude scripts will be preinitialized as part of the initial component build so that this does not result in any runtime work.
+* **Legacy Encoding**: `atob`, `btoa`, `decodeURI`, `encodeURI`, `decodeURIComponent`, `encodeURIComponent`
+* **Streams**: `ReadableStream`, `ReadableStreamBYOBReader`, `ReadableStreamBYOBRequest`, `ReadableStreamDefaultReader`, `ReadableStreamDefaultController`, `ReadableByteStreamController`, `WritableStream` `ByteLengthQueuingStrategy` `CountQueuingStrategy`, `TransformStream`
+* **URL**: `URL` `URLSearchParams`
+* **Console**: `console`
+* **Performance**: `Performance`
+* **Task**: `queueMicrotask`, `setInterval` `setTimeout` `clearInterval` `clearTimeout`
+* **Location**: `WorkerLocation`, `location`
+* **Encoding**: `TextEncoder`, `TextDecoder`, `CompressionStream`, `DecompressionStream`
+* **Structured Clone**: `structuredClone`
+* **Fetch**: `fetch` `Request` `Response` `Headers`
+* **Crypto**: `SubtleCrypto` `Crypto` `crypto` `CryptoKey`
 
 ## Usage
 
@@ -94,23 +97,34 @@ await writeFile('test.component.wasm', component);
 
 The component iself can be executed in any component runtime, see the [example](EXAMPLE.md) for a full workflow.
 
-## Console Support
+## Features
 
-By default, `console.log` calls will not write to `stdout`, unless explicitly configured by the `enableStdout: true` option.
+The set of enabled features in the engine can be customized depending on the target world and expected capabilities.
 
-In future this will use the WASI logging subsystem directly.
+The default set of features includes:
+
+* `'stdio'`: Output to stderr and stdout for errors and console logging, depends on `wasi:cli` and `wasi:io`.
+* `'random'`: Support for cryptographic random, depends on `wasi:random`. **When disabled, random numbers will still be generated but will not be random and instead fully deterministic.**
+* `'clocks'`: Support for clocks and duration polls, depends on `wasi:clocks` and `wasi:io`. **When disabled, using any timer functions like setTimeout or setInterval will panic.**
+
+Setting `disableFeatures: ['random', 'stdio', 'clocks']` will disable all features creating a minimal "pure component", that does not depend on any WASI APIs at all and just the target world.
+
+Note that pure components **will not report errors and will instead trap**, so that this should only be enabled after very careful testing.
+
+Note that features explicitly imported by the target world cannot be disabled - if you target a component to a world
+that imports `wasi:clocks`, then `disableFeatures: ['clocks']` will not be supported.
 
 ## API
 
-```js
-componentize(jsSource: string, {
+```ts
+export function componentize(jsSource: string, opts: {
   witPath: string,
   worldName: string,
   debug?: bool,
   sourceName?: string,
   engine?: string,
   preview2Adapter?: string,
-  enableStdout?: bool,
+  disableFeatures?: ('stdio' | 'random' | 'clocks')[],
 }): {
   component: Uint8Array,
   imports: string[]
@@ -126,14 +140,11 @@ Converts a JS source into a component binary.
 * `git submodule update --init --recursive` to update the submodules.
 * Stable Rust with the `wasm32-unknown-unknown` and `wasm32-wasi` targets
   installed.
-* `cbindgen`, which can be installed via `cargo install --force cbindgen`
-* `wget`, in macOS can be installed via `brew install wget`
 * `wasi-sdk-20.0` installed at `/opt/wasi-sdk/`
 
 ### Building and testing
 
 Building and testing is based on a `npm install && npm run build && npm run test` workflow.
-
 
 # License
 

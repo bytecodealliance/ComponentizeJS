@@ -97,8 +97,8 @@ fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
 }
 
 impl Guest for SpidermonkeyEmbeddingSplicerComponent {
-    fn stub_wasi(wasm: Vec<u8>, stdout: bool) -> Result<Vec<u8>, String> {
-        stub_wasi(wasm, stdout).map_err(|e| e.to_string())
+    fn stub_wasi(wasm: Vec<u8>, features: Vec<Features>) -> Result<Vec<u8>, String> {
+        stub_wasi(wasm, features).map_err(|e| e.to_string())
     }
 
     fn splice_bindings(
@@ -107,6 +107,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         wit_source: Option<String>,
         wit_path: Option<String>,
         world_name: Option<String>,
+        debug: bool,
     ) -> Result<SpliceResult, String> {
         let source_name = source_name.unwrap_or("source.js".to_string());
 
@@ -125,6 +126,9 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         let world = resolve
             .select_world(id, world_name.as_deref())
             .map_err(|e| e.to_string())?;
+
+        let mut wasm_bytes = wit_component::dummy_module(&resolve, world);
+        let componentized = bindgen::componentize_bindgen(&resolve, world, &source_name);
 
         // merge the engine world with the target world, retaining the engine producers
         let producers = if let Ok((
@@ -193,11 +197,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             data: encoded.into(),
         };
 
-        let mut wasm_bytes = wit_component::dummy_module(&resolve, world);
         wasm_bytes.push(section.id());
         section.encode(&mut wasm_bytes);
-
-        let componentized = bindgen::componentize_bindgen(&resolve, world, &source_name);
 
         let mut generated_bindings = componentized.js_bindings;
 
@@ -327,7 +328,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         // println!("{:?}", &componentized.imports);
         // println!("{:?}", &exports);
         let mut wasm =
-            splice::splice(engine, imports, exports, false).map_err(|e| format!("{:?}", e))?;
+            splice::splice(engine, imports, exports, debug).map_err(|e| format!("{:?}", e))?;
 
         // add the world section to the spliced wasm
         wasm.push(section.id());

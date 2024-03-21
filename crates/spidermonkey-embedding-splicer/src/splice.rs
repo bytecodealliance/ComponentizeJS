@@ -8,6 +8,8 @@ use walrus::{
 
 use crate::*;
 
+const DEBUG: bool = false;
+
 //
 // Parses the Spidermonkey binary into section data for reserialization
 // into an output binary, and in the process:
@@ -37,7 +39,10 @@ pub fn splice(
     exports: Vec<(String, CoreFn)>,
     debug: bool,
 ) -> Result<Vec<u8>> {
-    let config = walrus::ModuleConfig::new();
+    let mut config = walrus::ModuleConfig::new();
+    if debug {
+        config.generate_dwarf(true);
+    }
     let mut module = config.parse(&engine)?;
 
     // since StarlingMonkey implements CLI Run and incoming handler,
@@ -71,7 +76,7 @@ pub fn splice(
     // extract the native instructions from sample functions
     // then inline the imported functions and main import gating function
     // (erasing sample functions in the process)
-    synthesize_import_functions(&mut module, &imports, debug)?;
+    synthesize_import_functions(&mut module, &imports)?;
 
     // create the exported functions as wrappers around the "cabi_call" function
     synthesize_export_functions(&mut module, &exports)?;
@@ -89,7 +94,6 @@ fn get_export_fid(module: &walrus::Module, expt_id: &ExportId) -> FunctionId {
 fn synthesize_import_functions(
     module: &mut walrus::Module,
     imports: &Vec<(String, String, CoreFn, Option<i32>)>,
-    debug: bool,
 ) -> Result<()> {
     let mut coreabi_get_import: Option<ExportId> = None;
     let mut cabi_realloc: Option<ExportId> = None;
@@ -175,7 +179,7 @@ fn synthesize_import_functions(
         let tmp_local = module.locals.add(ValType::I64);
 
         for (impt_specifier, impt_name, impt_sig, retptr_size) in imports.iter() {
-            if debug {
+            if DEBUG {
                 println!(
                     "> IMPORT {} {} > {:?}",
                     impt_specifier, impt_name, &impt_sig

@@ -10,23 +10,30 @@ suite('Builtins', () => {
   for (const filename of builtinsCases) {
     const name = filename.slice(0, -3);
     test(name, async () => {
-      const { source, test: runTest } = await import(`./builtins/${filename}`);
+      const {
+        source,
+        test: runTest,
+        enableFeatures,
+        disableFeatures,
+      } = await import(`./builtins/${filename}`);
 
-      const { component } = await componentize(
+      const { component, imports } = await componentize(
         source,
         `
         package local:runworld;
         world runworld {
           export run: func() -> ();
+          export ready: func() -> bool;
         }
       `,
         {
           sourceName: `${name}.js`,
-          enableStdout: true,
+          enableFeatures,
+          disableFeatures,
         }
       );
 
-      const { files } = await transpile(component, { name, wasiShim: true });
+      const { files } = await transpile(component, { name, wasiShim: true, tracing: false });
 
       await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), {
         recursive: true,
@@ -47,35 +54,48 @@ suite('Builtins', () => {
       await writeFile(
         new URL(`./output/${name}/run.js`, import.meta.url),
         `
-        import { run } from './${name}.js';
+        import { run, ready } from './${name}.js';
         run();
+        while (!ready()) await new Promise(resolve => setTimeout(resolve, 10));
       `
       );
 
       await runTest(async function run() {
         let stdout = '',
-          stderr = '';
-        await new Promise((resolve, reject) => {
-          const cp = spawn(
-            process.argv[0],
-            [
-              fileURLToPath(
-                new URL(`./output/${name}/run.js`, import.meta.url)
-              ),
-            ],
-            { stdio: 'pipe' }
-          );
-          cp.stdout.on('data', (chunk) => {
-            stdout += chunk;
+          stderr = '',
+          timeout;
+        try {
+          await new Promise((resolve, reject) => {
+            const cp = spawn(
+              process.argv[0],
+              [
+                fileURLToPath(
+                  new URL(`./output/${name}/run.js`, import.meta.url)
+                ),
+              ],
+              { stdio: 'pipe' }
+            );
+            cp.stdout.on('data', (chunk) => {
+              stdout += chunk;
+            });
+            cp.stderr.on('data', (chunk) => {
+              stderr += chunk;
+            });
+            cp.on('error', reject);
+            cp.on('exit', (code) =>
+              code === 0 ? resolve() : reject(new Error(stderr || stdout))
+            );
+            timeout = setTimeout(() => {
+              reject(new Error("test timed out with output:\n" + stdout + '\n\nstderr:\n' + stderr));
+            }, 10_000);
           });
-          cp.stderr.on('data', (chunk) => {
-            stderr += chunk;
-          });
-          cp.on('error', reject);
-          cp.on('exit', (code) =>
-            code === 0 ? resolve() : reject(new Error(stderr || stdout))
-          );
-        });
+        }
+        catch (err) {
+          throw { err, stdout, stderr };
+        }
+        finally {
+          clearTimeout(timeout);
+        }
 
         return { stdout, stderr };
       });
@@ -92,7 +112,7 @@ suite('Bindings', () => {
         'utf8'
       );
 
-      let witWorld, witPath, worldName;
+      let witWorld, witPath, worldName, isWasiTarget = false;
       try {
         witWorld = await readFile(
           new URL(`./cases/${name}/world.wit`, import.meta.url),
@@ -101,6 +121,7 @@ suite('Bindings', () => {
       } catch (e) {
         if (e?.code == 'ENOENT') {
           try {
+            isWasiTarget = true;
             witPath = fileURLToPath(
               new URL(`./cases/${name}/wit`, import.meta.url)
             );
@@ -126,7 +147,7 @@ suite('Bindings', () => {
           witWorld,
           witPath,
           worldName,
-          enableStdout: true,
+          disableFeatures: isWasiTarget ? [] : ['random', 'clocks']
         });
 
         const map = {
