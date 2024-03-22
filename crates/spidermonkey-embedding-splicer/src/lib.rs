@@ -17,9 +17,6 @@ use wit_parser::{PackageId, Resolve, UnresolvedPackage};
 
 wit_bindgen::generate!({
     world: "spidermonkey-embedding-splicer",
-    exports: {
-        world: SpidermonkeyEmbeddingSplicerComponent
-    }
 });
 
 struct SpidermonkeyEmbeddingSplicerComponent;
@@ -384,3 +381,5 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         })
     }
 }
+
+export!(SpidermonkeyEmbeddingSplicerComponent);
