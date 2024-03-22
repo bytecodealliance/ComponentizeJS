@@ -21,7 +21,14 @@ const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8')
 );
 const isWindows = platform === 'win32';
-const DEBUG_INTERNAL = false;
+const DEBUG_BINDINGS = false;
+const DEBUG_CALLS = false;
+
+function maybeWindowsPath (path) {
+  if (!path) return path;
+  if (!isWindows) return resolve(path);
+  return '//?/' + resolve(path).replace(/\\/g, '/');
+}
 
 export async function componentize(jsSource, witWorld, opts) {
   if (typeof witWorld === 'object') {
@@ -44,7 +51,7 @@ export async function componentize(jsSource, witWorld, opts) {
     sourceName,
     await readFile(engine),
     witWorld,
-    witPath ? (isWindows ? '//?/' : '') + resolve(witPath) : null,
+    maybeWindowsPath(witPath),
     worldName,
     false
   );
@@ -79,7 +86,7 @@ export async function componentize(jsSource, witWorld, opts) {
     features.push('http');
   }
 
-  if (DEBUG_INTERNAL) {
+  if (DEBUG_BINDINGS) {
     console.log('--- JS Source ---');
     console.log(jsSource);
     console.log('--- JS Bindings ---');
@@ -131,7 +138,7 @@ export async function componentize(jsSource, witWorld, opts) {
   // write the source files into the source dir
   const sourceDir = join(tmpDir, 'sources');
 
-  if (DEBUG_INTERNAL) {
+  if (DEBUG_BINDINGS) {
     console.log(`> Writing sources to ${tmpDir}/sources`);
   }
 
@@ -150,7 +157,7 @@ export async function componentize(jsSource, witWorld, opts) {
   );
 
   const env = {
-    DEBUG: DEBUG_INTERNAL ? '1' : '',
+    DEBUG: DEBUG_CALLS ? '1' : '',
     SOURCE_NAME: sourceName,
     IMPORT_WRAPPER_CNT: Object.keys(importWrappers).length.toString(),
     EXPORT_CNT: exports.length.toString(),
@@ -170,7 +177,7 @@ export async function componentize(jsSource, witWorld, opts) {
   }
   env['IMPORT_CNT'] = imports.length;
 
-  if (DEBUG_INTERNAL) {
+  if (DEBUG_BINDINGS) {
     console.log('--- Wizer Env ---');
     console.log(env);
   }
@@ -191,7 +198,7 @@ export async function componentize(jsSource, witWorld, opts) {
       {
         stdio: [null, stdout, stderr],
         env,
-        input: join(sourceDir, sourceName.slice(0, -3) + '.bindings.js'),
+        input: maybeWindowsPath(join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')),
         shell: true,
         encoding: 'utf-8',
       }
@@ -202,7 +209,7 @@ export async function componentize(jsSource, witWorld, opts) {
     let err =
       `Failed to initialize the compiled Wasm binary with Wizer:\n` +
       error.message;
-    if (DEBUG_INTERNAL) {
+    if (DEBUG_BINDINGS) {
       err += `\nBinary and sources available for debugging at ${tmpDir}\n`;
     } else {
       rmSync(tmpDir, { recursive: true });
@@ -212,7 +219,7 @@ export async function componentize(jsSource, witWorld, opts) {
 
   const bin = await readFile(output);
 
-  const tmpdirRemovePromise = DEBUG_INTERNAL
+  const tmpdirRemovePromise = DEBUG_BINDINGS
     ? Promise.resolve()
     : rm(tmpDir, { recursive: true });
 
@@ -295,17 +302,6 @@ export async function componentize(jsSource, witWorld, opts) {
       break;
     default:
       err = `Unknown error - ${status}`;
-  }
-
-  // in debug mode, log the generated bindings for bindings errors
-  if (
-    DEBUG_INTERNAL &&
-    (status === INIT_BINDINGS_COMPILE || status === INIT_MEM_BINDINGS)
-  ) {
-    err += `\n\nGenerated bindings:\n_____\n${jsBindings
-      .split('\n')
-      .map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`)
-      .join('\n')}\n-----\n`;
   }
 
   if (err) {
