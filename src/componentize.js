@@ -189,7 +189,7 @@ export async function componentize(jsSource, witWorld, opts) {
         '--allow-wasi',
         '--init-func',
         'componentize.wizer',
-        `--dir=${sourceDir}`,
+        `--dir=${maybeWindowsPath(sourceDir)}`,
         `--wasm-bulk-memory=true`,
         '--inherit-env=true',
         `-o=${output}`,
