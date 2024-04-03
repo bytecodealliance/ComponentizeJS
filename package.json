@@ -13,6 +13,7 @@
     "@bytecodealliance/wizer": "^3.0.1",
     "es-module-lexer": "^1.4.1"
   },
+  "types": "types.d.ts",
   "scripts": {
     "build": "make release",
     "build:debug": "make debug",
