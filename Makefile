@@ -20,12 +20,12 @@ lib/spidermonkey-embedding-splicer.js: target/wasm32-wasi/release/spidermonkey_e
 target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm: Cargo.toml crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/*.rs
 	cargo build --release --target wasm32-wasi
 
-lib/starlingmonkey_embedding.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/**/* StarlingMonkey/include/* | lib
+lib/starlingmonkey_embedding.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/*/* StarlingMonkey/builtins/*/*/* StarlingMonkey/include/* | lib
 	cmake -B build-release -DCMAKE_BUILD_TYPE=Release
 	make -j16 -C build-release
 	@cp build-release/starling.wasm/starling.wasm $@
 
-lib/starlingmonkey_embedding.debug.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/**/* StarlingMonkey/include/* | lib
+lib/starlingmonkey_embedding.debug.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/*/* StarlingMonkey/builtins/*/*/* StarlingMonkey/include/* | lib
 	cmake -B build-debug -DCMAKE_BUILD_TYPE=RelWithDebInfo
 	make -j16 -C build-debug
 	@cp build-debug/starling.wasm/starling.wasm $@
@@ -42,4 +42,4 @@ obj/builtins:
 clean:
 	rm -r obj
 	rm lib/spidermonkey-embedding-splicer.js
-	rm lib/spidermonkey_embedding.wasm
+	rm lib/starlingmonkey_embedding.wasm

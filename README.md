@@ -125,13 +125,13 @@ The default set of features includes:
 * `'stdio'`: Output to stderr and stdout for errors and console logging, depends on `wasi:cli` and `wasi:io`.
 * `'random'`: Support for cryptographic random, depends on `wasi:random`. **When disabled, random numbers will still be generated but will not be random and instead fully deterministic.**
 * `'clocks'`: Support for clocks and duration polls, depends on `wasi:clocks` and `wasi:io`. **When disabled, using any timer functions like setTimeout or setInterval will panic.**
+* `'http'`: Support for outbound HTTP via the `fetch` global in JS.
 
-Setting `disableFeatures: ['random', 'stdio', 'clocks']` will disable all features creating a minimal "pure component", that does not depend on any WASI APIs at all and just the target world.
+Setting `disableFeatures: ['random', 'stdio', 'clocks', 'http']` will disable all features creating a minimal "pure component", that does not depend on any WASI APIs at all and just the target world.
 
 Note that pure components **will not report errors and will instead trap**, so that this should only be enabled after very careful testing.
 
-Note that features explicitly imported by the target world cannot be disabled - if you target a component to a world
-that imports `wasi:clocks`, then `disableFeatures: ['clocks']` will not be supported.
+Note that features explicitly imported by the target world cannot be disabled - if you target a component to a world that imports `wasi:clocks`, then `disableFeatures: ['clocks']` will not be supported.
 
 ## Using StarlingMonkey's `fetch-event`
 

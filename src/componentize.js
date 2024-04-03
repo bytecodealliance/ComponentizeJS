@@ -66,7 +66,6 @@ export async function componentize(jsSource, witWorld, opts) {
     guestExports.push(k.n);
   });
 
-
   // we never disable a feature that is already in the target world usage
   const features = [];
   if (!disableFeatures.includes('stdio')) {
@@ -93,7 +92,6 @@ export async function componentize(jsSource, witWorld, opts) {
     features,
     false
   );
-
 
   if (DEBUG_BINDINGS) {
     console.log('--- JS Source ---');
