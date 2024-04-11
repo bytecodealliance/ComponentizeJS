@@ -78,20 +78,43 @@ import { componentize } from '@bytecodealliance/componentize-js';
 import { writeFile } from 'node:fs/promises';
 
 const { component } = await componentize(`
-  export function hello (name) {
-    return \`Hello \${name}\`;
+  import { log } from 'local:hello/logger';
+
+  export function sayHello (name) {
+    log(`Hello ${name}`);
   }
+
 `, `
   package local:hello;
+  interface logger {
+    log: func(msg: string);
+  }
   world hello {
-    export hello: func(name: string) -> string;
+    import logger; 
+    export say-hello: func(name: string);
   }
 `);
 
 await writeFile('test.component.wasm', component);
 ```
 
-The component iself can be executed in any component runtime, see the [example](EXAMPLE.md) for a full workflow.
+The component iself can be executed in any component runtime, see the [example](EXAMPLE.md) for an end to end workflow in Wasmtime.
+
+### CLI
+
+ComponentizeJS can be used as a CLI from `jco`:
+
+```
+npm install -g @bytecodealliance/jco @bytecodealliance/componentize-js
+```
+
+For example:
+
+```sh
+jco componentize source.js --wit wit -o component.wasm
+```
+
+See `jco componentize --help` for more details.
 
 ## Features
 
