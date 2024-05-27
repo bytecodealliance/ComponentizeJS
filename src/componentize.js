@@ -24,7 +24,7 @@ const isWindows = platform === 'win32';
 const DEBUG_BINDINGS = false;
 const DEBUG_CALLS = false;
 
-function maybeWindowsPath (path) {
+function maybeWindowsPath(path) {
   if (!path) return path;
   if (!isWindows) return resolve(path);
   return '//?/' + resolve(path).replace(/\\/g, '/');
@@ -314,7 +314,9 @@ export async function componentize(jsSource, witWorld, opts) {
   }
 
   // after wizering, stub out the wasi imports depending on what features are enabled
-  const finalBin = stubWasi(bin, features);
+  const finalBin = stubWasi(bin, features, witWorld,
+    maybeWindowsPath(witPath),
+    worldName,);
 
   const component = await metadataAdd(
     await componentNew(

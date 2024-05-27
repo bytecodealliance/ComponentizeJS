@@ -94,8 +94,14 @@ fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
 }
 
 impl Guest for SpidermonkeyEmbeddingSplicerComponent {
-    fn stub_wasi(wasm: Vec<u8>, features: Vec<Features>) -> Result<Vec<u8>, String> {
-        stub_wasi(wasm, features).map_err(|e| e.to_string())
+    fn stub_wasi(
+        wasm: Vec<u8>,
+        features: Vec<Features>,
+        wit_source: Option<String>,
+        wit_path: Option<String>,
+        world_name: Option<String>,
+    ) -> Result<Vec<u8>, String> {
+        stub_wasi(wasm, features, wit_source, wit_path, world_name).map_err(|e| e.to_string())
     }
 
     fn splice_bindings(

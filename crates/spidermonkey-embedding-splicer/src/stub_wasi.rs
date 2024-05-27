@@ -1,12 +1,17 @@
 use anyhow::{bail, Result};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::HashSet,
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use walrus::{
     ir::{BinaryOp, MemArg, StoreKind, UnaryOp},
     Function, FunctionBuilder, FunctionId, FunctionKind, ImportKind, ImportedFunction, InitExpr,
     InstrSeqBuilder, LocalId, Module, ValType,
 };
+use wit_parser::{Resolve, UnresolvedPackage};
 
-use crate::Features;
+use crate::{parse_wit, Features};
 
 fn stub_import<StubFn>(
     module: &mut Module,
@@ -52,12 +57,40 @@ fn unreachable_stub(body: &mut InstrSeqBuilder) -> Result<Vec<LocalId>> {
     Ok(vec![])
 }
 
-pub fn stub_wasi(wasm: Vec<u8>, features: Vec<Features>) -> Result<Vec<u8>> {
+pub fn stub_wasi(
+    wasm: Vec<u8>,
+    features: Vec<Features>,
+    wit_source: Option<String>,
+    wit_path: Option<String>,
+    world_name: Option<String>,
+) -> Result<Vec<u8>> {
+    let (resolve, id) = if let Some(wit_source) = wit_source {
+        let mut resolve = Resolve::default();
+        let path = PathBuf::from("component.wit");
+        let pkg = UnresolvedPackage::parse(&path, &wit_source)?;
+
+        let id = resolve.push(pkg)?;
+
+        (resolve, id)
+    } else {
+        parse_wit(&PathBuf::from(wit_path.unwrap()))?
+    };
+
+    let world = resolve.select_world(id, world_name.as_deref())?;
+
+    let target_world = &resolve.worlds[world];
+    let mut target_world_imports = HashSet::new();
+
+    for (key, _) in &target_world.imports {
+        target_world_imports.insert(resolve.name_world_key(key));
+    }
+
     let mut module = Module::from_buffer(wasm.as_slice())?;
 
     stub_preview1(&mut module)?;
-    stub_filesystem(&mut module)?;
-    stub_cli(&mut module)?;
+
+    stub_filesystem(&mut module, &target_world_imports)?;
+    stub_cli(&mut module, &target_world_imports)?;
 
     if !features.contains(&Features::Random) {
         stub_random(&mut module)?;
@@ -77,14 +110,32 @@ pub fn stub_wasi(wasm: Vec<u8>, features: Vec<Features>) -> Result<Vec<u8>> {
 
     let has_io = features.contains(&Features::Clocks)
         || features.contains(&Features::Stdio)
-        || features.contains(&Features::Http);
+        || features.contains(&Features::Http)
+        || target_world_requires_io(&target_world_imports);
     if !has_io {
         stub_io(&mut module)?;
     }
 
-    stub_sockets(&mut module)?;
+    stub_sockets(&mut module, &target_world_imports)?;
 
     Ok(module.emit_wasm())
+}
+
+fn target_world_requires_io(target_world_imports: &HashSet<String>) -> bool {
+    return target_world_imports.contains("wasi:sockets/instance-network@0.2.0")
+        || target_world_imports.contains("wasi:sockets/udp@0.2.0")
+        || target_world_imports.contains("wasi:sockets/udp-create-socket@0.2.0")
+        || target_world_imports.contains("wasi:sockets/tcp@0.2.0")
+        || target_world_imports.contains("wasi:sockets/tcp-create-socket@0.2.0")
+        || target_world_imports.contains("wasi:sockets/ip-name-lookup@0.2.0")
+        || target_world_imports.contains("wasi:sockets/network@0.2.0")
+        || target_world_imports.contains("wasi:filesystem/types@0.2.0")
+        || target_world_imports.contains("wasi:filesystem/preopens@0.2.0")
+        || target_world_imports.contains("wasi:cli/terminal-stdin@0.2.0")
+        || target_world_imports.contains("wasi:cli/terminal-stdout@0.2.0")
+        || target_world_imports.contains("wasi:cli/terminal-stderr@0.2.0")
+        || target_world_imports.contains("wasi:cli/terminal-input@0.2.0")
+        || target_world_imports.contains("wasi:cli/terminal-output@0.2.0");
 }
 
 const PREVIEW1: &str = "wasi_snapshot_preview1";
@@ -866,603 +917,654 @@ fn stub_io(module: &mut Module) -> Result<()> {
     Ok(())
 }
 
-fn stub_sockets(module: &mut Module) -> Result<()> {
-    stub_import(
-        module,
-        "wasi:sockets/instance-network@0.2.0",
-        "instance-network",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.start-bind",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.finish-bind",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.stream",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.local-address",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.remote-address",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.address-family",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.unicast-hop-limit",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.set-unicast-hop-limit",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.receive-buffer-size",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.set-receive-buffer-size",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.send-buffer-size",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.set-send-buffer-size",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]udp-socket.subscribe",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]incoming-datagram-stream.receive",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]incoming-datagram-stream.subscribe",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]outgoing-datagram-stream.check-send",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]outgoing-datagram-stream.send",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[method]outgoing-datagram-stream.subscribe",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp-create-socket@0.2.0",
-        "create-udp-socket",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.start-bind",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.finish-bind",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.start-connect",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.finish-connect",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.start-listen",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.finish-listen",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.accept",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.local-address",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.remote-address",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.is-listening",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.address-family",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.set-listen-backlog-size",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.keep-alive-enabled",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.set-keep-alive-enabled",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.keep-alive-idle-time",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.set-keep-alive-idle-time",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.keep-alive-interval",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.set-keep-alive-interval",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.keep-alive-count",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.set-keep-alive-count",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.hop-limit",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.set-hop-limit",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.receive-buffer-size",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.set-receive-buffer-size",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.send-buffer-size",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.set-send-buffer-size",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.subscribe",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[method]tcp-socket.shutdown",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp-create-socket@0.2.0",
-        "create-tcp-socket",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/ip-name-lookup@0.2.0",
-        "resolve-addresses",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/ip-name-lookup@0.2.0",
-        "[method]resolve-address-stream.resolve-next-address",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/ip-name-lookup@0.2.0",
-        "[method]resolve-address-stream.subscribe",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/network@0.2.0",
-        "[resource-drop]network",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[resource-drop]udp-socket",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[resource-drop]incoming-datagram-stream",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/udp@0.2.0",
-        "[resource-drop]outgoing-datagram-stream",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/tcp@0.2.0",
-        "[resource-drop]tcp-socket",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:sockets/ip-name-lookup@0.2.0",
-        "[resource-drop]resolve-address-stream",
-        unreachable_stub,
-    )?;
+fn stub_sockets(module: &mut Module, world_imports: &HashSet<String>) -> Result<()> {
+    if !world_imports.contains("wasi:sockets/instance-network@0.2.0") {
+        stub_import(
+            module,
+            "wasi:sockets/instance-network@0.2.0",
+            "instance-network",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:sockets/udp@0.2.0") {
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.start-bind",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.finish-bind",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.stream",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.local-address",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.remote-address",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.address-family",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.unicast-hop-limit",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.set-unicast-hop-limit",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.receive-buffer-size",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.set-receive-buffer-size",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.send-buffer-size",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.set-send-buffer-size",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]udp-socket.subscribe",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]incoming-datagram-stream.receive",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]incoming-datagram-stream.subscribe",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]outgoing-datagram-stream.check-send",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]outgoing-datagram-stream.send",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[method]outgoing-datagram-stream.subscribe",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[resource-drop]udp-socket",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[resource-drop]incoming-datagram-stream",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/udp@0.2.0",
+            "[resource-drop]outgoing-datagram-stream",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:sockets/udp-create-socket@0.2.0") {
+        stub_import(
+            module,
+            "wasi:sockets/udp-create-socket@0.2.0",
+            "create-udp-socket",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:sockets/tcp@0.2.0") {
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.start-bind",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.finish-bind",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.start-connect",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.finish-connect",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.start-listen",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.finish-listen",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.accept",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.local-address",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.remote-address",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.is-listening",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.address-family",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.set-listen-backlog-size",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.keep-alive-enabled",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.set-keep-alive-enabled",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.keep-alive-idle-time",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.set-keep-alive-idle-time",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.keep-alive-interval",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.set-keep-alive-interval",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.keep-alive-count",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.set-keep-alive-count",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.hop-limit",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.set-hop-limit",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.receive-buffer-size",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.set-receive-buffer-size",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.send-buffer-size",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.set-send-buffer-size",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.subscribe",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[method]tcp-socket.shutdown",
+            unreachable_stub,
+        )?;
+
+        stub_import(
+            module,
+            "wasi:sockets/tcp@0.2.0",
+            "[resource-drop]tcp-socket",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:sockets/tcp-create-socket@0.2.0") {
+        stub_import(
+            module,
+            "wasi:sockets/tcp-create-socket@0.2.0",
+            "create-tcp-socket",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:sockets/ip-name-lookup@0.2.0") {
+        stub_import(
+            module,
+            "wasi:sockets/ip-name-lookup@0.2.0",
+            "resolve-addresses",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/ip-name-lookup@0.2.0",
+            "[method]resolve-address-stream.resolve-next-address",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:sockets/ip-name-lookup@0.2.0",
+            "[method]resolve-address-stream.subscribe",
+            unreachable_stub,
+        )?;
+
+        stub_import(
+            module,
+            "wasi:sockets/ip-name-lookup@0.2.0",
+            "[resource-drop]resolve-address-stream",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:sockets/network@0.2.0") {
+        stub_import(
+            module,
+            "wasi:sockets/network@0.2.0",
+            "[resource-drop]network",
+            unreachable_stub,
+        )?;
+    }
+
     Ok(())
 }
 
-fn stub_filesystem(module: &mut Module) -> Result<()> {
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "filesystem-error-code",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.read-via-stream",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.write-via-stream",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.append-via-stream",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.advise",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.sync-data",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.get-flags",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.get-type",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.set-size",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.set-times",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.read",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.write",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.sync",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.create-directory-at",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.stat",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.stat-at",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.set-times-at",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.link-at",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.open-at",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.readlink-at",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.remove-directory-at",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.rename-at",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.symlink-at",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.unlink-file-at",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.is-same-object",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.metadata-hash",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.metadata-hash-at",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]directory-entry-stream.read-directory-entry",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[method]descriptor.read-directory",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[resource-drop]descriptor",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/preopens@0.2.0",
-        "get-directories",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:filesystem/types@0.2.0",
-        "[resource-drop]directory-entry-stream",
-        unreachable_stub,
-    )?;
+fn stub_filesystem(module: &mut Module, world_imports: &HashSet<String>) -> Result<()> {
+    if !world_imports.contains("wasi:filesystem/types@0.2.0") {
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "filesystem-error-code",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.read-via-stream",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.write-via-stream",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.append-via-stream",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.advise",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.sync-data",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.get-flags",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.get-type",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.set-size",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.set-times",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.read",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.write",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.sync",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.create-directory-at",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.stat",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.stat-at",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.set-times-at",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.link-at",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.open-at",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.readlink-at",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.remove-directory-at",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.rename-at",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.symlink-at",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.unlink-file-at",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.is-same-object",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.metadata-hash",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.metadata-hash-at",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]directory-entry-stream.read-directory-entry",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[method]descriptor.read-directory",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[resource-drop]descriptor",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:filesystem/types@0.2.0",
+            "[resource-drop]directory-entry-stream",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:filesystem/preopens@0.2.0") {
+        stub_import(
+            module,
+            "wasi:filesystem/preopens@0.2.0",
+            "get-directories",
+            unreachable_stub,
+        )?;
+    }
+
     Ok(())
 }
 
-fn stub_cli(module: &mut Module) -> Result<()> {
-    stub_import(
-        module,
-        "wasi:cli/environment@0.2.0",
-        "get-environment",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:cli/environment@0.2.0",
-        "get-arguments",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:cli/environment@0.2.0",
-        "initial-cwd",
-        unreachable_stub,
-    )?;
-    stub_import(module, "wasi:cli/exit@0.2.0", "exit", unreachable_stub)?;
-    stub_import(
-        module,
-        "wasi:cli/terminal-stdin@0.2.0",
-        "get-terminal-stdin",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:cli/terminal-stdout@0.2.0",
-        "get-terminal-stdout",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:cli/terminal-stderr@0.2.0",
-        "get-terminal-stderr",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:cli/terminal-input@0.2.0",
-        "[resource-drop]terminal-input",
-        unreachable_stub,
-    )?;
-    stub_import(
-        module,
-        "wasi:cli/terminal-output@0.2.0",
-        "[resource-drop]terminal-output",
-        unreachable_stub,
-    )?;
+fn stub_cli(module: &mut Module, world_imports: &HashSet<String>) -> Result<()> {
+    if !world_imports.contains("wasi:cli/environment@0.2.0") {
+        stub_import(
+            module,
+            "wasi:cli/environment@0.2.0",
+            "get-environment",
+            unreachable_stub,
+        )?;
+
+        stub_import(
+            module,
+            "wasi:cli/environment@0.2.0",
+            "get-arguments",
+            unreachable_stub,
+        )?;
+        stub_import(
+            module,
+            "wasi:cli/environment@0.2.0",
+            "initial-cwd",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:cli/exit@0.2.0") {
+        stub_import(module, "wasi:cli/exit@0.2.0", "exit", unreachable_stub)?;
+    }
+
+    if !world_imports.contains("wasi:cli/terminal-stdin@0.2.0") {
+        stub_import(
+            module,
+            "wasi:cli/terminal-stdin@0.2.0",
+            "get-terminal-stdin",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:cli/terminal-stdout@0.2.0") {
+        stub_import(
+            module,
+            "wasi:cli/terminal-stdout@0.2.0",
+            "get-terminal-stdout",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:cli/terminal-stderr@0.2.0") {
+        stub_import(
+            module,
+            "wasi:cli/terminal-stderr@0.2.0",
+            "get-terminal-stderr",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:cli/terminal-input@0.2.0") {
+        stub_import(
+            module,
+            "wasi:cli/terminal-input@0.2.0",
+            "[resource-drop]terminal-input",
+            unreachable_stub,
+        )?;
+    }
+
+    if !world_imports.contains("wasi:cli/terminal-output@0.2.0") {
+        stub_import(
+            module,
+            "wasi:cli/terminal-output@0.2.0",
+            "[resource-drop]terminal-output",
+            unreachable_stub,
+        )?;
+    }
+
     Ok(())
 }
