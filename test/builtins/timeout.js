@@ -6,12 +6,10 @@ export const source = `
     console.log(Date.now());
     setTimeout(() => {
       console.log(Date.now());
-      console.log('done');
       done = true;
     }, 100);
   }
   export function ready () {
-    console.log('ready');
     return done;
   }
 `;
