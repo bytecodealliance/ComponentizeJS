@@ -30,8 +30,7 @@ jobs:
 
     - name: Install Rust Toolchain
       run: |
-        rustup toolchain install stable
-        rustup target add wasm32-unknown-unknown --toolchain stable
+        rustup toolchain install 1.77.1
         rustup target add wasm32-wasi --toolchain 1.77.1
 
     - uses: actions/setup-node@v2
