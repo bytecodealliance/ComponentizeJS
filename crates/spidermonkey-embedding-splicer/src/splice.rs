@@ -1,14 +1,9 @@
 use walrus::{
-    ir::{
-        BinaryOp, Binop, Const, Instr, LoadKind, LocalGet, LocalSet, LocalTee, MemArg, Store,
-        StoreKind, UnaryOp, Unop, Value,
-    },
+    ir::{BinaryOp, Binop, Const, Instr, LoadKind, MemArg, Store, StoreKind, UnaryOp, Unop, Value},
     ExportId, ExportItem, FunctionBuilder, FunctionId, LocalId, ValType,
 };
 
 use crate::*;
-
-const DEBUG: bool = false;
 
 //
 // Parses the Spidermonkey binary into section data for reserialization
@@ -39,10 +34,7 @@ pub fn splice(
     exports: Vec<(String, CoreFn)>,
     debug: bool,
 ) -> Result<Vec<u8>> {
-    let mut config = walrus::ModuleConfig::new();
-    if debug {
-        config.generate_dwarf(true);
-    }
+    let config = walrus::ModuleConfig::new();
     let mut module = config.parse(&engine)?;
 
     // since StarlingMonkey implements CLI Run and incoming handler,
@@ -76,7 +68,7 @@ pub fn splice(
     // extract the native instructions from sample functions
     // then inline the imported functions and main import gating function
     // (erasing sample functions in the process)
-    synthesize_import_functions(&mut module, &imports)?;
+    synthesize_import_functions(&mut module, &imports, debug)?;
 
     // create the exported functions as wrappers around the "cabi_call" function
     synthesize_export_functions(&mut module, &exports)?;
@@ -94,6 +86,7 @@ fn get_export_fid(module: &walrus::Module, expt_id: &ExportId) -> FunctionId {
 fn synthesize_import_functions(
     module: &mut walrus::Module,
     imports: &Vec<(String, String, CoreFn, Option<i32>)>,
+    debug: bool,
 ) -> Result<()> {
     let mut coreabi_get_import: Option<ExportId> = None;
     let mut cabi_realloc: Option<ExportId> = None;
@@ -116,8 +109,26 @@ fn synthesize_import_functions(
 
     let cabi_realloc_fid = get_export_fid(module, &cabi_realloc.unwrap());
 
-    let coreabi_sample_fid = get_export_fid(module, coreabi_sample_ids.first().unwrap());
-    let coreabi_sample_i32 = module.funcs.get(coreabi_sample_fid).kind.unwrap_local();
+    let coreabi_sample_i32 = module
+        .funcs
+        .get(get_export_fid(module, &coreabi_sample_ids[0]))
+        .kind
+        .unwrap_local();
+    let _coreabi_sample_i64 = module
+        .funcs
+        .get(get_export_fid(module, &coreabi_sample_ids[1]))
+        .kind
+        .unwrap_local();
+    let _coreabi_sample_f32 = module
+        .funcs
+        .get(get_export_fid(module, &coreabi_sample_ids[2]))
+        .kind
+        .unwrap_local();
+    let _coreabi_sample_f64 = module
+        .funcs
+        .get(get_export_fid(module, &coreabi_sample_ids[3]))
+        .kind
+        .unwrap_local();
 
     // These functions retrieve the corresponding type
     // from a JS::HandleValue
@@ -179,7 +190,7 @@ fn synthesize_import_functions(
         let tmp_local = module.locals.add(ValType::I64);
 
         for (impt_specifier, impt_name, impt_sig, retptr_size) in imports.iter() {
-            if DEBUG {
+            if debug {
                 println!(
                     "> IMPORT {} {} > {:?}",
                     impt_specifier, impt_name, &impt_sig
@@ -225,55 +236,6 @@ fn synthesize_import_functions(
             );
 
             let mut func_body = func.func_body();
-
-            // copy the prelude instructions from the sample function (first block)
-            let coreabi_sample_i32 = module.funcs.get(coreabi_sample_fid).kind.unwrap_local();
-            let prelude_block = &coreabi_sample_i32
-                .block(coreabi_sample_i32.entry_block())
-                .instrs[0]
-                .0;
-            let prelude_seq = match prelude_block {
-                Instr::Block(prelude_block) => prelude_block.seq,
-                _ => {
-                    eprintln!("Splicer error: unable to read prelude sequence, continuing for debug build but note binding functions will not work!");
-                    return Ok(());
-                }
-            };
-
-            let prelude_block = coreabi_sample_i32.block(prelude_seq);
-            func_body.block(None, |prelude| {
-                for (instr, _) in &prelude_block.instrs {
-                    match instr {
-                        Instr::LocalGet(LocalGet { local }) => {
-                            if local.eq(&vp_arg) {
-                                prelude.instr(instr.clone());
-                            } else {
-                                prelude.local_get(tmp_local);
-                            }
-                        }
-                        Instr::LocalSet(LocalSet { local }) => {
-                            if local.eq(&vp_arg) {
-                                prelude.instr(instr.clone());
-                            } else {
-                                prelude.local_set(tmp_local);
-                            }
-                        }
-                        Instr::LocalTee(LocalTee { local }) => {
-                            if local.eq(&vp_arg) {
-                                prelude.instr(instr.clone());
-                            } else {
-                                prelude.local_tee(tmp_local);
-                            }
-                        }
-                        Instr::BrIf(_) => {
-                            prelude.br_if(prelude.id());
-                        }
-                        _ => {
-                            prelude.instr(instr.clone());
-                        }
-                    };
-                }
-            });
 
             // stack the return arg now as it chains with the
             // args we're about to add to the stack
