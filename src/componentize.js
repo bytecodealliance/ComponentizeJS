@@ -45,6 +45,7 @@ export async function componentize(jsSource, witWorld, opts) {
     worldName,
     disableFeatures = [],
     enableFeatures = [],
+    retainFetchEvent = false
   } = opts || {};
 
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
@@ -53,7 +54,8 @@ export async function componentize(jsSource, witWorld, opts) {
     witWorld,
     maybeWindowsPath(witPath),
     worldName,
-    false
+    false,
+    retainFetchEvent
   );
 
   // we never disable a feature that is already in the target world usage

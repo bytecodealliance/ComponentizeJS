@@ -38,6 +38,7 @@ pub fn splice(
     imports: Vec<(String, String, CoreFn, Option<i32>)>,
     exports: Vec<(String, CoreFn)>,
     debug: bool,
+    retain_fetch_event: bool,
 ) -> Result<Vec<u8>> {
     let mut config = walrus::ModuleConfig::new();
     if debug {
@@ -53,13 +54,16 @@ pub fn splice(
         module.exports.delete(expt.id());
         module.funcs.delete(run);
     }
-    if let Ok(serve) = module
-        .exports
-        .get_func("wasi:http/incoming-handler@0.2.0#handle")
-    {
-        let expt = module.exports.get_exported_func(serve).unwrap();
-        module.exports.delete(expt.id());
-        module.funcs.delete(serve);
+
+    if !retain_fetch_event {
+        if let Ok(serve) = module
+            .exports
+            .get_func("wasi:http/incoming-handler@0.2.0#handle")
+        {
+            let expt = module.exports.get_exported_func(serve).unwrap();
+            module.exports.delete(expt.id());
+            module.funcs.delete(serve);
+        }
     }
 
     // we reencode the WASI world component data, so strip it out from the
@@ -79,7 +83,7 @@ pub fn splice(
     synthesize_import_functions(&mut module, &imports)?;
 
     // create the exported functions as wrappers around the "cabi_call" function
-    synthesize_export_functions(&mut module, &exports)?;
+    synthesize_export_functions(&mut module, &exports, retain_fetch_event)?;
 
     Ok(module.emit_wasm())
 }
@@ -530,6 +534,7 @@ fn synthesize_import_functions(
 fn synthesize_export_functions(
     module: &mut walrus::Module,
     exports: &Vec<(String, CoreFn)>,
+    retain_fetch_event: bool,
 ) -> Result<()> {
     let cabi_realloc = get_export_fid(
         module,
@@ -561,6 +566,9 @@ fn synthesize_export_functions(
     let arg_ptr = module.locals.add(ValType::I32);
     let ret_ptr = module.locals.add(ValType::I32);
     for (export_num, (expt_name, expt_sig)) in exports.iter().enumerate() {
+        if retain_fetch_event && expt_name == "wasi:http/incoming-handler@0.2.0#handle" {
+            continue;
+        }
         // Export function synthesis
         {
             // add the function type

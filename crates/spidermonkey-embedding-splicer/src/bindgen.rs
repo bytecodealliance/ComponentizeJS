@@ -124,7 +124,12 @@ pub struct Componentization {
     pub resource_imports: Vec<(String, String, u32)>,
 }
 
-pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Componentization {
+pub fn componentize_bindgen(
+    resolve: &Resolve,
+    id: WorldId,
+    name: &str,
+    retain_fetch_event: bool,
+) -> Componentization {
     let mut bindgen = JsBindgen {
         src: Source::default(),
         esm_bindgen: EsmBindgen::default(),
@@ -342,6 +347,7 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         "$source_mod",
         &mut bindgen.local_names,
         name,
+        retain_fetch_event,
     );
 
     let js_intrinsics = render_intrinsics(&mut bindgen.all_intrinsics, false, true);
@@ -1001,6 +1007,7 @@ impl EsmBindgen {
         imports_object: &str,
         _local_names: &mut LocalNames,
         source_name: &str,
+        retain_fetch_event: bool,
     ) {
         // TODO: bring back these validations of imports
         // including using the flattened bindings
@@ -1043,6 +1050,10 @@ impl EsmBindgen {
                 ");
         }
         for (export_name, binding) in &self.exports {
+            // If we are retaining the fetch event, then we should just let StarlingMonkey handle the event directly.
+            if retain_fetch_event && export_name == "wasi:http/incoming-handler@0.2.0" {
+                continue;
+            }
             match binding {
                 Binding::Interface(bindings) => {
                     uwrite!(output, "const ");

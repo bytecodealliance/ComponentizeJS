@@ -1,6 +1,9 @@
 use anyhow::{bail, Context, Result};
 use bindgen::BindingItem;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 mod bindgen;
 mod splice;
@@ -111,6 +114,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         wit_path: Option<String>,
         world_name: Option<String>,
         debug: bool,
+        mut retain_fetch_event: bool,
     ) -> Result<SpliceResult, String> {
         let source_name = source_name.unwrap_or("source.js".to_string());
 
@@ -131,7 +135,22 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             .map_err(|e| e.to_string())?;
 
         let mut wasm_bytes = wit_component::dummy_module(&resolve, world);
-        let componentized = bindgen::componentize_bindgen(&resolve, world, &source_name);
+        let componentized =
+            bindgen::componentize_bindgen(&resolve, world, &source_name, retain_fetch_event);
+
+        let target_world = &resolve.worlds[world];
+        let mut target_world_exports = HashSet::new();
+
+        for (key, _) in &target_world.exports {
+            target_world_exports.insert(resolve.name_world_key(key));
+        }
+
+        // Do not retain fetch event if the target world does not export the
+        // incomingHandler Interface as that would make it incompatible with the
+        // target world
+        if !target_world_exports.contains("wasi:http/incoming-handler@0.2.0") {
+            retain_fetch_event = false;
+        }
 
         // merge the engine world with the target world, retaining the engine producers
         let producers = if let Ok((
@@ -330,8 +349,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         // println!("{:?}", &imports);
         // println!("{:?}", &componentized.imports);
         // println!("{:?}", &exports);
-        let mut wasm =
-            splice::splice(engine, imports, exports, debug).map_err(|e| format!("{:?}", e))?;
+        let mut wasm = splice::splice(engine, imports, exports, debug, retain_fetch_event)
+            .map_err(|e| format!("{:?}", e))?;
 
         // add the world section to the spliced wasm
         wasm.push(section.id());
