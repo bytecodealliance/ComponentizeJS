@@ -1,6 +1,9 @@
 use anyhow::{bail, Context, Result};
 use bindgen::BindingItem;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    vec,
+};
 
 mod bindgen;
 mod splice;
@@ -110,6 +113,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         wit_source: Option<String>,
         wit_path: Option<String>,
         world_name: Option<String>,
+        guest_imports: Vec<String>,
         debug: bool,
     ) -> Result<SpliceResult, String> {
         let source_name = source_name.unwrap_or("source.js".to_string());
@@ -326,12 +330,18 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
                 Some(i32::try_from(*return_count).unwrap()),
             ));
         }
+        let mut trimmed_imports: Vec<(String, String, CoreFn, Option<i32>)> = Vec::new();
+        for (import, b, c, d) in imports {
+            // List of imports that are actually imported by the guest content
+            if guest_imports.contains(&import) {
+                trimmed_imports.push((import, b, c, d))
+            }
+        }
 
-        // println!("{:?}", &imports);
         // println!("{:?}", &componentized.imports);
         // println!("{:?}", &exports);
-        let mut wasm =
-            splice::splice(engine, imports, exports, debug).map_err(|e| format!("{:?}", e))?;
+        let mut wasm = splice::splice(engine, trimmed_imports, exports, debug)
+            .map_err(|e| format!("{:?}", e))?;
 
         // add the world section to the spliced wasm
         wasm.push(section.id());

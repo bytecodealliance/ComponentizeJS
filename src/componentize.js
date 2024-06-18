@@ -47,12 +47,26 @@ export async function componentize(jsSource, witWorld, opts) {
     enableFeatures = [],
   } = opts || {};
 
+  await lexerInit;
+  let jsImports = [];
+  try {
+    [jsImports] = parse(jsSource);
+  } catch {
+    // ignore parser errors - will show up as engine parse errors shortly
+  }
+
+  let guestImports = []
+  jsImports.map(k => {
+    guestImports.push(k.n)
+  })
+
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
     sourceName,
     await readFile(engine),
     witWorld,
     maybeWindowsPath(witPath),
     worldName,
+    guestImports,
     false
   );
 
@@ -103,13 +117,6 @@ export async function componentize(jsSource, witWorld, opts) {
   await writeFile(input, Buffer.from(wasm));
 
   // rewrite the JS source import specifiers to reference import wrappers
-  await lexerInit;
-  let jsImports = [];
-  try {
-    [jsImports] = parse(jsSource);
-  } catch {
-    // ignore parser errors - will show up as engine parse errors shortly
-  }
   let source = '',
     curIdx = 0;
   for (const jsImpt of jsImports) {
