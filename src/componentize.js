@@ -45,8 +45,9 @@ export async function componentize(jsSource, witWorld, opts) {
     worldName,
     disableFeatures = [],
     enableFeatures = [],
-    retainFetchEvent = false
   } = opts || {};
+
+  const retainFetchEvent = enableFeatures.includes('fetch-event')
 
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
     sourceName,

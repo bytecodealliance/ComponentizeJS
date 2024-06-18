@@ -130,6 +130,10 @@ Setting `disableFeatures: ['random', 'stdio', 'clocks']` will disable all featur
 
 Note that pure components **will not report errors and will instead trap**, so that this should only be enabled after very careful testing.
 
+The features that are not included by default are:
+* `'http'` - Support for sending and receiving HTTP requests, depends on `wasi:io` 
+* `'fetch-event'` - Enables using `fetchEvent` to respond to `wasi:http/incoming-handler@0.2.0#handle`. If the target world does note export `wasi:http/incoming-handler@0.2.0`, this will be ignored.
+
 Note that features explicitly imported by the target world cannot be disabled - if you target a component to a world
 that imports `wasi:clocks`, then `disableFeatures: ['clocks']` will not be supported.
 
