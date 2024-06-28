@@ -60,29 +60,14 @@ export async function componentize(jsSource, witWorld, opts) {
   const features = [];
   if (!disableFeatures.includes('stdio')) {
     features.push('stdio');
-  } else if (imports.some(([module]) => module.startsWith('wasi:cli/std') || module.startsWith('wasi:cli/terminal'))) {
-    throw new Error(
-      'Cannot disable "stdio" as it is already an import in the target world.'
-    );
   }
   if (!disableFeatures.includes('random')) {
     features.push('random');
-  } else if (imports.some(([module]) => module.startsWith('wasi:random/'))) {
-    throw new Error(
-      'Cannot disable "random" as it is already an import in the target world.'
-    );
   }
   if (!disableFeatures.includes('clocks')) {
     features.push('clocks');
-  } else if (imports.some(([module]) => module.startsWith('wasi:clocks/'))) {
-    throw new Error(
-      'Cannot disable "clocks" as it is already an import in the target world.'
-    );
   }
-  if (
-    enableFeatures.includes('http') ||
-    imports.some(([module]) => module.startsWith('wasi:http/'))
-  ) {
+  if (!disableFeatures.includes('http')) {
     features.push('http');
   }
 

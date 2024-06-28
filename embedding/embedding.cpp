@@ -70,7 +70,7 @@ extern "C"
   {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     int64_t arg1 = from_bigint64(args[1]);
-    args.rval().setBigInt(to_bigint64(cx, arg1));
+    args.rval().setBigInt(to_bigint64(cx, arg1 * 32771));
     return true;
   }
 
@@ -78,7 +78,7 @@ extern "C"
   {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     float arg2 = static_cast<float>(args[2].toDouble());
-    args.rval().setDouble(arg2);
+    args.rval().setDouble(arg2 * 32771);
     return true;
   }
 
@@ -86,7 +86,7 @@ extern "C"
   {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     double arg3 = args[3].toDouble();
-    args.rval().setDouble(arg3);
+    args.rval().setDouble(arg3 * 32771);
     return true;
   }
 
@@ -274,7 +274,6 @@ extern "C"
     }
     Runtime.free_list.clear();
     RootedValue result(Runtime.cx);
-    Runtime.engine->run_event_loop(&result);
     LOG("(post_call) end");
   }
 
