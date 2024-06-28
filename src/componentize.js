@@ -47,13 +47,16 @@ export async function componentize(jsSource, witWorld, opts) {
     enableFeatures = [],
   } = opts || {};
 
+  const retainFetchEvent = enableFeatures.includes('fetch-event')
+
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
     sourceName,
     await readFile(engine),
     witWorld,
     maybeWindowsPath(witPath),
     worldName,
-    false
+    false,
+    retainFetchEvent
   );
 
   // we never disable a feature that is already in the target world usage
