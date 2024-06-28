@@ -274,7 +274,6 @@ extern "C"
     }
     Runtime.free_list.clear();
     RootedValue result(Runtime.cx);
-    Runtime.engine->run_event_loop();
     LOG("(post_call) end");
   }
 
