@@ -5,13 +5,13 @@
   "type": "module",
   "exports": "./src/componentize.js",
   "devDependencies": {
-    "@bytecodealliance/preview2-shim": "^0.16.1",
+    "@bytecodealliance/preview2-shim": "^0.16.3",
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "1.1.1",
+    "@bytecodealliance/jco": "1.3.0",
     "@bytecodealliance/wizer": "^3.0.1",
-    "es-module-lexer": "^1.4.1"
+    "es-module-lexer": "^1.5.4"
   },
   "types": "types.d.ts",
   "scripts": {
