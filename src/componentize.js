@@ -49,8 +49,9 @@ export async function componentize(jsSource, witWorld, opts) {
 
   await lexerInit;
   let jsImports = [];
+  let jsExports = [];
   try {
-    [jsImports] = parse(jsSource);
+    [jsImports, jsExports] = parse(jsSource);
   } catch {
     // ignore parser errors - will show up as engine parse errors shortly
   }
@@ -60,6 +61,11 @@ export async function componentize(jsSource, witWorld, opts) {
     guestImports.push(k.n)
   })
 
+  let guestExports = []
+  jsExports.map(k => {
+    guestExports.push(k.n)
+  })
+
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
     sourceName,
     await readFile(engine),
@@ -67,6 +73,7 @@ export async function componentize(jsSource, witWorld, opts) {
     maybeWindowsPath(witPath),
     worldName,
     guestImports,
+    guestExports,
     false
   );
 

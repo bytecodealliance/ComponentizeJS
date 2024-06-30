@@ -114,6 +114,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         wit_path: Option<String>,
         world_name: Option<String>,
         guest_imports: Vec<String>,
+        guest_exports: Vec<String>,
         debug: bool,
     ) -> Result<SpliceResult, String> {
         let source_name = source_name.unwrap_or("source.js".to_string());
@@ -135,7 +136,13 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             .map_err(|e| e.to_string())?;
 
         let mut wasm_bytes = wit_component::dummy_module(&resolve, world);
-        let componentized = bindgen::componentize_bindgen(&resolve, world, &source_name);
+        let componentized = bindgen::componentize_bindgen(
+            &resolve,
+            world,
+            &source_name,
+            &guest_imports,
+            &guest_exports,
+        );
 
         // merge the engine world with the target world, retaining the engine producers
         let producers = if let Ok((
@@ -330,18 +337,11 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
                 Some(i32::try_from(*return_count).unwrap()),
             ));
         }
-        let mut trimmed_imports: Vec<(String, String, CoreFn, Option<i32>)> = Vec::new();
-        for (import, b, c, d) in imports {
-            // List of imports that are actually imported by the guest content
-            if guest_imports.contains(&import) {
-                trimmed_imports.push((import, b, c, d))
-            }
-        }
 
         // println!("{:?}", &componentized.imports);
         // println!("{:?}", &exports);
-        let mut wasm = splice::splice(engine, trimmed_imports, exports, debug)
-            .map_err(|e| format!("{:?}", e))?;
+        let mut wasm =
+            splice::splice(engine, imports, exports, debug).map_err(|e| format!("{:?}", e))?;
 
         // add the world section to the spliced wasm
         wasm.push(section.id());
