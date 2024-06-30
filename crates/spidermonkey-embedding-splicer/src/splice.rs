@@ -45,13 +45,16 @@ pub fn splice(
         module.exports.delete(expt.id());
         module.funcs.delete(run);
     }
-    if let Ok(serve) = module
-        .exports
-        .get_func("wasi:http/incoming-handler@0.2.0#handle")
-    {
-        let expt = module.exports.get_exported_func(serve).unwrap();
-        module.exports.delete(expt.id());
-        module.funcs.delete(serve);
+
+    if exports.iter().any(|(name, _)| name == "incoming-handler") {
+        if let Ok(serve) = module
+            .exports
+            .get_func("wasi:http/incoming-handler@0.2.0#handle")
+        {
+            let expt = module.exports.get_exported_func(serve).unwrap();
+            module.exports.delete(expt.id());
+            module.funcs.delete(serve);
+        }
     }
 
     // we reencode the WASI world component data, so strip it out from the

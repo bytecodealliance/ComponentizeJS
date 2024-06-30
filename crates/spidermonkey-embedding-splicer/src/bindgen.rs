@@ -124,7 +124,13 @@ pub struct Componentization {
     pub resource_imports: Vec<(String, String, u32)>,
 }
 
-pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Componentization {
+pub fn componentize_bindgen(
+    resolve: &Resolve,
+    id: WorldId,
+    name: &str,
+    guest_imports: &Vec<String>,
+    guest_exports: &Vec<String>,
+) -> Componentization {
     let mut bindgen = JsBindgen {
         src: Source::default(),
         esm_bindgen: EsmBindgen::default(),
@@ -147,7 +153,7 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         .local_names
         .exclude_globals(Intrinsic::get_global_names());
 
-    bindgen.imports_bindgen();
+    bindgen.imports_bindgen(&guest_imports);
 
     bindgen.exports_bindgen();
     bindgen.esm_bindgen.populate_export_aliases();
@@ -342,6 +348,7 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         "$source_mod",
         &mut bindgen.local_names,
         name,
+        &guest_exports,
     );
 
     let js_intrinsics = render_intrinsics(&mut bindgen.all_intrinsics, false, true);
@@ -451,9 +458,12 @@ impl JsBindgen<'_> {
         }
     }
 
-    fn imports_bindgen(&mut self) {
+    fn imports_bindgen(&mut self, guest_imports: &Vec<String>) {
         for (key, impt) in &self.resolve.worlds[self.world].imports {
             let import_name = self.resolve.name_world_key(key);
+            if !guest_imports.contains(&import_name) {
+                continue;
+            }
             match &impt {
                 WorldItem::Function(f) => {
                     self.import_bindgen(import_name, f, false, None);
@@ -1001,6 +1011,7 @@ impl EsmBindgen {
         imports_object: &str,
         _local_names: &mut LocalNames,
         source_name: &str,
+        guest_exports: &Vec<String>,
     ) {
         // TODO: bring back these validations of imports
         // including using the flattened bindings
@@ -1043,6 +1054,11 @@ impl EsmBindgen {
                 ");
         }
         for (export_name, binding) in &self.exports {
+            if export_name == "wasi:http/incoming-handler@0.2.0"
+                && !guest_exports.contains(&"incomingHandler".to_string())
+            {
+                continue;
+            }
             match binding {
                 Binding::Interface(bindings) => {
                     uwrite!(output, "const ");

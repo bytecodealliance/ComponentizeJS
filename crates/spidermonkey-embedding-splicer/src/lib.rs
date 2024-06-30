@@ -1,6 +1,9 @@
 use anyhow::{bail, Context, Result};
 use bindgen::BindingItem;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    vec,
+};
 
 mod bindgen;
 mod splice;
@@ -110,6 +113,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         wit_source: Option<String>,
         wit_path: Option<String>,
         world_name: Option<String>,
+        guest_imports: Vec<String>,
+        guest_exports: Vec<String>,
         debug: bool,
     ) -> Result<SpliceResult, String> {
         let source_name = source_name.unwrap_or("source.js".to_string());
@@ -131,7 +136,13 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             .map_err(|e| e.to_string())?;
 
         let mut wasm_bytes = wit_component::dummy_module(&resolve, world);
-        let componentized = bindgen::componentize_bindgen(&resolve, world, &source_name);
+        let componentized = bindgen::componentize_bindgen(
+            &resolve,
+            world,
+            &source_name,
+            &guest_imports,
+            &guest_exports,
+        );
 
         // merge the engine world with the target world, retaining the engine producers
         let producers = if let Ok((
@@ -327,7 +338,6 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             ));
         }
 
-        // println!("{:?}", &imports);
         // println!("{:?}", &componentized.imports);
         // println!("{:?}", &exports);
         let mut wasm =
