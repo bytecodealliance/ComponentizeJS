@@ -375,10 +375,23 @@ impl JsBindgen<'_> {
             let name = self.resolve.name_world_key(key);
             // TODO: figure out how to go from "run" -> wasi:cli/run@0.2.0 and
             // "incomingHandler" -> wasi:http/incomingHandler@0.2.0 and in
-            // general go from the sugared up names to explicit name
-            if !guest_exports.contains(&name) {
+            // general go from the sugared up names to explicit name. This is
+            // just to make sure some random export does not mess up the exports
+            // that a components to need to export
+            if name == "wasi:http/incoming-handler@0.2.0"
+                && !guest_exports.contains(&"incomingHandler".to_string())
+                && !guest_exports.contains(&"wasi:http/incomingHandler@0.2.0".to_string())
+            {
                 continue;
             }
+
+            if name == "wasi:cli/run@0.2.0"
+                && !guest_exports.contains(&"run".to_string())
+                && !guest_exports.contains(&"wasi:cli/run@0.2.0".to_string())
+            {
+                continue;
+            }
+
             match export {
                 WorldItem::Function(func) => {
                     let local_name = self.local_names.create_once(&func.name).to_string();
