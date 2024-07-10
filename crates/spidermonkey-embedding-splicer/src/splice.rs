@@ -38,15 +38,22 @@ pub fn splice(
     let mut module = config.parse(&engine)?;
 
     // since StarlingMonkey implements CLI Run and incoming handler,
-    // we override these in ComponentizeJS, removing them from the
-    // core function exports
-    if let Ok(run) = module.exports.get_func("wasi:cli/run@0.2.0#run") {
-        let expt = module.exports.get_exported_func(run).unwrap();
-        module.exports.delete(expt.id());
-        module.funcs.delete(run);
+    // we override them only if the guest content exports those functions
+    if exports
+        .iter()
+        .any(|(name, _)| name == "wasi:cli/run@0.2.0#run")
+    {
+        if let Ok(run) = module.exports.get_func("wasi:cli/run@0.2.0#run") {
+            let expt = module.exports.get_exported_func(run).unwrap();
+            module.exports.delete(expt.id());
+            module.funcs.delete(run);
+        }
     }
 
-    if exports.iter().any(|(name, _)| name == "incoming-handler") {
+    if exports
+        .iter()
+        .any(|(name, _)| name == "wasi:http/incoming-handler@0.2.0#handle")
+    {
         if let Ok(serve) = module
             .exports
             .get_func("wasi:http/incoming-handler@0.2.0#handle")

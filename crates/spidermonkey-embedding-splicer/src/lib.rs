@@ -113,7 +113,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         wit_source: Option<String>,
         wit_path: Option<String>,
         world_name: Option<String>,
-        guest_imports: Vec<String>,
+        mut guest_imports: Vec<String>,
         guest_exports: Vec<String>,
         debug: bool,
     ) -> Result<SpliceResult, String> {
@@ -136,13 +136,6 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             .map_err(|e| e.to_string())?;
 
         let mut wasm_bytes = wit_component::dummy_module(&resolve, world);
-        let componentized = bindgen::componentize_bindgen(
-            &resolve,
-            world,
-            &source_name,
-            &guest_imports,
-            &guest_exports,
-        );
 
         // merge the engine world with the target world, retaining the engine producers
         let producers = if let Ok((
@@ -155,6 +148,11 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             },
         )) = decode(&engine)
         {
+            // merge the imports from the engine with the imports from the guest content.
+            for (k, _) in &engine_resolve.worlds[engine_world].imports {
+                guest_imports.push(engine_resolve.name_world_key(k));
+            }
+
             // we disable the engine run and incoming handler as we recreate these exports
             // when needed, so remove these from the world before initiating the merge
             let maybe_run = engine_resolve.worlds[engine_world]
@@ -197,6 +195,14 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         } else {
             None
         };
+
+        let componentized = bindgen::componentize_bindgen(
+            &resolve,
+            world,
+            &source_name,
+            &guest_imports,
+            &guest_exports,
+        );
 
         let encoded = wit_component::metadata::encode(
             &resolve,

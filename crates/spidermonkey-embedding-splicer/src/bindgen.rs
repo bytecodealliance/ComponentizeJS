@@ -155,7 +155,7 @@ pub fn componentize_bindgen(
 
     bindgen.imports_bindgen(&guest_imports);
 
-    bindgen.exports_bindgen();
+    bindgen.exports_bindgen(&guest_exports);
     bindgen.esm_bindgen.populate_export_aliases();
 
     // consolidate import specifiers and generate wrappers
@@ -370,9 +370,15 @@ impl JsBindgen<'_> {
         return intrinsic.name().to_string();
     }
 
-    fn exports_bindgen(&mut self) {
+    fn exports_bindgen(&mut self, guest_exports: &Vec<String>) {
         for (key, export) in &self.resolve.worlds[self.world].exports {
             let name = self.resolve.name_world_key(key);
+            // TODO: figure out how to go from "run" -> wasi:cli/run@0.2.0 and
+            // "incomingHandler" -> wasi:http/incomingHandler@0.2.0 and in
+            // general go from the sugared up names to explicit name
+            if !guest_exports.contains(&name) {
+                continue;
+            }
             match export {
                 WorldItem::Function(func) => {
                     let local_name = self.local_names.create_once(&func.name).to_string();
