@@ -348,7 +348,6 @@ pub fn componentize_bindgen(
         "$source_mod",
         &mut bindgen.local_names,
         name,
-        &guest_exports,
     );
 
     let js_intrinsics = render_intrinsics(&mut bindgen.all_intrinsics, false, true);
@@ -373,23 +372,33 @@ impl JsBindgen<'_> {
     fn exports_bindgen(&mut self, guest_exports: &Vec<String>) {
         for (key, export) in &self.resolve.worlds[self.world].exports {
             let name = self.resolve.name_world_key(key);
-            // TODO: figure out how to go from "run" -> wasi:cli/run@0.2.0 and
-            // "incomingHandler" -> wasi:http/incomingHandler@0.2.0 and in
-            // general go from the sugared up names to explicit name. This is
-            // just to make sure some random export does not mess up the exports
-            // that a components to need to export
-            if name == "wasi:http/incoming-handler@0.2.0"
-                && !guest_exports.contains(&"incomingHandler".to_string())
-                && !guest_exports.contains(&"wasi:http/incomingHandler@0.2.0".to_string())
-            {
-                continue;
-            }
 
-            if name == "wasi:cli/run@0.2.0"
-                && !guest_exports.contains(&"run".to_string())
-                && !guest_exports.contains(&"wasi:cli/run@0.2.0".to_string())
-            {
-                continue;
+            // Do not generate exports when the guest export is not implemented.
+            // We check both the full interface name - "ns:pkg@v/my-interface" and the
+            // aliased interface name "myInterface". All other names are always
+            // camel-case in the check.
+            match key {
+                WorldKey::Interface(iface) => {
+                    if !guest_exports.contains(&name) {
+                        let iface = &self.resolve.interfaces[*iface];
+                        if let Some(name) = iface.name.as_ref() {
+                            let camel_case_name = name.to_lower_camel_case();
+                            if !guest_exports.contains(&camel_case_name) {
+                                continue;
+                            }
+                            // TODO: move populate_export_aliases to a preprocessing
+                            // step that doesn't require esm_bindgen, so that we can
+                            // do alias deduping here as well.
+                        } else {
+                            continue;
+                        }
+                    }
+                }
+                WorldKey::Name(export_name) => {
+                    if !guest_exports.contains(&export_name.to_lower_camel_case()) {
+                        continue;
+                    }
+                }
             }
 
             match export {
@@ -1030,7 +1039,6 @@ impl EsmBindgen {
         imports_object: &str,
         _local_names: &mut LocalNames,
         source_name: &str,
-        guest_exports: &Vec<String>,
     ) {
         // TODO: bring back these validations of imports
         // including using the flattened bindings
@@ -1073,11 +1081,6 @@ impl EsmBindgen {
                 ");
         }
         for (export_name, binding) in &self.exports {
-            if export_name == "wasi:http/incoming-handler@0.2.0"
-                && !guest_exports.contains(&"incomingHandler".to_string())
-            {
-                continue;
-            }
             match binding {
                 Binding::Interface(bindings) => {
                     uwrite!(output, "const ");
