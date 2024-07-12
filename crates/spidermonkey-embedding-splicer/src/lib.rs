@@ -345,6 +345,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         }
 
         // println!("{:?}", &componentized.imports);
+        // println!("{:?}", &componentized.resource_imports);
         // println!("{:?}", &exports);
         let mut wasm =
             splice::splice(engine, imports, exports, debug).map_err(|e| format!("{:?}", e))?;

@@ -334,5 +334,6 @@ export async function componentize(jsSource, witWorld, opts) {
   return {
     component,
     imports,
+    exports: exports.map(([name]) => name)
   };
 }

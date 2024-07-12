@@ -1,7 +1,3 @@
-import { y } from 'imports';
-
-export const exports = {
-  hello () {
+export function unusedHello () {
     return 'world (' + getNum('world') + ')';
-  }
-};
+}

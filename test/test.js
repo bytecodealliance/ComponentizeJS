@@ -17,7 +17,7 @@ suite('Builtins', () => {
         disableFeatures,
       } = await import(`./builtins/${filename}`);
 
-      const { component, imports } = await componentize(
+      const { component } = await componentize(
         source,
         `
         package local:runworld;
@@ -141,14 +141,16 @@ suite('Bindings', () => {
 
       const test = await import(`./cases/${name}/test.js`);
 
+      let testArg;
       try {
-        const { component, imports } = await componentize(source, {
+        const { component, imports, exports } = await componentize(source, {
           sourceName: `${name}.js`,
           witWorld,
           witPath,
           worldName,
-          disableFeatures: isWasiTarget ? [] : ['random', 'clocks']
+          disableFeatures: isWasiTarget ? [] : ['random', 'clocks', 'http', 'stdio']
         });
+        testArg = { imports, exports };
 
         const map = {
           'wasi:cli-base/*': '@bytecodealliance/preview2-shim/cli-base#*',
@@ -200,7 +202,7 @@ suite('Bindings', () => {
         }
         throw e;
       }
-      await test.test(instance);
+      await test.test(instance, testArg);
     });
   }
 });
