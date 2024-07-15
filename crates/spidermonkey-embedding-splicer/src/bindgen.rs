@@ -1,4 +1,5 @@
 use crate::{uwrite, uwriteln};
+use anyhow::{bail, Result};
 use heck::*;
 use js_component_bindgen::function_bindgen::{
     ErrHandling, FunctionBindgen, ResourceData, ResourceMap, ResourceTable,
@@ -124,7 +125,13 @@ pub struct Componentization {
     pub resource_imports: Vec<(String, String, u32)>,
 }
 
-pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Componentization {
+pub fn componentize_bindgen(
+    resolve: &Resolve,
+    id: WorldId,
+    name: &str,
+    guest_imports: &Vec<String>,
+    guest_exports: &Vec<String>,
+) -> Result<Componentization> {
     let mut bindgen = JsBindgen {
         src: Source::default(),
         esm_bindgen: EsmBindgen::default(),
@@ -147,9 +154,9 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
         .local_names
         .exclude_globals(Intrinsic::get_global_names());
 
-    bindgen.imports_bindgen();
+    bindgen.imports_bindgen(&guest_imports);
 
-    bindgen.exports_bindgen();
+    bindgen.exports_bindgen(&guest_exports)?;
     bindgen.esm_bindgen.populate_export_aliases();
 
     // consolidate import specifiers and generate wrappers
@@ -348,13 +355,13 @@ pub fn componentize_bindgen(resolve: &Resolve, id: WorldId, name: &str) -> Compo
     output.push_str(&js_intrinsics);
     output.push_str(&bindgen.src);
 
-    Componentization {
+    Ok(Componentization {
         js_bindings: output.to_string(),
         exports: bindgen.exports,
         imports: bindgen.imports,
         import_wrappers,
         resource_imports,
-    }
+    })
 }
 
 impl JsBindgen<'_> {
@@ -363,9 +370,39 @@ impl JsBindgen<'_> {
         return intrinsic.name().to_string();
     }
 
-    fn exports_bindgen(&mut self) {
+    fn exports_bindgen(&mut self, guest_exports: &Vec<String>) -> Result<()> {
         for (key, export) in &self.resolve.worlds[self.world].exports {
             let name = self.resolve.name_world_key(key);
+
+            // Do not generate exports when the guest export is not implemented.
+            // We check both the full interface name - "ns:pkg@v/my-interface" and the
+            // aliased interface name "myInterface". All other names are always
+            // camel-case in the check.
+            match key {
+                WorldKey::Interface(iface) => {
+                    if !guest_exports.contains(&name) {
+                        let iface = &self.resolve.interfaces[*iface];
+                        if let Some(name) = iface.name.as_ref() {
+                            let camel_case_name = name.to_lower_camel_case();
+                            if !guest_exports.contains(&camel_case_name) {
+                                bail!("Expected a JS export definition for '{}'", camel_case_name);
+                            }
+                            // TODO: move populate_export_aliases to a preprocessing
+                            // step that doesn't require esm_bindgen, so that we can
+                            // do alias deduping here as well.
+                        } else {
+                            continue;
+                        }
+                    }
+                }
+                WorldKey::Name(export_name) => {
+                    let camel_case_name = export_name.to_lower_camel_case();
+                    if !guest_exports.contains(&camel_case_name) {
+                        bail!("Expected a JS export definition for '{}'", camel_case_name);
+                    }
+                }
+            }
+
             match export {
                 WorldItem::Function(func) => {
                     let local_name = self.local_names.create_once(&func.name).to_string();
@@ -449,11 +486,15 @@ impl JsBindgen<'_> {
                 WorldItem::Type(_) => {}
             }
         }
+        Ok(())
     }
 
-    fn imports_bindgen(&mut self) {
+    fn imports_bindgen(&mut self, guest_imports: &Vec<String>) {
         for (key, impt) in &self.resolve.worlds[self.world].imports {
             let import_name = self.resolve.name_world_key(key);
+            if !guest_imports.contains(&import_name) {
+                continue;
+            }
             match &impt {
                 WorldItem::Function(f) => {
                     self.import_bindgen(import_name, f, false, None);

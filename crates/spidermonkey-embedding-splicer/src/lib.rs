@@ -1,6 +1,9 @@
 use anyhow::{bail, Context, Result};
 use bindgen::BindingItem;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    vec,
+};
 
 mod bindgen;
 mod splice;
@@ -110,6 +113,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         wit_source: Option<String>,
         wit_path: Option<String>,
         world_name: Option<String>,
+        mut guest_imports: Vec<String>,
+        guest_exports: Vec<String>,
         debug: bool,
     ) -> Result<SpliceResult, String> {
         let source_name = source_name.unwrap_or("source.js".to_string());
@@ -131,7 +136,6 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             .map_err(|e| e.to_string())?;
 
         let mut wasm_bytes = wit_component::dummy_module(&resolve, world);
-        let componentized = bindgen::componentize_bindgen(&resolve, world, &source_name);
 
         // merge the engine world with the target world, retaining the engine producers
         let producers = if let Ok((
@@ -144,6 +148,11 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             },
         )) = decode(&engine)
         {
+            // merge the imports from the engine with the imports from the guest content
+            for (k, _) in &engine_resolve.worlds[engine_world].imports {
+                guest_imports.push(engine_resolve.name_world_key(k));
+            }
+
             // we disable the engine run and incoming handler as we recreate these exports
             // when needed, so remove these from the world before initiating the merge
             let maybe_run = engine_resolve.worlds[engine_world]
@@ -174,18 +183,28 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             resolve
                 .merge(engine_resolve)
                 .expect("unable to merge with engine world");
-            let (engine_world, _) = resolve
-                .worlds
-                .iter()
-                .find(|(world, _)| resolve.worlds[*world].name == "root")
-                .unwrap();
-            resolve
-                .merge_worlds(engine_world, world)
-                .expect("unable to merge with engine world");
             producers
         } else {
             None
         };
+
+        let componentized = bindgen::componentize_bindgen(
+            &resolve,
+            world,
+            &source_name,
+            &guest_imports,
+            &guest_exports,
+        )
+        .map_err(|err| err.to_string())?;
+
+        let (engine_world, _) = resolve
+            .worlds
+            .iter()
+            .find(|(world, _)| resolve.worlds[*world].name == "root")
+            .unwrap();
+        resolve
+            .merge_worlds(engine_world, world)
+            .expect("unable to merge with engine world");
 
         let encoded = wit_component::metadata::encode(
             &resolve,
@@ -327,8 +346,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             ));
         }
 
-        // println!("{:?}", &imports);
         // println!("{:?}", &componentized.imports);
+        // println!("{:?}", &componentized.resource_imports);
         // println!("{:?}", &exports);
         let mut wasm =
             splice::splice(engine, imports, exports, debug).map_err(|e| format!("{:?}", e))?;

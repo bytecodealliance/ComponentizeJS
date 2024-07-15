@@ -1,3 +1,3 @@
 export function y () {
-  // console.log('y');
+  globalThis.y = true;
 }

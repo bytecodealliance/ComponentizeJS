@@ -47,12 +47,33 @@ export async function componentize(jsSource, witWorld, opts) {
     enableFeatures = [],
   } = opts || {};
 
+  await lexerInit;
+  let jsImports = [];
+  let jsExports = [];
+  try {
+    [jsImports, jsExports] = parse(jsSource);
+  } catch {
+    // ignore parser errors - will show up as engine parse errors shortly
+  }
+
+  let guestImports = [];
+  jsImports.map((k) => {
+    guestImports.push(k.n);
+  });
+
+  let guestExports = [];
+  jsExports.map((k) => {
+    guestExports.push(k.n);
+  });
+
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
     sourceName,
     await readFile(engine),
     witWorld,
     maybeWindowsPath(witPath),
     worldName,
+    guestImports,
+    guestExports,
     false
   );
 
@@ -103,13 +124,6 @@ export async function componentize(jsSource, witWorld, opts) {
   await writeFile(input, Buffer.from(wasm));
 
   // rewrite the JS source import specifiers to reference import wrappers
-  await lexerInit;
-  let jsImports = [];
-  try {
-    [jsImports] = parse(jsSource);
-  } catch {
-    // ignore parser errors - will show up as engine parse errors shortly
-  }
   let source = '',
     curIdx = 0;
   for (const jsImpt of jsImports) {
@@ -183,7 +197,9 @@ export async function componentize(jsSource, witWorld, opts) {
       {
         stdio: [null, stdout, stderr],
         env,
-        input: maybeWindowsPath(join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')),
+        input: maybeWindowsPath(
+          join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')
+        ),
         shell: true,
         encoding: 'utf-8',
       }
@@ -299,9 +315,13 @@ export async function componentize(jsSource, witWorld, opts) {
   }
 
   // after wizering, stub out the wasi imports depending on what features are enabled
-  const finalBin = stubWasi(bin, features, witWorld,
+  const finalBin = stubWasi(
+    bin,
+    features,
+    witWorld,
     maybeWindowsPath(witPath),
-    worldName,);
+    worldName
+  );
 
   const component = await metadataAdd(
     await componentNew(
