@@ -1,4 +1,5 @@
 use crate::{uwrite, uwriteln};
+use anyhow::{bail, Result};
 use heck::*;
 use js_component_bindgen::function_bindgen::{
     ErrHandling, FunctionBindgen, ResourceData, ResourceMap, ResourceTable,
@@ -130,7 +131,7 @@ pub fn componentize_bindgen(
     name: &str,
     guest_imports: &Vec<String>,
     guest_exports: &Vec<String>,
-) -> Componentization {
+) -> Result<Componentization> {
     let mut bindgen = JsBindgen {
         src: Source::default(),
         esm_bindgen: EsmBindgen::default(),
@@ -155,7 +156,7 @@ pub fn componentize_bindgen(
 
     bindgen.imports_bindgen(&guest_imports);
 
-    bindgen.exports_bindgen(&guest_exports);
+    bindgen.exports_bindgen(&guest_exports)?;
     bindgen.esm_bindgen.populate_export_aliases();
 
     // consolidate import specifiers and generate wrappers
@@ -354,13 +355,13 @@ pub fn componentize_bindgen(
     output.push_str(&js_intrinsics);
     output.push_str(&bindgen.src);
 
-    Componentization {
+    Ok(Componentization {
         js_bindings: output.to_string(),
         exports: bindgen.exports,
         imports: bindgen.imports,
         import_wrappers,
         resource_imports,
-    }
+    })
 }
 
 impl JsBindgen<'_> {
@@ -369,7 +370,7 @@ impl JsBindgen<'_> {
         return intrinsic.name().to_string();
     }
 
-    fn exports_bindgen(&mut self, guest_exports: &Vec<String>) {
+    fn exports_bindgen(&mut self, guest_exports: &Vec<String>) -> Result<()> {
         for (key, export) in &self.resolve.worlds[self.world].exports {
             let name = self.resolve.name_world_key(key);
 
@@ -384,7 +385,7 @@ impl JsBindgen<'_> {
                         if let Some(name) = iface.name.as_ref() {
                             let camel_case_name = name.to_lower_camel_case();
                             if !guest_exports.contains(&camel_case_name) {
-                                continue;
+                                bail!("Expected a JS export definition for '{}'", camel_case_name);
                             }
                             // TODO: move populate_export_aliases to a preprocessing
                             // step that doesn't require esm_bindgen, so that we can
@@ -397,7 +398,7 @@ impl JsBindgen<'_> {
                 WorldKey::Name(export_name) => {
                     let camel_case_name = export_name.to_lower_camel_case();
                     if !guest_exports.contains(&camel_case_name) {
-                        continue;
+                        bail!("Expected a JS export definition for '{}'", camel_case_name);
                     }
                 }
             }
@@ -485,6 +486,7 @@ impl JsBindgen<'_> {
                 WorldItem::Type(_) => {}
             }
         }
+        Ok(())
     }
 
     fn imports_bindgen(&mut self, guest_imports: &Vec<String>) {

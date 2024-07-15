@@ -194,7 +194,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             &source_name,
             &guest_imports,
             &guest_exports,
-        );
+        )
+        .map_err(|err| err.to_string())?;
 
         let (engine_world, _) = resolve
             .worlds
