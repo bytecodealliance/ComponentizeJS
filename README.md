@@ -144,6 +144,7 @@ export function componentize(jsSource: string, opts: {
   engine?: string,
   preview2Adapter?: string,
   disableFeatures?: ('stdio' | 'random' | 'clocks')[],
+  enableFeatures?: ('http')[],
 }): {
   component: Uint8Array,
   imports: string[]
