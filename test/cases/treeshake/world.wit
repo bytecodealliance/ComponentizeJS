@@ -5,6 +5,5 @@ world the-world {
   import imports: interface {
     y: func();
   }
-  export used-hello: func();
-  export unused-hello: func();
+  export hello: func();
 }

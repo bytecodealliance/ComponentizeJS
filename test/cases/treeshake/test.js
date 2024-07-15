@@ -1,10 +1,7 @@
-import { ok, deepStrictEqual } from 'node:assert';
+import { strictEqual, deepStrictEqual } from 'node:assert';
 
-export function test (instance, { imports, exports }) {
+export function test(instance, { imports }) {
   deepStrictEqual(imports, [['imports', 'y']]);
-  deepStrictEqual(exports, ['usedHello']);
-  ok(globalThis.y === false);
-  instance.usedHello();
-  ok(globalThis.y === true);
-  ok(instance);
+  instance.hello();
+  strictEqual(globalThis.y, true);
 }

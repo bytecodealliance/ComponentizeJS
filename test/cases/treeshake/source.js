@@ -1,5 +1,5 @@
 import * as imports from 'imports';
 
-export function usedHello () {
+export function hello () {
     imports.y();
 }

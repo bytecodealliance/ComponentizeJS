@@ -152,6 +152,9 @@ export function componentize(jsSource: string, opts: {
 
 Converts a JS source into a component binary.
 
+Imports provides the list of used guest imports only, while the StarlingMonkey engine may pull in additional
+imports. Direct component analysis should be used to correctly infer the real imports list.
+
 ## Contributing
 
 ### Pre-requisites

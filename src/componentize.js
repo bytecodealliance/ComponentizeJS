@@ -47,7 +47,6 @@ export async function componentize(jsSource, witWorld, opts) {
     enableFeatures = [],
   } = opts || {};
 
-
   await lexerInit;
   let jsImports = [];
   let jsExports = [];
@@ -58,12 +57,12 @@ export async function componentize(jsSource, witWorld, opts) {
   }
 
   let guestImports = [];
-  jsImports.map(k => {
+  jsImports.map((k) => {
     guestImports.push(k.n);
   });
 
   let guestExports = [];
-  jsExports.map(k => {
+  jsExports.map((k) => {
     guestExports.push(k.n);
   });
 
@@ -198,7 +197,9 @@ export async function componentize(jsSource, witWorld, opts) {
       {
         stdio: [null, stdout, stderr],
         env,
-        input: maybeWindowsPath(join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')),
+        input: maybeWindowsPath(
+          join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')
+        ),
         shell: true,
         encoding: 'utf-8',
       }
@@ -314,9 +315,13 @@ export async function componentize(jsSource, witWorld, opts) {
   }
 
   // after wizering, stub out the wasi imports depending on what features are enabled
-  const finalBin = stubWasi(bin, features, witWorld,
+  const finalBin = stubWasi(
+    bin,
+    features,
+    witWorld,
     maybeWindowsPath(witPath),
-    worldName,);
+    worldName
+  );
 
   const component = await metadataAdd(
     await componentNew(
@@ -335,6 +340,5 @@ export async function componentize(jsSource, witWorld, opts) {
   return {
     component,
     imports,
-    exports: exports.map(([name]) => name.slice(7))
   };
 }
