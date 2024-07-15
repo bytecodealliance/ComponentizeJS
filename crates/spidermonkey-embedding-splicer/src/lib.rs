@@ -148,7 +148,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             },
         )) = decode(&engine)
         {
-            // merge the imports from the engine with the imports from the guest content.
+            // merge the imports from the engine with the imports from the guest content
             for (k, _) in &engine_resolve.worlds[engine_world].imports {
                 guest_imports.push(engine_resolve.name_world_key(k));
             }
@@ -183,14 +183,6 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             resolve
                 .merge(engine_resolve)
                 .expect("unable to merge with engine world");
-            let (engine_world, _) = resolve
-                .worlds
-                .iter()
-                .find(|(world, _)| resolve.worlds[*world].name == "root")
-                .unwrap();
-            resolve
-                .merge_worlds(engine_world, world)
-                .expect("unable to merge with engine world");
             producers
         } else {
             None
@@ -203,6 +195,15 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             &guest_imports,
             &guest_exports,
         );
+
+        let (engine_world, _) = resolve
+            .worlds
+            .iter()
+            .find(|(world, _)| resolve.worlds[*world].name == "root")
+            .unwrap();
+        resolve
+            .merge_worlds(engine_world, world)
+            .expect("unable to merge with engine world");
 
         let encoded = wit_component::metadata::encode(
             &resolve,

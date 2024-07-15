@@ -395,7 +395,8 @@ impl JsBindgen<'_> {
                     }
                 }
                 WorldKey::Name(export_name) => {
-                    if !guest_exports.contains(&export_name.to_lower_camel_case()) {
+                    let camel_case_name = export_name.to_lower_camel_case();
+                    if !guest_exports.contains(&camel_case_name) {
                         continue;
                     }
                 }

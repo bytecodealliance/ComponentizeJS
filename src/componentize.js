@@ -47,6 +47,7 @@ export async function componentize(jsSource, witWorld, opts) {
     enableFeatures = [],
   } = opts || {};
 
+
   await lexerInit;
   let jsImports = [];
   let jsExports = [];
@@ -56,15 +57,15 @@ export async function componentize(jsSource, witWorld, opts) {
     // ignore parser errors - will show up as engine parse errors shortly
   }
 
-  let guestImports = []
+  let guestImports = [];
   jsImports.map(k => {
-    guestImports.push(k.n)
-  })
+    guestImports.push(k.n);
+  });
 
-  let guestExports = []
+  let guestExports = [];
   jsExports.map(k => {
-    guestExports.push(k.n)
-  })
+    guestExports.push(k.n);
+  });
 
   let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
     sourceName,
@@ -334,6 +335,6 @@ export async function componentize(jsSource, witWorld, opts) {
   return {
     component,
     imports,
-    exports: exports.map(([name]) => name)
+    exports: exports.map(([name]) => name.slice(7))
   };
 }
