@@ -22,8 +22,20 @@ interface ComponentizeOptions {
   /**
    * Disable WASI features in the base engine
    * Disabling all features results in a pure component with no WASI dependence
+   * 
+   * - stdio: console.log(), console.error and errors are provided to stderr
+   * - random: Math.random() and crypto.randomBytes()
+   * - clocks: Date.now()
+   * 
    */
   disableFeatures?: ('stdio' | 'random' | 'clocks')[],
+  /**
+     * Enable WASI features in the base engine
+     * 
+     * - http: fetch() API
+     * 
+     */
+  enableFeatures?: ('http')[],
 }
 
 /**
@@ -45,7 +57,7 @@ interface ComponentizeOutput {
    */
   component: Uint8Array,
   /**
-   * Available component world imports to the componentized JavaScript (whether used or not)
+   * Used guest imports in JavaScript (excluding those from StarlingMonkey engine)
    */
   imports: [[string, string]][]
 }
