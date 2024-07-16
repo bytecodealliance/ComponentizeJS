@@ -30,11 +30,11 @@ interface ComponentizeOptions {
    */
   disableFeatures?: ('stdio' | 'random' | 'clocks')[],
   /**
-     * Enable WASI features in the base engine
-     * 
-     * - http: fetch() API
-     * 
-     */
+   * Enable WASI features in the base engine
+   * 
+   * - http: fetch() API
+   * 
+   */
   enableFeatures?: ('http')[],
 }
 
