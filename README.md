@@ -144,11 +144,15 @@ export function componentize(jsSource: string, opts: {
   engine?: string,
   preview2Adapter?: string,
   disableFeatures?: ('stdio' | 'random' | 'clocks')[],
+  enableFeatures?: ('http')[],
 }): {
   component: Uint8Array,
   imports: string[]
 }
 ```
+
+`http` provides support for the host APIs used by the `fetch` method and is disabled by default,
+while this API is still being developed. Contributions very welcome to improve `fetch` support.
 
 Converts a JS source into a component binary.
 

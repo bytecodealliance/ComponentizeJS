@@ -141,17 +141,19 @@ suite('Bindings', () => {
 
       const test = await import(`./cases/${name}/test.js`);
 
+      const enableFeatures = test.enableFeatures || [];
+      const disableFeatures = test.disableFeatures || (isWasiTarget ? [] : ['random', 'clocks', 'http', 'stdio']);
+
       let testArg;
       try {
-        const { component, imports, exports } = await componentize(source, {
+        const { component, imports } = await componentize(source, {
           sourceName: `${name}.js`,
           witWorld,
           witPath,
           worldName,
-          disableFeatures: isWasiTarget ? [] : ['random', 'clocks', 'http', 'stdio']
+          enableFeatures,
+          disableFeatures
         });
-        testArg = { imports, exports };
-
         const map = {
           'wasi:cli-base/*': '@bytecodealliance/preview2-shim/cli-base#*',
           'wasi:clocks/*': '@bytecodealliance/preview2-shim/clocks#*',
@@ -170,12 +172,14 @@ suite('Bindings', () => {
           map[impt] = `../../cases/${name}/${importName}.js`;
         }
 
-        const { files } = await transpile(component, {
+        const { files, imports: componentImports, exports: componentExports } = await transpile(component, {
           name,
           map,
           wasiShim: true,
           validLiftingOptimization: false,
         });
+
+        testArg = { imports, componentImports, componentExports };
 
         await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), {
           recursive: true,
