@@ -387,16 +387,16 @@ impl JsBindgen<'_> {
                 WorldKey::Interface(iface) => {
                     if !guest_exports.contains(&name) {
                         let iface = &self.resolve.interfaces[*iface];
-                        if let Some(name) = iface.name.as_ref() {
-                            let camel_case_name = name.to_lower_camel_case();
+                        if let Some(iface_name) = iface.name.as_ref() {
+                            let camel_case_name = iface_name.to_lower_camel_case();
                             if !guest_exports.contains(&camel_case_name) {
                                 // For wasi:http/incoming-handler, we treat it
                                 // as a special case as the engine already
                                 // provides the export using fetchEvent and that
                                 // can be used when an explicit export is not
                                 // defined by the guest content.
-                                if name == "incoming-handler"
-                                    || name == "wasi:http/incoming-handler@0.2.0"
+                                if iface_name == "incoming-handler"
+                                    || iface_name == "wasi:http/incoming-handler@0.2.0"
                                 {
                                     if !features.contains(&Features::Http) {
                                         bail!(
