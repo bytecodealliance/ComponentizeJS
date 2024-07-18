@@ -115,6 +115,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         world_name: Option<String>,
         mut guest_imports: Vec<String>,
         guest_exports: Vec<String>,
+        features: Vec<Features>,
         debug: bool,
     ) -> Result<SpliceResult, String> {
         let source_name = source_name.unwrap_or("source.js".to_string());
@@ -194,6 +195,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             &source_name,
             &guest_imports,
             &guest_exports,
+            features,
         )
         .map_err(|err| err.to_string())?;
 
