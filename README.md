@@ -135,7 +135,7 @@ that imports `wasi:clocks`, then `disableFeatures: ['clocks']` will not be suppo
 
 ## Using StarlingMonkey's `fetch-event`
 
-The StarlingMonkey engine provides the ability to use `fetchEvent` to handle calls to `wasi:http/incoming-handler@0.2.0#handle`. When targeting worlds that export wasi:http/incoming-handker@0.2.0 the fetch event will automatically be attached. Alternatively, to override the fetch event with a custom handler, export an explict incomingHandler or wasi:http/incoming-handler@0.2.0 object. Using the `fetchEvent` requires enabling the `http` feature. 
+The StarlingMonkey engine provides the ability to use `fetchEvent` to handle calls to `wasi:http/incoming-handler@0.2.0#handle`. When targeting worlds that export `wasi:http/incoming-handler@0.2.0` the fetch event will automatically be attached. Alternatively, to override the fetch event with a custom handler, export an explict `incomingHandler` or `'wasi:http/incoming-handler@0.2.0'` object. Using the `fetchEvent` requires enabling the `http` feature. 
 
 ## API
 

@@ -66,16 +66,6 @@ export async function componentize(jsSource, witWorld, opts) {
     guestExports.push(k.n);
   });
 
-  let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
-    sourceName,
-    await readFile(engine),
-    witWorld,
-    maybeWindowsPath(witPath),
-    worldName,
-    guestImports,
-    guestExports,
-    false
-  );
 
   // we never disable a feature that is already in the target world usage
   const features = [];
@@ -91,6 +81,19 @@ export async function componentize(jsSource, witWorld, opts) {
   if (enableFeatures.includes('http')) {
     features.push('http');
   }
+
+  let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
+    sourceName,
+    await readFile(engine),
+    witWorld,
+    maybeWindowsPath(witPath),
+    worldName,
+    guestImports,
+    guestExports,
+    features,
+    false
+  );
+
 
   if (DEBUG_BINDINGS) {
     console.log('--- JS Source ---');

@@ -1,4 +1,4 @@
-use crate::{uwrite, uwriteln};
+use crate::{uwrite, uwriteln, Features};
 use anyhow::{bail, Result};
 use heck::*;
 use js_component_bindgen::function_bindgen::{
@@ -131,6 +131,7 @@ pub fn componentize_bindgen(
     name: &str,
     guest_imports: &Vec<String>,
     guest_exports: &Vec<String>,
+    features: Vec<Features>,
 ) -> Result<Componentization> {
     let mut bindgen = JsBindgen {
         src: Source::default(),
@@ -156,7 +157,7 @@ pub fn componentize_bindgen(
 
     bindgen.imports_bindgen(&guest_imports);
 
-    bindgen.exports_bindgen(&guest_exports)?;
+    bindgen.exports_bindgen(&guest_exports, features)?;
     bindgen.esm_bindgen.populate_export_aliases();
 
     // consolidate import specifiers and generate wrappers
@@ -370,7 +371,11 @@ impl JsBindgen<'_> {
         return intrinsic.name().to_string();
     }
 
-    fn exports_bindgen(&mut self, guest_exports: &Vec<String>) -> Result<()> {
+    fn exports_bindgen(
+        &mut self,
+        guest_exports: &Vec<String>,
+        features: Vec<Features>,
+    ) -> Result<()> {
         for (key, export) in &self.resolve.worlds[self.world].exports {
             let name = self.resolve.name_world_key(key);
 
@@ -393,6 +398,12 @@ impl JsBindgen<'_> {
                                 if name == "incoming-handler"
                                     || name == "wasi:http/incoming-handler@0.2.0"
                                 {
+                                    if !features.contains(&Features::Http) {
+                                        bail!(
+                                            "JS export definition for '{}' not found. Cannot use fetchEvent because the http feature is not enabled.",
+                                            camel_case_name
+                                        )
+                                    }
                                     continue;
                                 }
                                 bail!("Expected a JS export definition for '{}'", camel_case_name);
