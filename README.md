@@ -133,6 +133,10 @@ Note that pure components **will not report errors and will instead trap**, so t
 Note that features explicitly imported by the target world cannot be disabled - if you target a component to a world
 that imports `wasi:clocks`, then `disableFeatures: ['clocks']` will not be supported.
 
+## Using StarlingMonkey's `fetch-event`
+
+The StarlingMonkey engine provides the ability to use `fetchEvent` to handle calls to `wasi:http/incoming-handler@0.2.0#handle`. When targeting worlds that export `wasi:http/incoming-handler@0.2.0`, the component will use the `fetchEvent` if the guest content does not explicitly export a `incomingHandler` or `wasi:http/incoming-handler@0.2.0` object. Using the `fetchEvent` requires enabling the `http` feature. 
+
 ## API
 
 ```ts

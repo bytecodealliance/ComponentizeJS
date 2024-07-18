@@ -385,6 +385,11 @@ impl JsBindgen<'_> {
                         if let Some(name) = iface.name.as_ref() {
                             let camel_case_name = name.to_lower_camel_case();
                             if !guest_exports.contains(&camel_case_name) {
+                                if name == "incoming-handler"
+                                    || name == "wasi:http/incoming-handler@0.2.0"
+                                {
+                                    continue;
+                                }
                                 bail!("Expected a JS export definition for '{}'", camel_case_name);
                             }
                             // TODO: move populate_export_aliases to a preprocessing
