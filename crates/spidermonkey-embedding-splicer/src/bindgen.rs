@@ -385,6 +385,11 @@ impl JsBindgen<'_> {
                         if let Some(name) = iface.name.as_ref() {
                             let camel_case_name = name.to_lower_camel_case();
                             if !guest_exports.contains(&camel_case_name) {
+                                // For wasi:http/incoming-handler, we treat it
+                                // as a special case as the engine already
+                                // provides the export using fetchEvent and that
+                                // can be used when an explicit export is not
+                                // defined by the guest content.
                                 if name == "incoming-handler"
                                     || name == "wasi:http/incoming-handler@0.2.0"
                                 {
