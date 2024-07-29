@@ -1,11 +1,6 @@
 [workspace]
 members = ["crates/spidermonkey-embedding-splicer"]
-exclude = [
-  "deps/js-compute-runtime/runtime/js-compute-runtime/rust-url",
-  "deps/js-compute-runtime/runtime/js-compute-runtime/rust-encoding",
-  "StarlingMonkey/crates/rust-encoding",
-  "StarlingMonkey/crates/rust-url"
-]
+exclude = ["StarlingMonkey/crates/rust-url"]
 resolver = "2"
 
 [workspace.package]
@@ -13,20 +8,18 @@ edition = "2021"
 version = "0.1.0"
 
 [workspace.dependencies]
-anyhow = "1.0.81"
-base64 = "0.22.0"
-bitflags = "2.5.0"
-env_logger = "0.11.3"
+anyhow = "1.0.86"
+base64 = "0.22.1"
 heck = "0.5"
-js-component-bindgen = { version = "1.1.1", no-default-features = ["transpile-bindgen"] }
+js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", rev = "3946278b4471961f2d3a6b80576097996472bc07" }
 pulldown-cmark = { version = "0.10", default-features = false }
 rand = "0.8"
 walrus = "0.20.3"
-wasm-encoder = "0.201.0"
-wasmparser = "0.201.0"
-wasmprinter = "0.201.0"
-wat = "1.201.0"
-wit-bindgen = "0.22.0"
-wit-bindgen-core = "0.22.0"
-wit-component = { version = "0.201.0", features = ["dummy-module"] }
-wit-parser = "0.201.0"
+wasm-encoder = "0.212.0"
+wasmparser = "0.212.0"
+wasmprinter = "0.212.0"
+wat = "1.212.0"
+wit-bindgen = "0.27.0"
+wit-bindgen-core = "0.27.0"
+wit-component = { version = "0.212.0", features = ["dummy-module"] }
+wit-parser = "0.212.0"

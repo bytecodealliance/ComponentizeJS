@@ -5,6 +5,8 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { strictEqual } from 'node:assert';
 
+const DEBUG_TRACING = false;
+
 const builtinsCases = await readdir(new URL('./builtins', import.meta.url));
 suite('Builtins', () => {
   for (const filename of builtinsCases) {
@@ -33,7 +35,7 @@ suite('Builtins', () => {
         }
       );
 
-      const { files } = await transpile(component, { name, wasiShim: true, tracing: false });
+      const { files } = await transpile(component, { name, wasiShim: true, tracing: DEBUG_TRACING });
 
       await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), {
         recursive: true,
@@ -177,6 +179,7 @@ suite('Bindings', () => {
           map,
           wasiShim: true,
           validLiftingOptimization: false,
+          tracing: DEBUG_TRACING
         });
 
         testArg = { imports, componentImports, componentExports };
@@ -238,7 +241,7 @@ suite('WASI', () => {
       component
     );
 
-    const { files } = await transpile(component);
+    const { files } = await transpile(component, { tracing: DEBUG_TRACING });
 
     await mkdir(new URL(`./output/wasi/interfaces`, import.meta.url), {
       recursive: true,
