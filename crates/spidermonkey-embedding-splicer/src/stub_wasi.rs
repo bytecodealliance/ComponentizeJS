@@ -9,7 +9,7 @@ use walrus::{
     Function, FunctionBuilder, FunctionId, FunctionKind, ImportKind, ImportedFunction, InitExpr,
     InstrSeqBuilder, LocalId, Module, ValType,
 };
-use wit_parser::{Resolve, UnresolvedPackage};
+use wit_parser::Resolve;
 
 use crate::{parse_wit, Features};
 
@@ -64,19 +64,17 @@ pub fn stub_wasi(
     wit_path: Option<String>,
     world_name: Option<String>,
 ) -> Result<Vec<u8>> {
-    let (resolve, id) = if let Some(wit_source) = wit_source {
+    let (resolve, ids) = if let Some(wit_source) = wit_source {
         let mut resolve = Resolve::default();
         let path = PathBuf::from("component.wit");
-        let pkg = UnresolvedPackage::parse(&path, &wit_source)?;
+        let ids = resolve.push_str(&path, &wit_source)?;
 
-        let id = resolve.push(pkg)?;
-
-        (resolve, id)
+        (resolve, ids)
     } else {
         parse_wit(&PathBuf::from(wit_path.unwrap()))?
     };
 
-    let world = resolve.select_world(id, world_name.as_deref())?;
+    let world = resolve.select_world(&ids, world_name.as_deref())?;
 
     let target_world = &resolve.worlds[world];
     let mut target_world_imports = HashSet::new();

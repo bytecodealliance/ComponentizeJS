@@ -4,8 +4,7 @@ import {
   roundtripFlag4,
   roundtripFlag8,
   roundtripFlag16,
-  roundtripFlag32,
-  roundtripFlag64
+  roundtripFlag32
 } from 'local:flags/flags';
 
 export const flags = {
@@ -26,8 +25,5 @@ export const flags = {
   },
   roundtripFlag32 (f) {
     return roundtripFlag32(f);
-  },
-  roundtripFlag64 (f) {
-    return roundtripFlag64(f);
   }
 };

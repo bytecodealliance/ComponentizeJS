@@ -16,7 +16,7 @@ use wit_component::{
     metadata::{decode, Bindgen},
     StringEncoding,
 };
-use wit_parser::{PackageId, Resolve, UnresolvedPackage};
+use wit_parser::{PackageId, Resolve};
 
 wit_bindgen::generate!({
     world: "spidermonkey-embedding-splicer",
@@ -79,9 +79,9 @@ fn map_core_fn(cfn: &bindgen::CoreFn) -> CoreFn {
     }
 }
 
-fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
+fn parse_wit(path: &Path) -> Result<(Resolve, Vec<PackageId>)> {
     let mut resolve = Resolve::default();
-    let id = if path.is_dir() {
+    let ids = if path.is_dir() {
         resolve.push_dir(&path)?.0
     } else {
         let contents =
@@ -90,10 +90,9 @@ fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
             Ok(s) => s,
             Err(_) => bail!("input file is not valid utf-8"),
         };
-        let pkg = UnresolvedPackage::parse(&path, text)?;
-        resolve.push(pkg)?
+        resolve.push_str(&path, text)?
     };
-    Ok((resolve, id))
+    Ok((resolve, ids))
 }
 
 impl Guest for SpidermonkeyEmbeddingSplicerComponent {
@@ -120,20 +119,19 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
     ) -> Result<SpliceResult, String> {
         let source_name = source_name.unwrap_or("source.js".to_string());
 
-        let (mut resolve, id) = if let Some(wit_source) = wit_source {
+        let (mut resolve, ids) = if let Some(wit_source) = wit_source {
             let mut resolve = Resolve::default();
             let path = PathBuf::from("component.wit");
-            let pkg = UnresolvedPackage::parse(&path, &wit_source).map_err(|e| e.to_string())?;
-
-            let id = resolve.push(pkg).map_err(|e| e.to_string())?;
-
-            (resolve, id)
+            let ids = resolve
+                .push_str(&path, &wit_source)
+                .map_err(|e| e.to_string())?;
+            (resolve, ids)
         } else {
             parse_wit(&PathBuf::from(wit_path.unwrap())).map_err(|e| format!("{:?}", e))?
         };
 
         let world = resolve
-            .select_world(id, world_name.as_deref())
+            .select_world(&ids, world_name.as_deref())
             .map_err(|e| e.to_string())?;
 
         let mut wasm_bytes = wit_component::dummy_module(&resolve, world);

@@ -234,7 +234,11 @@ pub fn componentize_bindgen(
     let mut finalization_registries = Vec::new();
     for (key, export) in &resolve.worlds[id].exports {
         let key_name = resolve.name_world_key(key);
-        if let WorldItem::Interface(iface_id) = export {
+        if let WorldItem::Interface {
+            id: iface_id,
+            stability: _,
+        } = export
+        {
             let iface = &resolve.interfaces[*iface_id];
             for ty_id in iface.types.values() {
                 let ty = &resolve.types[*ty_id];
@@ -277,7 +281,11 @@ pub fn componentize_bindgen(
     let mut imported_resource_modules = HashMap::new();
     for (key, import) in &resolve.worlds[id].imports {
         let key_name = resolve.name_world_key(key);
-        if let WorldItem::Interface(iface_id) = import {
+        if let WorldItem::Interface {
+            id: iface_id,
+            stability: _,
+        } = import
+        {
             let iface = &resolve.interfaces[*iface_id];
             for ty_id in iface.types.values() {
                 let ty = &resolve.types[*ty_id];
@@ -441,7 +449,7 @@ impl JsBindgen<'_> {
                         func.name.to_lower_camel_case(),
                     );
                 }
-                WorldItem::Interface(id) => {
+                WorldItem::Interface { id, stability: _ } => {
                     let iface = &self.resolve.interfaces[*id];
                     for id in iface.types.values() {
                         if let TypeDefKind::Resource = &self.resolve.types[*id].kind {
@@ -520,7 +528,10 @@ impl JsBindgen<'_> {
                 WorldItem::Function(f) => {
                     self.import_bindgen(import_name, f, false, None);
                 }
-                WorldItem::Interface(i) => {
+                WorldItem::Interface {
+                    id: i,
+                    stability: _,
+                } => {
                     let iface = &self.resolve.interfaces[*i];
                     for id in iface.types.values() {
                         if let TypeDefKind::Resource = &self.resolve.types[*id].kind {
@@ -836,7 +847,7 @@ impl JsBindgen<'_> {
             },
             src: Source::default(),
             resource_map: &resource_map,
-            cur_resource_borrows: Vec::new(),
+            cur_resource_borrows: false,
             resolve: self.resolve,
             callee_resource_dynamic: false,
         };
