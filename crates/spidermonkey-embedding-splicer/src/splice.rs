@@ -1,7 +1,6 @@
-use walrus::{
-    ir::{BinaryOp, Binop, Const, Instr, LoadKind, MemArg, Store, StoreKind, UnaryOp, Unop, Value},
-    ExportId, ExportItem, FunctionBuilder, FunctionId, LocalId, ValType,
-};
+use orca::ir::id::{ExportsID, FunctionID};
+use orca::ir::module::Module;
+use wasmparser::ExternalKind;
 
 use crate::*;
 
@@ -34,8 +33,7 @@ pub fn splice(
     exports: Vec<(String, CoreFn)>,
     debug: bool,
 ) -> Result<Vec<u8>> {
-    let config = walrus::ModuleConfig::new();
-    let mut module = config.parse(&engine)?;
+    let mut module = Module::parse(&*engine, false)?;
 
     // since StarlingMonkey implements CLI Run and incoming handler,
     // we override them only if the guest content exports those functions
@@ -43,10 +41,13 @@ pub fn splice(
         .iter()
         .any(|(name, _)| name == "wasi:cli/run@0.2.0#run")
     {
-        if let Ok(run) = module.exports.get_func("wasi:cli/run@0.2.0#run") {
-            let expt = module.exports.get_exported_func(run).unwrap();
-            module.exports.delete(expt.id());
-            module.funcs.delete(run);
+        if let Some(run) = module
+            .exports
+            .get_by_name("wasi:cli/run@0.2.0#run".to_string())
+        {
+            let expt = module.exports.get_func(run).unwrap();
+            module.exports.delete(expt.index);
+            module.delete_function(run);
         }
     }
 
@@ -56,23 +57,20 @@ pub fn splice(
     {
         if let Ok(serve) = module
             .exports
-            .get_func("wasi:http/incoming-handler@0.2.0#handle")
+            .get_by_name("wasi:http/incoming-handler@0.2.0#handle".to_string())
         {
-            let expt = module.exports.get_exported_func(serve).unwrap();
-            module.exports.delete(expt.id());
-            module.funcs.delete(serve);
+            let expt = module.exports.get_func(serve).unwrap();
+            module.exports.delete(expt.index);
+            module.delete_function(serve);
         }
     }
 
     // we reencode the WASI world component data, so strip it out from the
     // custom section
-    let maybe_component_section_id = module
-        .customs
-        .iter()
-        .find(|(_, section)| section.name() == "component-type:bindings")
-        .map(|(id, _)| id);
+    let maybe_component_section_id =
+        module.get_custom_section("component-type:bindings".to_string());
     if let Some(component_section_id) = maybe_component_section_id {
-        module.customs.delete(component_section_id);
+        module.delete_custom_section(component_section_id);
     }
 
     // extract the native instructions from sample functions
@@ -83,28 +81,30 @@ pub fn splice(
     // create the exported functions as wrappers around the "cabi_call" function
     synthesize_export_functions(&mut module, &exports)?;
 
-    Ok(module.emit_wasm())
+    Ok(module.encode())
 }
 
-fn get_export_fid(module: &walrus::Module, expt_id: &ExportId) -> FunctionId {
-    match &module.exports.get(*expt_id).item {
-        ExportItem::Function(fid) => *fid,
+fn get_export_fid(module: &Module, expt_id: &ExportsID) -> FunctionID {
+    let expt = module.exports.get_by_id(*expt_id).unwrap();
+
+    match expt.kind {
+        ExternalKind::Func => *expt_id,
         _ => panic!("Missing coreabi_get_import"),
     }
 }
 
 fn synthesize_import_functions(
-    module: &mut walrus::Module,
+    module: &mut Module,
     imports: &Vec<(String, String, CoreFn, Option<i32>)>,
     debug: bool,
 ) -> Result<()> {
-    let mut coreabi_get_import: Option<ExportId> = None;
-    let mut cabi_realloc: Option<ExportId> = None;
+    let mut coreabi_get_import: Option<ExportsID> = None;
+    let mut cabi_realloc: Option<ExportsID> = None;
 
     let mut coreabi_sample_ids = Vec::new();
     for expt in module.exports.iter() {
-        let id = expt.id();
-        match expt.name.as_str() {
+        let id = expt.index;
+        match expt.name {
             "coreabi_sample_i32" | "coreabi_sample_i64" | "coreabi_sample_f32"
             | "coreabi_sample_f64" => coreabi_sample_ids.push(id),
             "coreabi_get_import" => coreabi_get_import = Some(id),
@@ -188,7 +188,7 @@ fn synthesize_import_functions(
     //
     //     bool NativeFn(JSContext *cx, unsigned argc, JS::Value *vp)
     //
-    let mut import_fnids: Vec<FunctionId> = Vec::new();
+    let mut import_fnids: Vec<FunctionID> = Vec::new();
     {
         // synthesized native import function parameters (in order)
         let ctx_arg = coreabi_sample_i32.args[0];
@@ -471,8 +471,8 @@ fn synthesize_import_functions(
         let mut table_instr_idx = 0;
         for (idx, (instr, _)) in func_body.instrs_mut().iter_mut().enumerate() {
             if let Instr::Const(Const {
-                value: Value::I32(ref mut v),
-            }) = instr
+                                    value: Value::I32(ref mut v),
+                                }) = instr
             {
                 // we specifically need the const "around" 3393
                 // which is the coreabi_sample_i32 table offset
@@ -499,10 +499,7 @@ fn synthesize_import_functions(
     Ok(())
 }
 
-fn synthesize_export_functions(
-    module: &mut walrus::Module,
-    exports: &Vec<(String, CoreFn)>,
-) -> Result<()> {
+fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreFn)>) -> Result<()> {
     let cabi_realloc = get_export_fid(
         module,
         &module
