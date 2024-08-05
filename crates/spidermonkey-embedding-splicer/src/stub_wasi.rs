@@ -1,14 +1,12 @@
 use anyhow::{bail, Result};
+use orca::ir::id::{FunctionID, LocalID};
+use orca::Module;
 use std::{
     collections::HashSet,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
-use walrus::{
-    ir::{BinaryOp, MemArg, StoreKind, UnaryOp},
-    Function, FunctionBuilder, FunctionId, FunctionKind, ImportKind, ImportedFunction, InitExpr,
-    InstrSeqBuilder, LocalId, Module, ValType,
-};
+
 use wit_parser::Resolve;
 
 use crate::{parse_wit, Features};
@@ -18,9 +16,9 @@ fn stub_import<StubFn>(
     import: &str,
     name: &str,
     stub: StubFn,
-) -> Result<Option<FunctionId>>
+) -> Result<Option<FunctionID>>
 where
-    StubFn: Fn(&mut InstrSeqBuilder) -> Result<Vec<LocalId>>,
+    StubFn: Fn(&mut InstrSeqBuilder) -> Result<Vec<LocalID>>,
 {
     let Some(iid) = module.imports.find(import, name) else {
         return Ok(None);
@@ -52,7 +50,7 @@ where
     Ok(Some(fid))
 }
 
-fn unreachable_stub(body: &mut InstrSeqBuilder) -> Result<Vec<LocalId>> {
+fn unreachable_stub(body: &mut InstrSeqBuilder) -> Result<Vec<LocalID>> {
     body.unreachable();
     Ok(vec![])
 }
@@ -161,7 +159,7 @@ fn stub_preview1(module: &mut Module) -> Result<()> {
 
 fn stub_random(module: &mut Module) -> Result<()> {
     let memory = module.get_memory_id()?;
-    let realloc = module.exports.get_func("cabi_realloc")?;
+    let realloc = module.exports.get_func_by_name("cabi_realloc")?;
     // stubbed random implements random with a pseudorandom implementation
     // create a mutable random seed global
     let seed_val: i64 = 0;
