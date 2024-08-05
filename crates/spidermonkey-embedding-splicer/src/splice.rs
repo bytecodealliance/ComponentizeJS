@@ -1,6 +1,8 @@
 use orca::ir::function::FunctionBuilder;
 use orca::ir::id::{ExportsID, FunctionID, LocalID};
 use orca::ir::module::Module;
+use orca::ir::types::BlockType;
+use orca::{DataType, Opcode};
 use wasmparser::{ExternalKind, MemArg, Operator, ValType};
 
 use crate::*;
@@ -156,14 +158,18 @@ fn synthesize_import_functions(
     // Sets the return value on args from the stack
     let args_ret_i32: Vec<Operator> = vec![
         Operator::I64ExtendI32U,
-        Operator::I64Const { value: -545460846592 },
+        Operator::I64Const {
+            value: -545460846592,
+        },
         Operator::I64Or,
-        Operator::I64Store { memarg: MemArg {
-            align: 8,
-            max_align: 0, // TODO: What to put here?
-            offset: 0,
-            memory,
-        } },
+        Operator::I64Store {
+            memarg: MemArg {
+                align: 8,
+                max_align: 0, // TODO: What to put here?
+                offset: 0,
+                memory,
+            },
+        },
     ];
 
     // BigInt instructions are a little more involved as we need to extract
@@ -226,28 +232,25 @@ fn synthesize_import_functions(
                 if let Ok(existing) = module.imports.get_func(&impt_specifier, &impt_name) {
                     existing
                 } else {
-                    module
-                        .add_import_func(&impt_specifier, &impt_name, import_fn_type)
-                        .0
+                    module.add_import_func(&impt_specifier, &impt_name, import_fn_type)
                 };
 
             // create the native JS binding function
             let mut func = FunctionBuilder::new(
-                &mut module.types,
                 &vec![ValType::I32, ValType::I32, ValType::I32],
                 &vec![ValType::I32],
             );
 
-            let mut func_body = func.func_body();
+            // let mut func_body = func.body;
 
             // stack the return arg now as it chains with the
             // args we're about to add to the stack
             if impt_sig.ret.is_some() {
-                func_body.local_get(vp_arg);
+                func.local_get(vp_arg);
 
                 // if an i64 return, then we need to stack the extra BigInt constructor arg for that now
                 if matches!(impt_sig.ret.unwrap(), CoreTy::I64) {
-                    func_body.local_get(ctx_arg);
+                    func.local_get(ctx_arg);
                 }
             }
 
@@ -257,83 +260,67 @@ fn synthesize_import_functions(
                     break;
                 }
                 // JS args
-                func_body.local_get(vp_arg);
+                func.local_get(vp_arg);
                 // JS args offset
-                func_body.i32_const(16 + 8 * idx as i32);
-                func_body.binop(BinaryOp::I32Add);
+                func.i32_const(16 + 8 * idx as i32);
+                func.i32_add();
                 match arg {
                     CoreTy::I32 => {
-                        func_body.load(
+                        func.i64_load(MemArg {
+                            align: 8,
+                            max_align: 0, // TODO: again
+                            offset: 0,
                             memory,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 8,
-                                offset: 0,
-                            },
-                        );
-                        func_body.unop(UnaryOp::I32WrapI64);
+                        });
+                        func.i32_wrap_i64();
                     }
                     CoreTy::I64 => {
-                        func_body.call(get_export_fid(&module, &coreabi_from_bigint64));
+                        func.call(get_export_fid(&module, &coreabi_from_bigint64));
                     }
                     CoreTy::F32 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
-                        func_body.load(
+                        func.i64_load(MemArg {
+                            align: 8,
+                            max_align: 0, // TODO: again
+                            offset: 0,
                             memory,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 8,
-                                offset: 0,
-                            },
-                        );
-                        func_body.local_tee(tmp_local);
-                        func_body.i64_const(32);
-                        func_body.binop(BinaryOp::I64ShrU);
-                        func_body.i64_const(0xFFFFFF81);
-                        func_body.binop(BinaryOp::I64Eq);
-                        func_body.if_else(
-                            ValType::F32,
-                            |then| {
-                                // value is a uint32
-                                then.local_get(tmp_local);
-                                then.unop(UnaryOp::I32WrapI64);
-                                then.unop(UnaryOp::F32ConvertSI32);
-                            },
-                            |else_| {
-                                else_.local_get(tmp_local);
-                                else_.unop(UnaryOp::F64ReinterpretI64);
-                                else_.unop(UnaryOp::F32DemoteF64);
-                            },
-                        );
+                        });
+                        func.local_tee(tmp_local);
+                        func.i64_const(32);
+                        func.i64_shr_unsigned();
+                        func.i64_const(0xFFFFFF81);
+                        func.i64_eq();
+                        func.if_stmt(BlockType::Type(DataType::F32));
+                        func.local_get(tmp_local);
+                        func.i32_wrap_i64();
+                        func.f32_convert_i32s();
+                        func.else_stmt();
+                        func.local_get(tmp_local);
+                        func.f64_reinterpret_i64();
+                        func.f32_demote_f64();
+                        func.end(); // Todo: Need to add this?
                     }
                     CoreTy::F64 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
-                        func_body.load(
+                        func.i64_load(MemArg {
+                            align: 8,
+                            max_align: 0, // TODO: again
+                            offset: 0,
                             memory,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 8,
-                                offset: 0,
-                            },
-                        );
-                        func_body.local_tee(tmp_local);
-                        func_body.i64_const(32);
-                        func_body.binop(BinaryOp::I64ShrU);
-                        func_body.i64_const(0xFFFFFF81);
-                        func_body.binop(BinaryOp::I64Eq);
-                        func_body.if_else(
-                            ValType::F64,
-                            |then| {
-                                // value is a uint32
-                                then.local_get(tmp_local);
-                                then.unop(UnaryOp::I32WrapI64);
-                                then.unop(UnaryOp::F64ConvertSI32);
-                            },
-                            |else_| {
-                                else_.local_get(tmp_local);
-                                else_.unop(UnaryOp::F64ReinterpretI64);
-                            },
-                        );
+                        });
+                        func.local_tee(tmp_local);
+                        func.i64_const(32);
+                        func.i64_shr_unsigned();
+                        func.i64_const(0xFFFFFF81);
+                        func.i64_eq();
+                        func.if_stmt(BlockType::Type(DataType::F32));
+                        func.local_get(tmp_local);
+                        func.i32_wrap_i64();
+                        func.f32_convert_i32s();
+                        func.else_stmt();
+                        func.local_get(tmp_local);
+                        func.f64_reinterpret_i64();
+                        func.end();
                     }
                 };
             }
@@ -343,78 +330,72 @@ fn synthesize_import_functions(
             if impt_sig.retptr {
                 assert!(!impt_sig.ret.is_some());
                 // prepare the context arg for the return set shortly
-                func_body.local_get(vp_arg);
+                func.local_get(vp_arg);
 
                 // allocate the retptr
-                func_body.i32_const(0);
-                func_body.i32_const(0);
-                func_body.i32_const(4);
+                func.i32_const(0);
+                func.i32_const(0);
+                func.i32_const(4);
                 // Last realloc arg is byte length to allocate
-                func_body.i32_const(retptr_size.unwrap());
+                func.i32_const(retptr_size.unwrap());
 
                 // Call realloc, getting back the retptr
-                func_body.call(cabi_realloc_fid);
+                func.call(cabi_realloc_fid);
 
                 // tee the retptr into a local
-                func_body.local_tee(retptr_local);
+                func.local_tee(retptr_local);
 
                 // also set the retptr as the return value of the JS function
                 // (consumes the context arg above)
                 args_ret_i32.iter().for_each(|instr| {
-                    func_body.instr(instr.clone());
+                    func.instr(instr.clone());
                 });
 
                 // add the retptr back on the stack for the call
-                func_body.local_get(retptr_local);
+                func.local_get(retptr_local);
             }
 
             // main call to the import lowering function
-            func_body.call(import_fn_fid);
+            func.call(import_fn_fid);
 
             match impt_sig.ret {
                 None => {}
                 Some(CoreTy::I32) => args_ret_i32.iter().for_each(|instr| {
-                    func_body.instr(instr.clone());
+                    func.inject(instr.clone());
                 }),
                 Some(CoreTy::I64) => {
-                    func_body.call(get_export_fid(&module, &coreabi_to_bigint64));
-                    func_body.unop(UnaryOp::I64ExtendUI32);
-                    func_body.i64_const(-511101108224);
-                    func_body.binop(BinaryOp::I64Or);
-                    func_body.store(
+                    func.call(get_export_fid(&module, &coreabi_to_bigint64));
+                    func.i64_extend_i32u();
+                    func.i64_const(-511101108224);
+                    func.i64_or();
+                    func.i64_store(MemArg {
+                        align: 8,
+                        max_align: 0,
+                        offset: 0,
                         memory,
-                        StoreKind::I64 { atomic: false },
-                        MemArg {
-                            align: 8,
-                            offset: 0,
-                        },
-                    );
+                    })
                 }
                 Some(CoreTy::F32) => {
-                    func_body.unop(UnaryOp::F64PromoteF32);
-                    func_body.store(
+                    func.f64_promote_f32();
+                    func.f64_store(MemArg {
+                        align: 8,
+                        max_align: 0,
+                        offset: 0,
                         memory,
-                        StoreKind::F64,
-                        MemArg {
-                            align: 8,
-                            offset: 0,
-                        },
-                    );
+                    });
                 }
                 Some(CoreTy::F64) => {
-                    func_body.store(
+                    func.f64_store(MemArg {
+                        align: 8,
+                        max_align: 0,
+                        offset: 0,
                         memory,
-                        StoreKind::F64,
-                        MemArg {
-                            align: 8,
-                            offset: 0,
-                        },
-                    );
+                    });
                 }
             }
 
             // return true
-            func_body.i32_const(1);
+            func.i32_const(1);
 
             let fid = func.finish(vec![ctx_arg, argc_arg, vp_arg], &mut module.functions);
             import_fnids.push(fid);
@@ -492,10 +473,7 @@ fn synthesize_import_functions(
     Ok(())
 }
 
-fn synthesize_export_functions(
-    module: &mut Module,
-    exports: &Vec<(String, CoreFn)>,
-) -> Result<()> {
+fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreFn)>) -> Result<()> {
     let cabi_realloc = get_export_fid(
         module,
         &module
@@ -550,7 +528,7 @@ fn synthesize_export_functions(
                 })
                 .collect::<Vec<ValType>>();
 
-            let mut func = FunctionBuilder::new(&mut module.types, &params, &ret);
+            let mut func = FunctionBuilder::new(&params, &ret);
             func.name(expt_name.to_string());
             let func_body = &mut func.func_body();
             let args: Vec<LocalID> = params
@@ -596,27 +574,39 @@ fn synthesize_export_functions(
                     func_body.local_get(args[idx]);
                     match param {
                         CoreTy::I32 => {
-                            func_body.store(
+                            func.i32_store(MemArg {
+                                align: 4,
+                                max_align: 0,
+                                offset,
                                 memory,
-                                StoreKind::I32 { atomic: false },
-                                MemArg { align: 4, offset },
-                            );
+                            });
                             offset += 4;
                         }
                         CoreTy::I64 => {
-                            func_body.store(
+                            func.i64_store(MemArg {
+                                align: 8,
+                                offset,
                                 memory,
-                                StoreKind::I64 { atomic: false },
-                                MemArg { align: 8, offset },
-                            );
+                                max_align: 0,
+                            });
                             offset += 8;
                         }
                         CoreTy::F32 => {
-                            func_body.store(memory, StoreKind::F32, MemArg { align: 4, offset });
+                            func.f32_store(MemArg {
+                                align: 4,
+                                max_align: 0,
+                                offset,
+                                memory,
+                            });
                             offset += 4;
                         }
                         CoreTy::F64 => {
-                            func_body.store(memory, StoreKind::F64, MemArg { align: 8, offset });
+                            func.f64_store(MemArg {
+                                align: 8,
+                                offset,
+                                memory,
+                                max_align: 0,
+                            });
                             offset += 8;
                         }
                     }
@@ -639,51 +629,42 @@ fn synthesize_export_functions(
                 // value type from the retptr
                 match expt_sig.ret.unwrap() {
                     CoreTy::I32 => {
-                        func_body.load(
+                        func.i32_load(MemArg {
+                            align: 4,
+                            max_align: 0,
+                            offset: 0,
                             memory,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 4,
-                                offset: 0,
-                            },
-                        );
+                        });
                     }
                     CoreTy::I64 => {
-                        func_body.load(
+                        func.i64_load(MemArg {
+                            align: 8,
+                            max_align: 0,
+                            offset: 0,
                             memory,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 8,
-                                offset: 0,
-                            },
-                        );
+                        });
                     }
                     CoreTy::F32 => {
-                        func_body.load(
+                        func.f32_load(MemArg {
+                            align: 4,
+                            max_align: 0,
+                            offset: 0,
                             memory,
-                            LoadKind::F32,
-                            MemArg {
-                                align: 4,
-                                offset: 0,
-                            },
-                        );
+                        });
                     }
                     CoreTy::F64 => {
-                        func_body.load(
+                        func.f64_load(MemArg {
+                            align: 8,
+                            offset: 0,
                             memory,
-                            LoadKind::F64,
-                            MemArg {
-                                align: 8,
-                                offset: 0,
-                            },
-                        );
+                            max_align: 0,
+                        });
                     }
                 }
             }
 
             let fid = func.finish(args, &mut module.functions);
-
-            module.exports.add(&expt_name, ExportItem::Function(fid));
+            module.exports.add_export_func(&expt_name, fid);
         }
 
         // Post export function synthesis
@@ -699,7 +680,7 @@ fn synthesize_export_functions(
         } else {
             vec![]
         };
-        let mut func = FunctionBuilder::new(&mut module.types, &params, &[]);
+        let mut func = FunctionBuilder::new(&params, &[]);
         func.name(format!("post_{}", expt_name));
         let mut func_body = func.func_body();
 
@@ -710,10 +691,9 @@ fn synthesize_export_functions(
         func_body.call(post_call);
         let fid = func.finish(vec![], &mut module.functions);
 
-        module.exports.add(
-            &format!("cabi_post_{}", expt_name),
-            ExportItem::Function(fid),
-        );
+        module
+            .exports
+            .add_export_func(&format!("cabi_post_{}", expt_name), fid);
     }
 
     // remove unnecessary exports

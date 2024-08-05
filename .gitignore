@@ -11,3 +11,4 @@ example/hello.component.wasm
 /build-debug
 /build-release
 .vscode
+.idea
