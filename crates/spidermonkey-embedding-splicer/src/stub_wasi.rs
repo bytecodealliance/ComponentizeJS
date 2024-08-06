@@ -1,12 +1,15 @@
 use anyhow::{bail, Result};
+use orca::ir::function::FunctionBuilder;
 use orca::ir::id::{FunctionID, LocalID};
-use orca::Module;
+use orca::ir::module::module_functions::{FuncKind, Function, ImportedFunction};
+use orca::ir::types::{BlockType, Value};
+use orca::{DataType, InitExpr, Module, Opcode};
 use std::{
     collections::HashSet,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
-use wasmparser::MemArg;
+use wasmparser::{MemArg, TypeRef};
 
 use wit_parser::Resolve;
 
@@ -19,39 +22,43 @@ fn stub_import<StubFn>(
     stub: StubFn,
 ) -> Result<Option<FunctionID>>
 where
-    StubFn: Fn(&mut InstrSeqBuilder) -> Result<Vec<LocalID>>,
+    StubFn: Fn(&mut FunctionBuilder) -> Result<Vec<LocalID>>,
 {
-    let Some(iid) = module.imports.find(import, name) else {
+    let Some(iid) = module.imports.find(import.parse()?, Some(name.parse()?)) else {
         return Ok(None);
     };
 
-    let ImportKind::Function(fid) = module.imports.get(iid).kind else {
+    let TypeRef::Func(fid) = module.imports.get(iid).ty else {
         bail!("'{import}#{name}' is not a function.")
     };
 
     let Function {
-        kind: FunctionKind::Import(ImportedFunction { ty, .. }),
+        kind: FuncKind::Import(ImportedFunction { ty_id, .. }),
         ..
-    } = module.funcs.get(fid)
+    } = module.functions.get(fid)
     else {
         bail!("Can't find type of '{import}#{name}'")
     };
 
-    let ty = module.types.get(*ty);
-    let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
+    let ty = module.types.get(*ty_id).unwrap();
+    let (params, results) = (ty.params.to_vec(), ty.results.to_vec());
+    let id = module.functions.len();
+    let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
+    let args = stub(&mut builder)?;
 
-    let mut builder =
-        FunctionBuilder::new(&mut module.types, params.as_slice(), results.as_slice());
-    let args = stub(&mut builder.func_body())?;
-    let local_func = builder.local_func(args);
+    let ty_id = module.types.add(&*params, &*results);
+    let local_func = builder.local_func(args, id as FunctionID, ty_id);
 
-    module.funcs.get_mut(fid).kind = FunctionKind::Local(local_func);
+    module
+        .functions
+        .get_mut(fid)
+        .set_kind(FuncKind::Local(local_func));
 
     module.imports.delete(iid);
     Ok(Some(fid))
 }
 
-fn unreachable_stub(body: &mut InstrSeqBuilder) -> Result<Vec<LocalID>> {
+fn unreachable_stub(body: &mut FunctionBuilder) -> Result<Vec<LocalID>> {
     body.unreachable();
     Ok(vec![])
 }
@@ -73,7 +80,7 @@ pub fn stub_wasi(
         parse_wit(&PathBuf::from(wit_path.unwrap()))?
     };
 
-    let world = resolve.select_world(&ids, world_name.as_deref())?;
+    let world = resolve.select_world(ids, world_name.as_deref())?;
 
     let target_world = &resolve.worlds[world];
     let mut target_world_imports = HashSet::new();
@@ -82,7 +89,7 @@ pub fn stub_wasi(
         target_world_imports.insert(resolve.name_world_key(key));
     }
 
-    let mut module = Module::from_buffer(wasm.as_slice())?;
+    let mut module = Module::parse(wasm.as_slice(), false).unwrap();
 
     stub_preview1(&mut module)?;
 
@@ -115,7 +122,7 @@ pub fn stub_wasi(
 
     stub_sockets(&mut module, &target_world_imports)?;
 
-    Ok(module.emit_wasm())
+    Ok(module.encode())
 }
 
 fn target_world_requires_io(target_world_imports: &HashSet<String>) -> bool {
@@ -160,44 +167,49 @@ fn stub_preview1(module: &mut Module) -> Result<()> {
 
 fn stub_random(module: &mut Module) -> Result<()> {
     let memory = module.get_memory_id()?;
-    let realloc = module.exports.get_func_by_name("cabi_realloc".to_string())?;
+    let realloc = module
+        .exports
+        .get_func_by_name("cabi_realloc".to_string())
+        .unwrap()
+        .index;
     // stubbed random implements random with a pseudorandom implementation
     // create a mutable random seed global
     let seed_val: i64 = 0;
-    let seed_global = module.globals.add_local(
-        ValType::I64,
+    let seed_global = module.globals.create(
+        InitExpr::Value(Value::I64(seed_val)),
+        DataType::I64,
         true,
-        InitExpr::Value(walrus::ir::Value::I64(seed_val)),
+        false,
     );
 
     let random_u64 = stub_import(
         module,
         "wasi:random/random@0.2.0",
         "get-random-u64",
-        |body| {
-            body.global_get(seed_global);
-            body.i64_const(-0x5F89E29B87429BD1);
-            body.binop(BinaryOp::I64Add);
-            body.global_set(seed_global);
-            body.global_get(seed_global);
-            body.global_get(seed_global);
-            body.i64_const(-0x18FC812E5F4BD725);
-            body.binop(BinaryOp::I64Xor);
-            body.binop(BinaryOp::I64Mul);
+        |func| {
+            func.global_get(seed_global);
+            func.i64_const(-0x5F89E29B87429BD1);
+            func.i64_add();
+            func.global_set(seed_global);
+            func.global_get(seed_global);
+            func.global_get(seed_global);
+            func.i64_const(-0x18FC812E5F4BD725);
+            func.i64_xor();
+            func.i64_mul();
             Ok(vec![])
         },
     )?
     .expect("get-random-u64 not found");
 
-    let num_bytes = module.locals.add(ValType::I64);
-    let retptr = module.locals.add(ValType::I32);
-    let outptr = module.locals.add(ValType::I32);
-    let curptr = module.locals.add(ValType::I32);
     stub_import(
         module,
         "wasi:random/random@0.2.0",
         "get-random-bytes",
         |body| {
+            let num_bytes = body.add_local(DataType::I64);
+            let retptr = body.add_local(DataType::I32);
+            let outptr = body.add_local(DataType::I32);
+            let curptr = body.add_local(DataType::I32);
             // carries through to *retptr = outptr
             body.local_get(retptr);
 
@@ -206,69 +218,61 @@ fn stub_random(module: &mut Module) -> Result<()> {
             body.i32_const(0);
             body.i32_const(1);
             body.local_get(num_bytes);
-            body.unop(UnaryOp::I32WrapI64);
+            body.i32_wrap_i64();
             body.i32_const(3);
-            body.binop(BinaryOp::I32ShrU);
+            body.i32_shr_unsigned();
             body.i32_const(3);
-            body.binop(BinaryOp::I32Shl);
+            body.i32_shl();
             body.i32_const(8);
-            body.binop(BinaryOp::I32Add);
+            body.i32_add();
             body.call(realloc);
 
             body.local_tee(outptr);
 
             // *retptr = outptr
             // *retptr + 1 = len
-            body.store(
+            body.i32_load(MemArg {
+                align: 4,
+                max_align: 0, // TODO
+                offset: 0,
                 memory,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 4,
-                    offset: 0,
-                },
-            );
+            });
 
             body.local_get(retptr);
             body.local_get(num_bytes);
-            body.unop(UnaryOp::I32WrapI64);
-            body.store(
+            body.i32_wrap_i64();
+            body.i32_store(MemArg {
+                align: 4,
+                max_align: 0,
+                offset: 4,
                 memory,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 4,
-                    offset: 4,
-                },
-            );
-
+            });
             body.local_get(outptr);
             body.local_set(curptr);
 
             // store random bytes, we allocated a multiple of 8 bytes at the
             // start, so we do that exact multiple, while returning a shorter
             // list
-            body.loop_(None, |body| {
-                body.local_get(curptr);
-                body.call(random_u64);
-                body.store(
-                    memory,
-                    StoreKind::I64 { atomic: false },
-                    MemArg {
-                        align: 8,
-                        offset: 0,
-                    },
-                );
-                body.local_get(curptr);
-                body.i32_const(8);
-                body.binop(BinaryOp::I32Add);
-                body.local_tee(curptr);
-
-                body.local_get(outptr);
-                body.binop(BinaryOp::I32Sub);
-                body.local_get(num_bytes);
-                body.unop(UnaryOp::I32WrapI64);
-                body.binop(BinaryOp::I32LtU);
-                body.br_if(body.id());
+            body.loop_stmt(BlockType::Empty); // TODO: Is Empty the correct block type?
+            body.local_get(curptr);
+            body.call(random_u64);
+            body.i64_store(MemArg {
+                align: 8,
+                max_align: 0,
+                offset: 0,
+                memory,
             });
+            body.local_get(curptr);
+            body.i32_const(8);
+            body.i32_add();
+            body.local_tee(curptr);
+            body.local_get(outptr);
+            body.i32_sub();
+            body.local_get(num_bytes);
+            body.i32_wrap_i64();
+            body.i32_lt_unsigned();
+            body.br_if(0); // TODO: Correct relative-depth to keep here
+            body.end();
 
             Ok(vec![num_bytes, retptr])
         },
@@ -304,21 +308,19 @@ fn stub_clocks(module: &mut Module) -> Result<()> {
     let unix_time = time.duration_since(UNIX_EPOCH)?;
 
     // (func (param i32 i64 i32) (result i32)))
-    let clock_id = module.locals.add(ValType::I32);
-    let precision = module.locals.add(ValType::I64);
-    let time_ptr = module.locals.add(ValType::I32);
     stub_import(module, PREVIEW1, "clock_time_get", |body| {
+        let clock_id = body.add_local(DataType::I32);
+        let precision = body.add_local(DataType::I64);
+        let time_ptr = body.add_local(DataType::I32);
         body.local_get(time_ptr);
         body.local_get(time_ptr);
         body.i64_const(i64::try_from(unix_time.as_nanos())?);
-        body.store(
+        body.i64_store(MemArg {
+            align: 8,
+            offset: 0,
+            max_align: 0,
             memory,
-            StoreKind::I64 { atomic: false },
-            MemArg {
-                align: 8,
-                offset: 0,
-            },
-        );
+        });
         Ok(vec![clock_id, precision, time_ptr])
     })?;
 
@@ -368,8 +370,8 @@ fn stub_stdio(module: &mut Module) -> Result<()> {
     })?;
 
     // (func (param i32 i32 i32 i32) (result i32)))
-    let len_local = module.locals.add(ValType::I32);
     stub_import(module, PREVIEW1, "fd_write", |body| {
+        let len_local = body.add_local(DataType::I32);
         body.local_get(len_local);
         Ok(vec![len_local])
     })?;

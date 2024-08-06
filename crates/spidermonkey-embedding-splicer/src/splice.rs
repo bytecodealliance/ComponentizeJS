@@ -46,10 +46,13 @@ pub fn splice(
         .iter()
         .any(|(name, _)| name == "wasi:cli/run@0.2.0#run")
     {
-        if let Some(run) = module.exports.get_by_name("wasi:cli/run@0.2.0#run".to_string()) {
+        if let Some(run) = module
+            .exports
+            .get_by_name("wasi:cli/run@0.2.0#run".to_string())
+        {
             let expt = module.exports.get_func_by_id(run).unwrap();
-            module.exports.delete(expt.index);
-            module.functions.delete(expt.index); // TODO: Look at the intended behaviour here
+            module.exports.delete(expt);
+            module.functions.delete(expt); // TODO: Look at the intended behaviour here
         }
     }
 
@@ -62,8 +65,8 @@ pub fn splice(
             .get_by_name("wasi:http/incoming-handler@0.2.0#handle".to_string())
         {
             let expt = module.exports.get_func_by_id(serve).unwrap();
-            module.exports.delete(expt.index);
-            module.functions.delete(expt.index); // TODO: Look at the intended behaviour here
+            module.exports.delete(expt);
+            module.functions.delete(expt); // TODO: Look at the intended behaviour here
         }
     }
 
@@ -221,16 +224,18 @@ fn synthesize_import_functions(
             };
             let import_fn_type = module.types.add(&params, &ret);
 
-            let import_fn_fid =
-                if let Some(existing) = module.imports.get_func((*impt_specifier).clone(), Some((*impt_name).clone())) {
-                    existing
-                } else {
-                    module.add_import_func(
-                        (*impt_specifier).clone(),
-                        (*impt_name).clone(),
-                        import_fn_type,
-                    )
-                };
+            let import_fn_fid = if let Some(existing) = module
+                .imports
+                .get_func((*impt_specifier).clone(), Some((*impt_name).clone()))
+            {
+                existing
+            } else {
+                module.add_import_func(
+                    (*impt_specifier).clone(),
+                    (*impt_name).clone(),
+                    import_fn_type,
+                )
+            };
 
             // create the native JS binding function
             let mut func = FunctionBuilder::new(
