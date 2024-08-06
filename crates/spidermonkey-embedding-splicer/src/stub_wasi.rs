@@ -166,7 +166,7 @@ fn stub_preview1(module: &mut Module) -> Result<()> {
 }
 
 fn stub_random(module: &mut Module) -> Result<()> {
-    let memory = module.get_memory_id()?;
+    let memory = module.get_memory_id().unwrap();
     let realloc = module
         .exports
         .get_func_by_name("cabi_realloc".to_string())
@@ -300,7 +300,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
 }
 
 fn stub_clocks(module: &mut Module) -> Result<()> {
-    let memory = module.get_memory_id()?;
+    let memory = module.get_memory_id().unwrap();
     stub_import(module, PREVIEW1, "clock_res_get", unreachable_stub)?;
 
     // stub the time with the current time at build time

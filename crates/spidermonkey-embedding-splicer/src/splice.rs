@@ -109,7 +109,7 @@ fn synthesize_import_functions(
     let mut coreabi_sample_ids = Vec::new();
     for expt in module.exports.iter() {
         let id = expt.index;
-        match expt.name {
+        match expt.name.as_str() {
             "coreabi_sample_i32" | "coreabi_sample_i64" | "coreabi_sample_f32"
             | "coreabi_sample_f64" => coreabi_sample_ids.push(id),
             "coreabi_get_import" => coreabi_get_import = Some(id),
@@ -118,7 +118,8 @@ fn synthesize_import_functions(
         };
     }
 
-    let memory = module.memories.iter().nth(0).unwrap().id();
+    // let memory = module.memories.iter().nth(0).unwrap().id();
+    let memory = 0; // TODO: Check this
     let main_tid = module.tables.main_function().unwrap();
     let import_fn_table_start_idx = module.tables.get(main_tid).unwrap().initial as i32;
 
@@ -511,7 +512,8 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
         .index;
     let post_call = get_export_fid(module, &post_call_expt);
 
-    let memory = module.memories.iter().nth(0).unwrap().id();
+    // let memory = module.memories.iter().nth(0).unwrap().id();
+    let memory = 0; // TODO: Check this
 
     // (2) Export call function synthesis
     for (export_num, (expt_name, expt_sig)) in exports.iter().enumerate() {
@@ -675,7 +677,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
             }
 
             let fid = func.finish_module(module);
-            module.exports.add_export_func(&expt_name, fid);
+            module.exports.add_export_func((*expt_name).clone(), fid);
         }
 
         // Post export function synthesis
@@ -700,10 +702,9 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
         func.i32_const(export_num as i32);
         func.call(post_call);
         let fid = func.finish_module(module);
-
         module
             .exports
-            .add_export_func(&format!("cabi_post_{}", expt_name), fid);
+            .add_export_func(format!("cabi_post_{}", expt_name), fid);
     }
 
     // remove unnecessary exports
