@@ -55,6 +55,20 @@ jobs:
         path: build-release
         key: engine-build-${{ hashFiles('.git/modules/StarlingMonkey/FETCH_HEAD') }}
 
+    - name: Download and build orca
+      run: |
+        cd .. && git clone git@github.com:thesuhas/orca.git
+        cd orca && git fetch
+        git switch huge_refactor_for_more_apis
+        cargo build
+
+    - name: Download and build jco fork
+      run: |
+        cd .. && git clone git@github.com:thesuhas/jco.git
+        cd jco && git fetch
+        git switch wasm_tools_upgrade
+        cargo build
+
     - name: Build
       run: npm run build
 

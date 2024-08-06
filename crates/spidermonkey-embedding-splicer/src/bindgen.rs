@@ -10,7 +10,9 @@ use js_component_bindgen::source::Source;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write;
 use wit_bindgen_core::abi::{self, LiftLower};
+use wit_bindgen_core::wit_parser::Resolve;
 use wit_component::StringEncoding;
+use wit_parser::abi::WasmType;
 use wit_parser::abi::{AbiVariant, WasmSignature};
 use wit_parser::*;
 
@@ -947,24 +949,24 @@ impl JsBindgen<'_> {
                 .params
                 .iter()
                 .map(|v| match v {
-                    abi::WasmType::I32 => CoreTy::I32,
-                    abi::WasmType::I64 => CoreTy::I64,
-                    abi::WasmType::F32 => CoreTy::F32,
-                    abi::WasmType::F64 => CoreTy::F64,
-                    abi::WasmType::PointerOrI64 => CoreTy::I64,
-                    abi::WasmType::Pointer => CoreTy::I32,
-                    abi::WasmType::Length => CoreTy::I32,
+                    WasmType::I32 => CoreTy::I32,
+                    WasmType::I64 => CoreTy::I64,
+                    WasmType::F32 => CoreTy::F32,
+                    WasmType::F64 => CoreTy::F64,
+                    WasmType::PointerOrI64 => CoreTy::I64,
+                    WasmType::Pointer => CoreTy::I32,
+                    WasmType::Length => CoreTy::I32,
                 })
                 .collect(),
             ret: match sig.results.first() {
                 None => None,
-                Some(abi::WasmType::I32) => Some(CoreTy::I32),
-                Some(abi::WasmType::I64) => Some(CoreTy::I64),
-                Some(abi::WasmType::F32) => Some(CoreTy::F32),
-                Some(abi::WasmType::F64) => Some(CoreTy::F64),
-                Some(abi::WasmType::PointerOrI64) => Some(CoreTy::I64),
-                Some(abi::WasmType::Pointer) => Some(CoreTy::I32),
-                Some(abi::WasmType::Length) => Some(CoreTy::I32),
+                Some(WasmType::I32) => Some(CoreTy::I32),
+                Some(WasmType::I64) => Some(CoreTy::I64),
+                Some(WasmType::F32) => Some(CoreTy::F32),
+                Some(WasmType::F64) => Some(CoreTy::F64),
+                Some(WasmType::PointerOrI64) => Some(CoreTy::I64),
+                Some(WasmType::Pointer) => Some(CoreTy::I32),
+                Some(WasmType::Length) => Some(CoreTy::I32),
             },
         }
     }

@@ -6,6 +6,7 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use wasmparser::MemArg;
 
 use wit_parser::Resolve;
 
@@ -159,7 +160,7 @@ fn stub_preview1(module: &mut Module) -> Result<()> {
 
 fn stub_random(module: &mut Module) -> Result<()> {
     let memory = module.get_memory_id()?;
-    let realloc = module.exports.get_func_by_name("cabi_realloc")?;
+    let realloc = module.exports.get_func_by_name("cabi_realloc".to_string())?;
     // stubbed random implements random with a pseudorandom implementation
     // create a mutable random seed global
     let seed_val: i64 = 0;

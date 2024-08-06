@@ -1,10 +1,10 @@
 use orca::ir::function::{FunctionBuilder, FunctionModifier};
 use orca::ir::id::{ExportsID, FunctionID, LocalID};
 use orca::ir::module::Module;
-use orca::ir::types::{BlockType, InstrumentationMode};
-use orca::{DataType, ModuleBuilder, Opcode};
-use wasmparser::MemArg;
+use orca::ir::types::{BlockType, ElementItems, InstrumentationMode};
+use orca::{DataType, Opcode};
 use wasmparser::ExternalKind;
+use wasmparser::MemArg;
 use wasmparser::Operator;
 
 use crate::*;
@@ -38,7 +38,7 @@ pub fn splice(
     exports: Vec<(String, CoreFn)>,
     debug: bool,
 ) -> Result<Vec<u8>> {
-    let mut module = Module::parse(&*engine, false)?;
+    let mut module = Module::parse(&*engine, false).unwrap();
 
     // since StarlingMonkey implements CLI Run and incoming handler,
     // we override them only if the guest content exports those functions
@@ -46,7 +46,7 @@ pub fn splice(
         .iter()
         .any(|(name, _)| name == "wasi:cli/run@0.2.0#run")
     {
-        if let Some(run) = module.exports.get("wasi:cli/run@0.2.0#run".to_string()) {
+        if let Some(run) = module.exports.get_by_name("wasi:cli/run@0.2.0#run".to_string()) {
             let expt = module.exports.get_func_by_id(run).unwrap();
             module.exports.delete(expt.index);
             module.functions.delete(expt.index); // TODO: Look at the intended behaviour here
@@ -117,7 +117,7 @@ fn synthesize_import_functions(
 
     let memory = module.memories.iter().nth(0).unwrap().id();
     let main_tid = module.tables.main_function().unwrap();
-    let import_fn_table_start_idx = module.tables.get(main_tid)?.initial as i32;
+    let import_fn_table_start_idx = module.tables.get(main_tid).unwrap().initial as i32;
 
     let cabi_realloc_fid = get_export_fid(module, &cabi_realloc.unwrap());
 
@@ -222,7 +222,7 @@ fn synthesize_import_functions(
             let import_fn_type = module.types.add(&params, &ret);
 
             let import_fn_fid =
-                if let Ok(existing) = module.imports.get_func(&impt_specifier, &impt_name) {
+                if let Some(existing) = module.imports.get_func((*impt_specifier).clone(), Some((*impt_name).clone())) {
                     existing
                 } else {
                     module.add_import_func(
@@ -241,7 +241,7 @@ fn synthesize_import_functions(
             let retptr_local = func.add_local(DataType::I32);
             let tmp_local = func.add_local(DataType::I64);
 
-            // let mut func_body = func.body;
+            // let mut func = func.body;
 
             // stack the return arg now as it chains with the
             // args we're about to add to the stack
@@ -403,13 +403,18 @@ fn synthesize_import_functions(
 
         // extend the main table to include indices for generated imported functions
         let table = module.tables.get_mut(main_tid);
-        table.initial += imports.len() as u32;
-        table.maximum = Some(table.maximum.unwrap() + imports.len() as u32);
+        table.initial += imports.len() as u64;
+        table.maximum = Some(table.maximum.unwrap() + imports.len() as u64);
 
         // create imported function table
         let els = module.elements.iter_mut().next().unwrap();
-        for fid in import_fnids {
-            els.members.push(Some(fid.clone()));
+        match &mut els.1 {
+            ElementItems::Functions(mut funcs) => {
+                for fid in import_fnids {
+                    funcs.push(fid);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -535,23 +540,22 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
             let arg_ptr = func.add_local(DataType::I32);
             let ret_ptr = func.add_local(DataType::I32);
 
-            let func_body = &mut func.func_body();
             let args: Vec<LocalID> = params.iter().map(|param| func.add_local(*param)).collect();
 
             // Stack "call" arg1 - export number to call
-            func_body.i32_const(export_num as i32);
+            func.i32_const(export_num as i32);
 
             // Now we just have to add the argptr
             if expt_sig.params.len() == 0 {
-                func_body.i32_const(0);
+                func.i32_const(0);
             } else if expt_sig.paramptr {
                 // param ptr is the first arg with indirect params
-                func_body.local_get(args[0]);
+                func.local_get(args[0]);
             } else {
                 // realloc call to allocate params
-                func_body.i32_const(0);
-                func_body.i32_const(0);
-                func_body.i32_const(4);
+                func.i32_const(0);
+                func.i32_const(0);
+                func.i32_const(4);
                 // Last realloc arg is byte length to allocate
                 let mut byte_size = 0;
                 for param in expt_sig.params.iter() {
@@ -564,16 +568,16 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                         }
                     }
                 }
-                func_body.i32_const(byte_size);
+                func.i32_const(byte_size);
                 // Call realloc, getting back the argptr
-                func_body.call(cabi_realloc);
+                func.call(cabi_realloc);
 
                 // Tee the argptr into its local var
-                func_body.local_tee(arg_ptr);
+                func.local_tee(arg_ptr);
 
                 let mut offset = 0;
                 for (idx, param) in expt_sig.params.iter().enumerate() {
-                    func_body.local_get(args[idx]);
+                    func.local_get(args[idx]);
                     match param {
                         CoreTy::I32 => {
                             func.i32_store(MemArg {
@@ -612,20 +616,20 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                             offset += 8;
                         }
                     }
-                    func_body.local_get(arg_ptr);
+                    func.local_get(arg_ptr);
                 }
 
                 // argptr stays on stack
             }
 
             // Call "call" (returns retptr)
-            func_body.call(call);
+            func.call(call);
 
             if expt_sig.ret.is_none() {
-                func_body.drop();
+                func.drop();
             } else if !expt_sig.retptr {
                 // Tee retptr into its local var
-                func_body.local_tee(ret_ptr);
+                func.local_tee(ret_ptr);
 
                 // if it's a direct return, we must read the return
                 // value type from the retptr
@@ -684,13 +688,12 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
         };
         let mut func = FunctionBuilder::new(&params, &[]);
         func.set_name(format!("post_{}", expt_name));
-        let mut func_body = func.func_body();
 
         // calls post_call with just the function number argument
         // internally post_call is already tracking the frees needed
         // and that is currently done based on timing assumptions of calls
-        func_body.i32_const(export_num as i32);
-        func_body.call(post_call);
+        func.i32_const(export_num as i32);
+        func.call(post_call);
         let fid = func.finish_module(module);
 
         module
