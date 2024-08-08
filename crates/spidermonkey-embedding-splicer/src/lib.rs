@@ -79,7 +79,7 @@ fn map_core_fn(cfn: &bindgen::CoreFn) -> CoreFn {
     }
 }
 
-fn parse_wit(path: &Path) -> Result<(Resolve, Vec<PackageId>)> {
+fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
     let mut resolve = Resolve::default();
     let ids = if path.is_dir() {
         resolve.push_dir(&path)?.0
@@ -131,7 +131,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         };
 
         let world = resolve
-            .select_world(&ids, world_name.as_deref())
+            .select_world(ids, world_name.as_deref())
             .map_err(|e| e.to_string())?;
 
         let mut wasm_bytes = wit_component::dummy_module(&resolve, world);
