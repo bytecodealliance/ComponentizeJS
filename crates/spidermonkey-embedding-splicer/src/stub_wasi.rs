@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use orca::ir::function::FunctionBuilder;
 use orca::ir::id::{FunctionID, LocalID};
-use orca::ir::module::module_functions::{FuncKind, Function, ImportedFunction};
+use orca::ir::module::module_functions::FuncKind;
 use orca::ir::types::{BlockType, Value};
 use orca::{DataType, InitExpr, Module, Opcode};
 use std::{
@@ -32,15 +32,14 @@ where
         bail!("'{import}#{name}' is not a function.")
     };
 
-    let Function {
-        kind: FuncKind::Import(ImportedFunction { ty_id, .. }),
-        ..
-    } = module.functions.get(fid)
-    else {
-        bail!("Can't find type of '{import}#{name}'")
-    };
+    let f = module.functions.get(fid);
+    let ty_id;
+    match f.kind() {
+        FuncKind::Local(_) => bail!("Can't find type of '{import}#{name}'"),
+        FuncKind::Import(i) => ty_id = i.ty_id,
+    }
 
-    let ty = module.types.get(*ty_id).unwrap();
+    let ty = module.types.get(ty_id).unwrap();
     let (params, results) = (ty.params.to_vec(), ty.results.to_vec());
     let id = module.functions.len();
     let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
@@ -54,7 +53,7 @@ where
         .get_mut(fid)
         .set_kind(FuncKind::Local(local_func));
 
-    module.imports.delete(iid);
+    module.delete_import_func(iid);
     Ok(Some(fid))
 }
 
@@ -170,8 +169,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
     let realloc = module
         .exports
         .get_func_by_name("cabi_realloc".to_string())
-        .unwrap()
-        .index;
+        .unwrap();
     // stubbed random implements random with a pseudorandom implementation
     // create a mutable random seed global
     let seed_val: i64 = 0;

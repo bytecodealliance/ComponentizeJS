@@ -48,7 +48,7 @@ pub fn splice(
     {
         if let Some(run) = module
             .exports
-            .get_by_name("wasi:cli/run@0.2.0#run".to_string())
+            .get_func_by_name("wasi:cli/run@0.2.0#run".to_string())
         {
             let expt = module.exports.get_func_by_id(run).unwrap();
             module.exports.delete(expt);
@@ -62,7 +62,7 @@ pub fn splice(
     {
         if let Some(serve) = module
             .exports
-            .get_by_name("wasi:http/incoming-handler@0.2.0#handle".to_string())
+            .get_func_by_name("wasi:http/incoming-handler@0.2.0#handle".to_string())
         {
             let expt = module.exports.get_func_by_id(serve).unwrap();
             module.exports.delete(expt);
@@ -72,16 +72,17 @@ pub fn splice(
 
     // we reencode the WASI world component data, so strip it out from the
     // custom section
-    let maybe_component_section_id =
-        module.get_custom_section("component-type:bindings".to_string());
+    let maybe_component_section_id = module
+        .custom_sections
+        .get_id("component-type:bindings".to_string());
     if let Some(component_section_id) = maybe_component_section_id {
-        module.delete_custom_section(component_section_id);
+        module.custom_sections.delete(component_section_id);
     }
 
     // extract the native instructions from sample functions
     // then inline the imported functions and main import gating function
     // (erasing sample functions in the process)
-    synthesize_import_functions(&mut module, &imports, debug)?;
+    synthesize_import_functions(&mut module, &imports, true)?;
 
     // create the exported functions as wrappers around the "cabi_call" function
     synthesize_export_functions(&mut module, &exports)?;
@@ -120,10 +121,14 @@ fn synthesize_import_functions(
 
     // let memory = module.memories.iter().nth(0).unwrap().id();
     let memory = 0; // TODO: Check this
+    println!("Memory ID: {:?}", memory);
     let main_tid = module.tables.main_function().unwrap();
+    println!("Table: {:?}", main_tid);
     let import_fn_table_start_idx = module.tables.get(main_tid).unwrap().initial as i32;
+    println!("Import FN Start Idx: {:?}", import_fn_table_start_idx);
 
     let cabi_realloc_fid = get_export_fid(module, &cabi_realloc.unwrap());
+    println!("Cabi realloc fid: {:?}", cabi_realloc_fid);
 
     let coreabi_sample_i32 = module
         .functions
@@ -153,6 +158,7 @@ fn synthesize_import_functions(
         .find(|expt| expt.name == "coreabi_from_bigint64")
         .unwrap()
         .index;
+    println!("Coreabi from bigint64: {:?}", coreabi_from_bigint64);
 
     // Sets the return value on args from the stack
     let args_ret_i32: Vec<Operator> = vec![
@@ -179,6 +185,7 @@ fn synthesize_import_functions(
         .find(|expt| expt.name == "coreabi_to_bigint64")
         .unwrap()
         .index;
+    println!("Coreabi to bigint64: {:?}", coreabi_to_bigint64);
 
     // create the import functions
     // All JS wrapper function bindings have the same type, the
@@ -192,9 +199,13 @@ fn synthesize_import_functions(
         let ctx_arg = coreabi_sample_i32.args[0];
         let argc_arg = coreabi_sample_i32.args[1];
         let vp_arg = coreabi_sample_i32.args[2];
+        println!(
+            "Coreabi sample args: {:?} {:?} {:?}",
+            ctx_arg, argc_arg, vp_arg
+        );
 
         // if we need to tee the retptr
-
+        println!("Imports len {:?}", imports.len());
         for (impt_specifier, impt_name, impt_sig, retptr_size) in imports.iter() {
             if debug {
                 println!(
@@ -246,6 +257,10 @@ fn synthesize_import_functions(
 
             let retptr_local = func.add_local(DataType::I32);
             let tmp_local = func.add_local(DataType::I64);
+            println!(
+                "Retptr local: {:?} tmp local: {:?}",
+                retptr_local, tmp_local
+            );
 
             // let mut func = func.body;
 
@@ -354,7 +369,7 @@ fn synthesize_import_functions(
                 // also set the retptr as the return value of the JS function
                 // (consumes the context arg above)
                 args_ret_i32.iter().for_each(|instr| {
-                    func.instr(instr.clone());
+                    func.inject(instr.clone());
                 });
 
                 // add the retptr back on the stack for the call
@@ -403,7 +418,7 @@ fn synthesize_import_functions(
             // return true
             func.i32_const(1);
 
-            let fid = func.finish_module(module);
+            let fid = func.finish_module(vec![ctx_arg, argc_arg, vp_arg], module);
             import_fnids.push(fid);
         }
 
@@ -411,11 +426,14 @@ fn synthesize_import_functions(
         let table = module.tables.get_mut(main_tid);
         table.initial += imports.len() as u64;
         table.maximum = Some(table.maximum.unwrap() + imports.len() as u64);
-
+        println!(
+            "Table Initial: {:?} Table Max: {:?}",
+            table.initial, table.maximum
+        );
         // create imported function table
         let els = module.elements.iter_mut().next().unwrap();
         match &mut els.1 {
-            ElementItems::Functions(mut funcs) => {
+            ElementItems::Functions(ref mut funcs) => {
                 for fid in import_fnids {
                     funcs.push(fid);
                 }
@@ -434,13 +452,14 @@ fn synthesize_import_functions(
     //
     {
         let coreabi_get_import_fid = get_export_fid(module, &coreabi_get_import.unwrap());
-
+        println!("Coreabi get import fid {:?}", coreabi_get_import_fid);
         let args = &module
             .functions
             .get(coreabi_get_import_fid)
             .kind()
             .unwrap_local()
             .args;
+        println!("Args: {:?}", args);
         let arg_idx = args[0].clone();
 
         let builder: &mut FunctionModifier = &mut module
@@ -452,6 +471,7 @@ fn synthesize_import_functions(
         let mut table_instr_idx = 0;
         for (idx, (instr, _)) in builder.body.instructions.iter_mut().enumerate() {
             if let Operator::I32Const { value: ref mut v } = instr {
+                println!("Call {:?}", v);
                 // we specifically need the const "around" 3393
                 // which is the coreabi_sample_i32 table offset
                 if *v < 1000 || *v > 5000 {
@@ -459,6 +479,7 @@ fn synthesize_import_functions(
                 }
                 *v = import_fn_table_start_idx;
                 table_instr_idx = idx;
+                println!("New Call {:?} Table Instr Idx: {:?}", v, table_instr_idx);
                 break;
             }
         }
@@ -514,9 +535,10 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
 
     // let memory = module.memories.iter().nth(0).unwrap().id();
     let memory = 0; // TODO: Check this
-
+    println!("Exports len: {:?}", exports.len());
     // (2) Export call function synthesis
     for (export_num, (expt_name, expt_sig)) in exports.iter().enumerate() {
+        println!("Export: {:?}", export_num);
         // Export function synthesis
         {
             // add the function type
@@ -676,7 +698,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                 }
             }
 
-            let fid = func.finish_module(module);
+            let fid = func.finish_module(args, module);
             module.exports.add_export_func((*expt_name).clone(), fid);
         }
 
@@ -701,7 +723,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
         // and that is currently done based on timing assumptions of calls
         func.i32_const(export_num as i32);
         func.call(post_call);
-        let fid = func.finish_module(module);
+        let fid = func.finish_module(vec![], module);
         module
             .exports
             .add_export_func(format!("cabi_post_{}", expt_name), fid);
