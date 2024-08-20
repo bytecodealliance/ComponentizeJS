@@ -48,12 +48,16 @@ jobs:
     - name: Install NPM packages
       run: npm install
 
+    - name: Get StarlingMonkey Commit
+      id: starlingmonkey-commit
+      run: echo "STARLINGMONKEY_HASH=$(git submodule status | head -c9 | tail -c8)" >> "$GITHUB_OUTPUT"
+
     - name: Cache StarlingMonkey
       uses: actions/cache@v3
       id: starlingmonkey-build
       with:
         path: build-release
-        key: engine-build-${{ hashFiles('.git/modules/StarlingMonkey/FETCH_HEAD') }}
+        key: engine-build-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
 
     - name: Build
       run: npm run build
