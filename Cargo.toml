@@ -11,7 +11,7 @@ version = "0.1.0"
 anyhow = "1.0.86"
 base64 = "0.22.1"
 heck = "0.5"
-js-component-bindgen = { git = "https://github.com/bytecodealliance/jco", rev = "3946278b4471961f2d3a6b80576097996472bc07" }
+js-component-bindgen = "1.4.3"
 pulldown-cmark = { version = "0.10", default-features = false }
 rand = "0.8"
 walrus = "0.20.3"

@@ -9,7 +9,7 @@
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "1.4.0",
+    "@bytecodealliance/jco": "1.4.3",
     "@bytecodealliance/wizer": "^3.0.1",
     "es-module-lexer": "^1.5.4"
   },
