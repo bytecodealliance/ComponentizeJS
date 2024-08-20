@@ -2,7 +2,9 @@ use orca::ir::function::{FunctionBuilder, FunctionModifier};
 use orca::ir::id::{ExportsID, FunctionID, LocalID};
 use orca::ir::module::Module;
 use orca::ir::types::{BlockType, ElementItems, InstrumentationMode};
+use orca::opcode::Inject;
 use orca::{DataType, Opcode};
+use orca::module_builder::AddLocal;
 use wasmparser::ExternalKind;
 use wasmparser::MemArg;
 use wasmparser::Operator;
@@ -52,7 +54,7 @@ pub fn splice(
         {
             let expt = module.exports.get_func_by_id(run).unwrap();
             module.exports.delete(expt);
-            module.functions.delete(expt); // TODO: Look at the intended behaviour here
+            module.functions.delete(run); // TODO: Look at the intended behaviour here. Need to pass function ID to delete from functions. Was Previously passing Exports ID
         }
     }
 
@@ -66,7 +68,7 @@ pub fn splice(
         {
             let expt = module.exports.get_func_by_id(serve).unwrap();
             module.exports.delete(expt);
-            module.functions.delete(expt); // TODO: Look at the intended behaviour here
+            module.functions.delete(serve); // TODO: Look at the intended behaviour here. Same as above comment
         }
     }
 
@@ -94,7 +96,7 @@ fn get_export_fid(module: &Module, expt_id: &ExportsID) -> FunctionID {
     let expt = module.exports.get_by_id(*expt_id).unwrap();
 
     match expt.kind {
-        ExternalKind::Func => *expt_id,
+        ExternalKind::Func => expt.index as FunctionID,
         _ => panic!("Missing coreabi_get_import"),
     }
 }
@@ -108,31 +110,30 @@ fn synthesize_import_functions(
     let mut cabi_realloc: Option<ExportsID> = None;
 
     let mut coreabi_sample_ids = Vec::new();
-    for expt in module.exports.iter() {
-        let id = expt.index;
+    for (id, expt) in module.exports.iter().enumerate() {
         match expt.name.as_str() {
             "coreabi_sample_i32" | "coreabi_sample_i64" | "coreabi_sample_f32"
-            | "coreabi_sample_f64" => coreabi_sample_ids.push(id),
-            "coreabi_get_import" => coreabi_get_import = Some(id),
-            "cabi_realloc" => cabi_realloc = Some(id),
+            | "coreabi_sample_f64" => coreabi_sample_ids.push(id as ExportsID),
+            "coreabi_get_import" => coreabi_get_import = Some(id as ExportsID),
+            "cabi_realloc" => cabi_realloc = Some(id as ExportsID),
             _ => {}
         };
     }
 
     // let memory = module.memories.iter().nth(0).unwrap().id();
-    let memory = 0; // TODO: Check this
-    println!("Memory ID: {:?}", memory);
+    let memory = 0;
+    // println!("Memory ID: {:?}", memory);
     let main_tid = module.tables.main_function().unwrap();
-    println!("Table: {:?}", main_tid);
+    // println!("Table: {:?}", main_tid);
     let import_fn_table_start_idx = module.tables.get(main_tid).unwrap().initial as i32;
-    println!("Import FN Start Idx: {:?}", import_fn_table_start_idx);
+    // println!("Import FN Start Idx: {:?}", import_fn_table_start_idx);
 
     let cabi_realloc_fid = get_export_fid(module, &cabi_realloc.unwrap());
-    println!("Cabi realloc fid: {:?}", cabi_realloc_fid);
-
+    // println!("Cabi realloc fid: {:?}", cabi_realloc_fid);
+    let fid = get_export_fid(module, &coreabi_sample_ids[0]);
     let coreabi_sample_i32 = module
         .functions
-        .get(get_export_fid(module, &coreabi_sample_ids[0]))
+        .get(fid)
         .unwrap_local();
     let _coreabi_sample_i64 = module
         .functions
@@ -154,11 +155,9 @@ fn synthesize_import_functions(
     // unless there are major ABI changes in Spidermonkey
     let coreabi_from_bigint64 = module
         .exports
-        .iter()
-        .find(|expt| expt.name == "coreabi_from_bigint64")
-        .unwrap()
-        .index;
-    println!("Coreabi from bigint64: {:?}", coreabi_from_bigint64);
+        .get_export_id_by_name("coreabi_from_bigint64".to_string())
+        .unwrap();
+    // println!("Coreabi from bigint64: {:?}", coreabi_from_bigint64);
 
     // Sets the return value on args from the stack
     let args_ret_i32: Vec<Operator> = vec![
@@ -169,8 +168,8 @@ fn synthesize_import_functions(
         Operator::I64Or,
         Operator::I64Store {
             memarg: MemArg {
-                align: 8,
-                max_align: 0, // TODO: What to put here?
+                align: 4,
+                max_align: 0,
                 offset: 0,
                 memory,
             },
@@ -181,11 +180,9 @@ fn synthesize_import_functions(
     // the separate ToBigInt call from the get_i64 sample
     let coreabi_to_bigint64 = module
         .exports
-        .iter()
-        .find(|expt| expt.name == "coreabi_to_bigint64")
-        .unwrap()
-        .index;
-    println!("Coreabi to bigint64: {:?}", coreabi_to_bigint64);
+        .get_export_id_by_name("coreabi_to_bigint64".to_string())
+        .unwrap();
+    // println!("Coreabi to bigint64: {:?}", coreabi_to_bigint64);
 
     // create the import functions
     // All JS wrapper function bindings have the same type, the
@@ -199,13 +196,13 @@ fn synthesize_import_functions(
         let ctx_arg = coreabi_sample_i32.args[0];
         let argc_arg = coreabi_sample_i32.args[1];
         let vp_arg = coreabi_sample_i32.args[2];
-        println!(
-            "Coreabi sample args: {:?} {:?} {:?}",
-            ctx_arg, argc_arg, vp_arg
-        );
+        // println!(
+        //     "Coreabi sample args: {:?} {:?} {:?}",
+        //     ctx_arg, argc_arg, vp_arg
+        // );
 
         // if we need to tee the retptr
-        println!("Imports len {:?}", imports.len());
+        // println!("Imports len {:?}", imports.len());
         for (impt_specifier, impt_name, impt_sig, retptr_size) in imports.iter() {
             if debug {
                 println!(
@@ -257,10 +254,10 @@ fn synthesize_import_functions(
 
             let retptr_local = func.add_local(DataType::I32);
             let tmp_local = func.add_local(DataType::I64);
-            println!(
-                "Retptr local: {:?} tmp local: {:?}",
-                retptr_local, tmp_local
-            );
+            // println!(
+            //     "Retptr local: {:?} tmp local: {:?}",
+            //     retptr_local, tmp_local
+            // );
 
             // let mut func = func.body;
 
@@ -288,8 +285,8 @@ fn synthesize_import_functions(
                 match arg {
                     CoreTy::I32 => {
                         func.i64_load(MemArg {
-                            align: 8,
-                            max_align: 0, // TODO: again
+                            align: 3,
+                            max_align: 0,
                             offset: 0,
                             memory,
                         });
@@ -301,8 +298,8 @@ fn synthesize_import_functions(
                     CoreTy::F32 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
                         func.i64_load(MemArg {
-                            align: 8,
-                            max_align: 0, // TODO: again
+                            align: 3,
+                            max_align: 0,
                             offset: 0,
                             memory,
                         });
@@ -319,13 +316,13 @@ fn synthesize_import_functions(
                         func.local_get(tmp_local);
                         func.f64_reinterpret_i64();
                         func.f32_demote_f64();
-                        func.end(); // Todo: Need to add this?
+                        func.end();
                     }
                     CoreTy::F64 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
                         func.i64_load(MemArg {
-                            align: 8,
-                            max_align: 0, // TODO: again
+                            align: 3,
+                            max_align: 0,
                             offset: 0,
                             memory,
                         });
@@ -390,7 +387,7 @@ fn synthesize_import_functions(
                     func.i64_const(-511101108224);
                     func.i64_or();
                     func.i64_store(MemArg {
-                        align: 8,
+                        align: 3,
                         max_align: 0,
                         offset: 0,
                         memory,
@@ -399,7 +396,7 @@ fn synthesize_import_functions(
                 Some(CoreTy::F32) => {
                     func.f64_promote_f32();
                     func.f64_store(MemArg {
-                        align: 8,
+                        align: 3,
                         max_align: 0,
                         offset: 0,
                         memory,
@@ -407,7 +404,7 @@ fn synthesize_import_functions(
                 }
                 Some(CoreTy::F64) => {
                     func.f64_store(MemArg {
-                        align: 8,
+                        align: 3,
                         max_align: 0,
                         offset: 0,
                         memory,
@@ -418,7 +415,7 @@ fn synthesize_import_functions(
             // return true
             func.i32_const(1);
 
-            let fid = func.finish_module(vec![ctx_arg, argc_arg, vp_arg], module);
+            let fid = func.finish_module(3, module);
             import_fnids.push(fid);
         }
 
@@ -426,10 +423,10 @@ fn synthesize_import_functions(
         let table = module.tables.get_mut(main_tid);
         table.initial += imports.len() as u64;
         table.maximum = Some(table.maximum.unwrap() + imports.len() as u64);
-        println!(
-            "Table Initial: {:?} Table Max: {:?}",
-            table.initial, table.maximum
-        );
+        // println!(
+        //     "Table Initial: {:?} Table Max: {:?}",
+        //     table.initial, table.maximum
+        // );
         // create imported function table
         let els = module.elements.iter_mut().next().unwrap();
         match &mut els.1 {
@@ -452,14 +449,14 @@ fn synthesize_import_functions(
     //
     {
         let coreabi_get_import_fid = get_export_fid(module, &coreabi_get_import.unwrap());
-        println!("Coreabi get import fid {:?}", coreabi_get_import_fid);
+        // println!("Coreabi get import fid {:?}", coreabi_get_import_fid);
         let args = &module
             .functions
             .get(coreabi_get_import_fid)
             .kind()
             .unwrap_local()
             .args;
-        println!("Args: {:?}", args);
+        // println!("Args: {:?}", args);
         let arg_idx = args[0].clone();
 
         let builder: &mut FunctionModifier = &mut module
@@ -471,7 +468,7 @@ fn synthesize_import_functions(
         let mut table_instr_idx = 0;
         for (idx, (instr, _)) in builder.body.instructions.iter_mut().enumerate() {
             if let Operator::I32Const { value: ref mut v } = instr {
-                println!("Call {:?}", v);
+                // println!("Call {:?}", v);
                 // we specifically need the const "around" 3393
                 // which is the coreabi_sample_i32 table offset
                 if *v < 1000 || *v > 5000 {
@@ -479,20 +476,20 @@ fn synthesize_import_functions(
                 }
                 *v = import_fn_table_start_idx;
                 table_instr_idx = idx;
-                println!("New Call {:?} Table Instr Idx: {:?}", v, table_instr_idx);
+                // println!("New Call {:?} Table Instr Idx: {:?}", v, table_instr_idx);
                 break;
             }
         }
         builder.inject_at(
             table_instr_idx,
-            InstrumentationMode::Alternate,
+            InstrumentationMode::Before,
             Operator::LocalGet {
                 local_index: arg_idx,
             },
         );
         builder.inject_at(
-            table_instr_idx + 2,
-            InstrumentationMode::Alternate,
+            table_instr_idx + 1,
+            InstrumentationMode::Before,
             Operator::I32Add,
         );
     }
@@ -513,32 +510,26 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
         module,
         &module
             .exports
-            .iter()
-            .find(|expt| expt.name == "cabi_realloc")
-            .unwrap()
-            .index,
+            .get_export_id_by_name("cabi_realloc".to_string())
+            .unwrap(),
     );
     let call_expt = module
         .exports
-        .iter()
-        .find(|expt| expt.name == "call")
-        .unwrap()
-        .index;
+        .get_export_id_by_name("call".to_string())
+        .unwrap();
     let call = get_export_fid(module, &call_expt);
     let post_call_expt = module
         .exports
-        .iter()
-        .find(|expt| expt.name == "post_call")
-        .unwrap()
-        .index;
+        .get_export_id_by_name("post_call".to_string())
+        .unwrap();
     let post_call = get_export_fid(module, &post_call_expt);
 
     // let memory = module.memories.iter().nth(0).unwrap().id();
-    let memory = 0; // TODO: Check this
-    println!("Exports len: {:?}", exports.len());
+    let memory = 0;
+    // println!("Exports len: {:?}", exports.len());
     // (2) Export call function synthesis
     for (export_num, (expt_name, expt_sig)) in exports.iter().enumerate() {
-        println!("Export: {:?}", export_num);
+        // println!("Export: {:?}", export_num);
         // Export function synthesis
         {
             // add the function type
@@ -566,10 +557,10 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
             let mut func = FunctionBuilder::new(&params, &ret);
             func.set_name(expt_name.to_string());
 
+            let args: Vec<LocalID> = params.iter().map(|param| func.add_local(*param)).collect();
+
             let arg_ptr = func.add_local(DataType::I32);
             let ret_ptr = func.add_local(DataType::I32);
-
-            let args: Vec<LocalID> = params.iter().map(|param| func.add_local(*param)).collect();
 
             // Stack "call" arg1 - export number to call
             func.i32_const(export_num as i32);
@@ -610,7 +601,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                     match param {
                         CoreTy::I32 => {
                             func.i32_store(MemArg {
-                                align: 4,
+                                align: 2,
                                 max_align: 0,
                                 offset,
                                 memory,
@@ -619,7 +610,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                         }
                         CoreTy::I64 => {
                             func.i64_store(MemArg {
-                                align: 8,
+                                align: 3,
                                 offset,
                                 memory,
                                 max_align: 0,
@@ -628,7 +619,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                         }
                         CoreTy::F32 => {
                             func.f32_store(MemArg {
-                                align: 4,
+                                align: 2,
                                 max_align: 0,
                                 offset,
                                 memory,
@@ -637,7 +628,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                         }
                         CoreTy::F64 => {
                             func.f64_store(MemArg {
-                                align: 8,
+                                align: 3,
                                 offset,
                                 memory,
                                 max_align: 0,
@@ -665,7 +656,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                 match expt_sig.ret.unwrap() {
                     CoreTy::I32 => {
                         func.i32_load(MemArg {
-                            align: 4,
+                            align: 2,
                             max_align: 0,
                             offset: 0,
                             memory,
@@ -673,7 +664,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                     }
                     CoreTy::I64 => {
                         func.i64_load(MemArg {
-                            align: 8,
+                            align: 3,
                             max_align: 0,
                             offset: 0,
                             memory,
@@ -681,7 +672,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                     }
                     CoreTy::F32 => {
                         func.f32_load(MemArg {
-                            align: 4,
+                            align: 2,
                             max_align: 0,
                             offset: 0,
                             memory,
@@ -689,7 +680,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                     }
                     CoreTy::F64 => {
                         func.f64_load(MemArg {
-                            align: 8,
+                            align: 3,
                             offset: 0,
                             memory,
                             max_align: 0,
@@ -698,7 +689,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                 }
             }
 
-            let fid = func.finish_module(args, module);
+            let fid = func.finish_module(args.len(), module);
             module.exports.add_export_func((*expt_name).clone(), fid);
         }
 
@@ -723,7 +714,8 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
         // and that is currently done based on timing assumptions of calls
         func.i32_const(export_num as i32);
         func.call(post_call);
-        let fid = func.finish_module(vec![], module);
+        let fid = func.finish_module(0, module);
+        // println!("Func Name: {:?} FuncID: {:?}", expt_name, fid);
         module
             .exports
             .add_export_func(format!("cabi_post_{}", expt_name), fid);

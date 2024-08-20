@@ -9,6 +9,7 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use orca::module_builder::AddLocal;
 use wasmparser::{MemArg, TypeRef};
 
 use wit_parser::Resolve;
@@ -24,13 +25,14 @@ fn stub_import<StubFn>(
 where
     StubFn: Fn(&mut FunctionBuilder) -> Result<Vec<LocalID>>,
 {
-    let Some(iid) = module.imports.find(import.parse()?, Some(name.parse()?)) else {
+    let Some(iid) = module.imports.find(import.parse()?, name.parse()?) else {
         return Ok(None);
     };
 
-    let TypeRef::Func(fid) = module.imports.get(iid).ty else {
+    let TypeRef::Func(t) = module.imports.get(iid).ty else {
         bail!("'{import}#{name}' is not a function.")
     };
+    let fid: FunctionID = iid as FunctionID;
 
     let f = module.functions.get(fid);
     let ty_id;
@@ -41,24 +43,21 @@ where
 
     let ty = module.types.get(ty_id).unwrap();
     let (params, results) = (ty.params.to_vec(), ty.results.to_vec());
-    let id = module.functions.len();
     let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
     let args = stub(&mut builder)?;
 
-    let ty_id = module.types.add(&*params, &*results);
-    let local_func = builder.local_func(args, id as FunctionID, ty_id);
+    // let ty_id = module.types.add(&*params, &*results); Do not need to add a new type as replacing a function with the same type
+    // Pass in Import ID as function ID to preserve location
+    let local_func = builder.local_func(args, iid as FunctionID, ty_id);
 
-    module
-        .functions
-        .get_mut(fid)
-        .set_kind(FuncKind::Local(local_func));
+    module.convert_import_fn_to_local(iid, local_func);
 
-    module.delete_import_func(iid);
     Ok(Some(fid))
 }
 
 fn unreachable_stub(body: &mut FunctionBuilder) -> Result<Vec<LocalID>> {
     body.unreachable();
+    body.end();
     Ok(vec![])
 }
 
@@ -194,6 +193,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
             func.i64_const(-0x18FC812E5F4BD725);
             func.i64_xor();
             func.i64_mul();
+            func.end();
             Ok(vec![])
         },
     )?
@@ -204,8 +204,9 @@ fn stub_random(module: &mut Module) -> Result<()> {
         "wasi:random/random@0.2.0",
         "get-random-bytes",
         |body| {
-            let num_bytes = body.add_local(DataType::I64);
-            let retptr = body.add_local(DataType::I32);
+            // let num_bytes = body.add_local(DataType::I64);
+            let num_bytes = 0; // First parameter
+            let retptr = 1; // Second parametr
             let outptr = body.add_local(DataType::I32);
             let curptr = body.add_local(DataType::I32);
             // carries through to *retptr = outptr
@@ -229,9 +230,9 @@ fn stub_random(module: &mut Module) -> Result<()> {
 
             // *retptr = outptr
             // *retptr + 1 = len
-            body.i32_load(MemArg {
-                align: 4,
-                max_align: 0, // TODO
+            body.i32_store(MemArg {
+                align: 2,
+                max_align: 0,
                 offset: 0,
                 memory,
             });
@@ -240,7 +241,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
             body.local_get(num_bytes);
             body.i32_wrap_i64();
             body.i32_store(MemArg {
-                align: 4,
+                align:2,
                 max_align: 0,
                 offset: 4,
                 memory,
@@ -251,11 +252,11 @@ fn stub_random(module: &mut Module) -> Result<()> {
             // store random bytes, we allocated a multiple of 8 bytes at the
             // start, so we do that exact multiple, while returning a shorter
             // list
-            body.loop_stmt(BlockType::Empty); // TODO: Is Empty the correct block type?
+            body.loop_stmt(BlockType::Empty);
             body.local_get(curptr);
             body.call(random_u64);
             body.i64_store(MemArg {
-                align: 8,
+                align: 3,
                 max_align: 0,
                 offset: 0,
                 memory,
@@ -269,8 +270,9 @@ fn stub_random(module: &mut Module) -> Result<()> {
             body.local_get(num_bytes);
             body.i32_wrap_i64();
             body.i32_lt_unsigned();
-            body.br_if(0); // TODO: Correct relative-depth to keep here
-            body.end();
+            body.br_if(0);
+            body.end(); // This is for the loop
+            body.end(); // This is for the function
 
             Ok(vec![num_bytes, retptr])
         },
@@ -307,23 +309,25 @@ fn stub_clocks(module: &mut Module) -> Result<()> {
 
     // (func (param i32 i64 i32) (result i32)))
     stub_import(module, PREVIEW1, "clock_time_get", |body| {
-        let clock_id = body.add_local(DataType::I32);
-        let precision = body.add_local(DataType::I64);
-        let time_ptr = body.add_local(DataType::I32);
+        let clock_id = 0; // First Parameter
+        let precision = 1; // Second Parameter
+        let time_ptr = 2; // Third Parameter
         body.local_get(time_ptr);
         body.local_get(time_ptr);
         body.i64_const(i64::try_from(unix_time.as_nanos())?);
         body.i64_store(MemArg {
-            align: 8,
+            align: 3,
             offset: 0,
             max_align: 0,
             memory,
         });
+        body.end();
         Ok(vec![clock_id, precision, time_ptr])
     })?;
 
     stub_import(module, "wasi:clocks/monotonic-clock@0.2.0", "now", |body| {
         body.i64_const(i64::try_from(unix_time.as_nanos())?);
+        body.end();
         Ok(vec![])
     })?;
     stub_import(
@@ -364,13 +368,15 @@ fn stub_stdio(module: &mut Module) -> Result<()> {
     // (func (param i32 i32) (result i32)))
     stub_import(module, PREVIEW1, "fd_fdstat_get", |body| {
         body.i32_const(0);
+        body.end();
         Ok(vec![])
     })?;
 
     // (func (param i32 i32 i32 i32) (result i32)))
     stub_import(module, PREVIEW1, "fd_write", |body| {
-        let len_local = body.add_local(DataType::I32);
+        let len_local = 3; // Index of the last local
         body.local_get(len_local);
+        body.end();
         Ok(vec![len_local])
     })?;
 
