@@ -48,6 +48,9 @@ jobs:
     - name: Install NPM packages
       run: npm install
 
+    - name: Check NPM packages
+      run: ls node_modules/.bin
+
     - name: Cache StarlingMonkey
       uses: actions/cache@v3
       id: starlingmonkey-build
