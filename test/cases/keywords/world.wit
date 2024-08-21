@@ -1,7 +1,8 @@
 package local:keywords;
 
 interface keywords {
-    %type: func(%type: u32) -> (%type: u32, %flags: s32);
+    type %flags = s32;
+    %type: func(%type: u32) -> %flags;
 }
 
 world the-world {
