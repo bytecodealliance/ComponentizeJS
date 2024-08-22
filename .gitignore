@@ -12,3 +12,4 @@ example/hello.component.wasm
 /build-release
 .vscode
 .idea
+.DS_Store

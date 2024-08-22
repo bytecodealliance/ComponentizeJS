@@ -8,7 +8,6 @@ edition.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
-
 [dependencies]
 anyhow = { workspace = true }
 heck = { workspace = true }

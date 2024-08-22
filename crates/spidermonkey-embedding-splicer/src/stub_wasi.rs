@@ -3,13 +3,13 @@ use orca::ir::function::FunctionBuilder;
 use orca::ir::id::{FunctionID, LocalID};
 use orca::ir::module::module_functions::FuncKind;
 use orca::ir::types::{BlockType, Value};
+use orca::module_builder::AddLocal;
 use orca::{DataType, InitExpr, Module, Opcode};
 use std::{
     collections::HashSet,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
-use orca::module_builder::AddLocal;
 use wasmparser::{MemArg, TypeRef};
 
 use wit_parser::Resolve;
@@ -29,17 +29,16 @@ where
         return Ok(None);
     };
 
-    let TypeRef::Func(t) = module.imports.get(iid).ty else {
+    let TypeRef::Func(_) = module.imports.get(iid).ty else {
         bail!("'{import}#{name}' is not a function.")
     };
     let fid: FunctionID = iid as FunctionID;
 
     let f = module.functions.get(fid);
-    let ty_id;
-    match f.kind() {
+    let ty_id= match f.kind() {
         FuncKind::Local(_) => bail!("Can't find type of '{import}#{name}'"),
-        FuncKind::Import(i) => ty_id = i.ty_id,
-    }
+        FuncKind::Import(i) => i.ty_id,
+    };
 
     let ty = module.types.get(ty_id).unwrap();
     let (params, results) = (ty.params.to_vec(), ty.results.to_vec());
@@ -119,12 +118,11 @@ pub fn stub_wasi(
     }
 
     stub_sockets(&mut module, &target_world_imports)?;
-
     Ok(module.encode())
 }
 
 fn target_world_requires_io(target_world_imports: &HashSet<String>) -> bool {
-    return target_world_imports.contains("wasi:sockets/instance-network@0.2.0")
+    target_world_imports.contains("wasi:sockets/instance-network@0.2.0")
         || target_world_imports.contains("wasi:sockets/udp@0.2.0")
         || target_world_imports.contains("wasi:sockets/udp-create-socket@0.2.0")
         || target_world_imports.contains("wasi:sockets/tcp@0.2.0")
@@ -137,7 +135,7 @@ fn target_world_requires_io(target_world_imports: &HashSet<String>) -> bool {
         || target_world_imports.contains("wasi:cli/terminal-stdout@0.2.0")
         || target_world_imports.contains("wasi:cli/terminal-stderr@0.2.0")
         || target_world_imports.contains("wasi:cli/terminal-input@0.2.0")
-        || target_world_imports.contains("wasi:cli/terminal-output@0.2.0");
+        || target_world_imports.contains("wasi:cli/terminal-output@0.2.0")
 }
 
 const PREVIEW1: &str = "wasi_snapshot_preview1";
@@ -241,7 +239,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
             body.local_get(num_bytes);
             body.i32_wrap_i64();
             body.i32_store(MemArg {
-                align:2,
+                align: 2,
                 max_align: 0,
                 offset: 4,
                 memory,
