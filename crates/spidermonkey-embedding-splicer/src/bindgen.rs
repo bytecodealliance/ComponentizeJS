@@ -525,13 +525,13 @@ impl JsBindgen<'_> {
     fn imports_bindgen(&mut self, guest_imports: &Vec<String>) {
         for (key, impt) in &self.resolve.worlds[self.world].imports {
             let import_name = self.resolve.name_world_key(key);
-            if !guest_imports.contains(&import_name)
-                && !import_name.starts_with(&self.local_package_name)
-            {
-                continue;
-            }
             match &impt {
                 WorldItem::Function(f) => {
+                    if !guest_imports.contains(&import_name)
+                        && !import_name.starts_with(&self.local_package_name)
+                    {
+                        continue;
+                    }
                     self.import_bindgen(import_name, f, false, None);
                 }
                 WorldItem::Interface {
@@ -577,15 +577,21 @@ impl JsBindgen<'_> {
                             uwriteln!(self.src, "\nexport class import_{name} {{");
                         }
 
-                        for (_, func) in functions {
-                            self.import_bindgen(
-                                import_name.clone(),
-                                func,
-                                true,
-                                iface_name.clone(),
-                            );
+                        if guest_imports.contains(&import_name)
+                            || import_name.starts_with(&self.local_package_name)
+                        {
+                            for (_, func) in functions {
+                                self.import_bindgen(
+                                    import_name.clone(),
+                                    func,
+                                    true,
+                                    iface_name.clone(),
+                                );
+                            }
                         }
 
+                        // TODO: Resource tree-shaking, which requires resource use checks against used
+                        //       functions.
                         if let Some(ty) = resource {
                             let lower_camel = &self.resolve.types[ty]
                                 .name
