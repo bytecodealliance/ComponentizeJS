@@ -100,6 +100,23 @@ await writeFile('test.component.wasm', component);
 
 The component iself can be executed in any component runtime, see the [example](EXAMPLE.md) for an end to end workflow in Wasmtime.
 
+### Async Support
+
+To support asynchronous operations, all functions may optionally be written as sync or async functions, even though they will always be turned into sync component functions.
+
+For example, to use `fetch` which requires async calls, we can write the same example component using an async function:
+
+```js
+export async function sayHello (name) {
+  const text = await (await fetch(`http://localhost:8080/${name}`)).text();
+  console.log(text);
+}
+```
+
+ComponentizeJS will automatically resolve promises returned by functions to syncify their return values, running the event loop within the JS component to resolution.
+
+This asynchrony is only supported for exported functions - imported functions can only be synchronous pending component-model-level async support.
+
 ### CLI
 
 ComponentizeJS can be used as a CLI from `jco`:
