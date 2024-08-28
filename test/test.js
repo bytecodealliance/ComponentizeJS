@@ -15,8 +15,8 @@ suite('Builtins', () => {
       const {
         source,
         test: runTest,
-        enableFeatures,
         disableFeatures,
+        enableFeatures
       } = await import(`./builtins/${filename}`);
 
       const { component } = await componentize(
@@ -25,7 +25,6 @@ suite('Builtins', () => {
         package local:runworld;
         world runworld {
           export run: func() -> ();
-          export ready: func() -> bool;
         }
       `,
         {
@@ -56,51 +55,57 @@ suite('Builtins', () => {
       await writeFile(
         new URL(`./output/${name}/run.js`, import.meta.url),
         `
-        import { run, ready } from './${name}.js';
+        import { run } from './${name}.js';
         run();
-        while (!ready()) await new Promise(resolve => setTimeout(resolve, 10));
       `
       );
 
-      await runTest(async function run() {
-        let stdout = '',
-          stderr = '',
-          timeout;
-        try {
-          await new Promise((resolve, reject) => {
-            const cp = spawn(
-              process.argv[0],
-              [
-                fileURLToPath(
-                  new URL(`./output/${name}/run.js`, import.meta.url)
-                ),
-              ],
-              { stdio: 'pipe' }
-            );
-            cp.stdout.on('data', (chunk) => {
-              stdout += chunk;
+      try {
+        await runTest(async function run() {
+          let stdout = '',
+            stderr = '',
+            timeout;
+          try {
+            await new Promise((resolve, reject) => {
+              const cp = spawn(
+                process.argv[0],
+                [
+                  fileURLToPath(
+                    new URL(`./output/${name}/run.js`, import.meta.url)
+                  ),
+                ],
+                { stdio: 'pipe' }
+              );
+              cp.stdout.on('data', (chunk) => {
+                stdout += chunk;
+              });
+              cp.stderr.on('data', (chunk) => {
+                stderr += chunk;
+              });
+              cp.on('error', reject);
+              cp.on('exit', (code) =>
+                code === 0 ? resolve() : reject(new Error(stderr || stdout))
+              );
+              timeout = setTimeout(() => {
+                reject(new Error("test timed out with output:\n" + stdout + '\n\nstderr:\n' + stderr));
+              }, 10_000);
             });
-            cp.stderr.on('data', (chunk) => {
-              stderr += chunk;
-            });
-            cp.on('error', reject);
-            cp.on('exit', (code) =>
-              code === 0 ? resolve() : reject(new Error(stderr || stdout))
-            );
-            timeout = setTimeout(() => {
-              reject(new Error("test timed out with output:\n" + stdout + '\n\nstderr:\n' + stderr));
-            }, 10_000);
-          });
-        }
-        catch (err) {
-          throw { err, stdout, stderr };
-        }
-        finally {
-          clearTimeout(timeout);
-        }
+          }
+          catch (err) {
+            throw { err, stdout, stderr };
+          }
+          finally {
+            clearTimeout(timeout);
+          }
 
-        return { stdout, stderr };
-      });
+          return { stdout, stderr };
+        });
+      }
+      catch (err) {
+        if (err.stderr)
+          console.error(err.stderr);
+        throw err.err || err;
+      }
     });
   }
 });
@@ -143,7 +148,7 @@ suite('Bindings', () => {
 
       const test = await import(`./cases/${name}/test.js`);
 
-      const enableFeatures = test.enableFeatures || [];
+      const enableFeatures = test.enableFeatures || ['http'];
       const disableFeatures = test.disableFeatures || (isWasiTarget ? [] : ['random', 'clocks', 'http', 'stdio']);
 
       let testArg;

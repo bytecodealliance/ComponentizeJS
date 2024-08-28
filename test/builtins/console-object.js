@@ -46,9 +46,6 @@ export const source = `
     Object.defineProperty(o, 'hidden', { value: 'hidden', enumerable: false });
     console.log(o);
   };
-  export function ready () {
-    return true;
-  }
 `;
 
 export async function test (run) {

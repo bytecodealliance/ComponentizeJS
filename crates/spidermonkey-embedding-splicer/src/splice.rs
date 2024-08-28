@@ -34,7 +34,8 @@ pub fn splice(
     exports: Vec<(String, CoreFn)>,
     debug: bool,
 ) -> Result<Vec<u8>> {
-    let config = walrus::ModuleConfig::new();
+    let mut config = walrus::ModuleConfig::new();
+    config.generate_dwarf(true);
     let mut module = config.parse(&engine)?;
 
     // since StarlingMonkey implements CLI Run and incoming handler,

@@ -910,7 +910,8 @@ impl JsBindgen<'_> {
             binding_name(&resource.func_name(fn_name), &iface_name)
         );
 
-        uwrite!(self.src, "\nexport function {binding_name}");
+        // all exports are supported as async functions
+        uwrite!(self.src, "\nexport async function {binding_name}");
 
         // exports are canonicalized as imports because
         // the function bindgen as currently written still makes this assumption
@@ -918,7 +919,7 @@ impl JsBindgen<'_> {
 
         self.bindgen(
             sig.params.len(),
-            &callee,
+            &format!("await {callee}"),
             string_encoding,
             func,
             AbiVariant::GuestImport,

@@ -5,9 +5,6 @@ export const source = `
     console.log(Math.random());
     console.log(Math.random());
   }
-  export function ready () {
-    return true;
-  }
 `;
 
 export const disableFeatures = ['random'];
