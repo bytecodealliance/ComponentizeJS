@@ -1,6 +1,6 @@
 {
   "name": "@bytecodealliance/componentize-js",
-  "version": "0.11.1",
+  "version": "0.11.3",
   "homepage": "https://github.com/bytecodealliance/componentize-js#readme",
   "type": "module",
   "exports": "./src/componentize.js",
@@ -20,10 +20,11 @@
     "test": "mocha -u tdd test/test.js --timeout 120000"
   },
   "files": [
-    "lib",
+    "lib/interfaces",
+    "lib/spidermonkey-*",
+    "lib/starlingmonkey_embedding.wasm",
     "src"
   ],
-  "ignore": "lib/starlingmonkey_embedding.debug.wasm",
   "workspaces": [
     "."
   ]
