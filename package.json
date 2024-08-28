@@ -24,6 +24,7 @@
     "lib",
     "src"
   ],
+  "ignore": "spidermonkey_embedding.debug.wasm",
   "workspaces": [
     "."
   ]
