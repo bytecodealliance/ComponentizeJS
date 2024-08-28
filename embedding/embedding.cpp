@@ -19,7 +19,7 @@ public:
 };
 
 void builtin_impl_console_log(Console::LogType log_ty, const char *msg) {
-  if (log_ty == Console::LogType::Log) {
+  if (log_ty == Console::LogType::Log || log_ty == Console::LogType::Info) {
     fprintf(stdout, "%s\n", msg);
     fflush(stdout);
   } else {
@@ -45,8 +45,7 @@ bool call_catch_handler(JSContext *cx, JS::HandleObject receiver,
                         JS::HandleValue extra, JS::CallArgs args) {
   LOG("(call) call catch handler");
   Runtime.engine->decr_event_loop_interest();
-  fprintf(stderr, "Promise error during call:");
-  Runtime.engine->dump_value(args.get(0), stderr);
+  Runtime.engine->dump_error(args.get(0), stderr);
   return false;
 }
 
@@ -66,7 +65,7 @@ from_bigint64(JS::MutableHandleValue handle) {
   JS::BigInt *arg0 = handle.toBigInt();
   uint64_t arg0_uint64;
   if (!JS::detail::BigIntIsUint64(arg0, &arg0_uint64)) {
-    abort();
+    Runtime.engine->abort("Internal bindgen error in coreabi_from_bigint64 validation");
   }
   return arg0_uint64;
 }

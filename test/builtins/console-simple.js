@@ -4,9 +4,6 @@ export const source = `
   export function run () {
     console.log('test');
   }
-  export function ready () {
-    return true;
-  }
 `;
 
 export async function test (run) {

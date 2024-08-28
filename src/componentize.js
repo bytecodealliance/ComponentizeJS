@@ -77,7 +77,7 @@ export async function componentize(jsSource, witWorld, opts) {
   if (!disableFeatures.includes('clocks')) {
     features.push('clocks');
   }
-  if (enableFeatures.includes('http')) {
+  if (!disableFeatures.includes('http')) {
     features.push('http');
   }
 

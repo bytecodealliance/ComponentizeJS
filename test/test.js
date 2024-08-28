@@ -25,7 +25,6 @@ suite('Builtins', () => {
         package local:runworld;
         world runworld {
           export run: func() -> ();
-          export ready: func() -> bool;
         }
       `,
         {
@@ -56,9 +55,8 @@ suite('Builtins', () => {
       await writeFile(
         new URL(`./output/${name}/run.js`, import.meta.url),
         `
-        import { run, ready } from './${name}.js';
+        import { run } from './${name}.js';
         run();
-        while (!ready()) await new Promise(resolve => setTimeout(resolve, 10));
       `
       );
 
