@@ -445,7 +445,7 @@ static bool ReallocFn(JSContext *cx, unsigned argc, JS::Value *vp) {
 
 void cabi_free(void *ptr) {
   LOG("(cabi_free) %d", (uint32_t)ptr);
-  // JS_free(Runtime.cx, ptr);
+  JS_free(Runtime.cx, ptr);
 }
 
 const char *core_ty_str(CoreVal ty) {
