@@ -1,16 +1,16 @@
 {
   "name": "@bytecodealliance/componentize-js",
-  "version": "0.10.2",
+  "version": "0.11.4",
   "homepage": "https://github.com/bytecodealliance/componentize-js#readme",
   "type": "module",
   "exports": "./src/componentize.js",
   "devDependencies": {
-    "@bytecodealliance/preview2-shim": "^0.16.4",
+    "@bytecodealliance/preview2-shim": "^0.16.5",
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "1.4.0",
-    "@bytecodealliance/wizer": "^3.0.1",
+    "@bytecodealliance/jco": "1.4.4",
+    "@bytecodealliance/wizer": "^7.0.4",
     "es-module-lexer": "^1.5.4"
   },
   "types": "types.d.ts",
@@ -20,8 +20,9 @@
     "test": "mocha -u tdd test/test.js --timeout 120000"
   },
   "files": [
-    "console.js",
-    "lib",
+    "lib/interfaces",
+    "lib/spidermonkey-*",
+    "lib/starlingmonkey_embedding.wasm",
     "src"
   ],
   "workspaces": [

@@ -6,9 +6,6 @@ export const source = `
     crypto.getRandomValues(out);
     console.log(out.join('\\n'));
   }
-  export function ready () {
-    return true;
-  }
 `;
 
 export const disableFeatures = ['random'];

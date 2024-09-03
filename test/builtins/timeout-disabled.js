@@ -1,18 +1,14 @@
 import { strictEqual, ok } from 'node:assert';
 
 export const source = `
-  let done = false;
-  export function run () {
+  export async function run () {
     console.log(Date.now());
 
     // causes a panic
-    setTimeout(() => {
+    await new Promise(resolve => setTimeout(() => {
       console.log(Date.now());
-      done = true;
-    }, 100);
-  }
-  export function ready () {
-    return done;
+      resolve();
+    }, 100));
   }
 `;
 

@@ -11,7 +11,7 @@
   {                                            \
     fprintf(stderr, __VA_ARGS__);              \
     fprintf(stderr, "\n");                     \
-    fflush(stdout);                            \
+    fflush(stderr);                            \
   }
 
 // StarlingMonkey Wizer initialize function
@@ -53,11 +53,6 @@ namespace componentize::embedding
 
     // The name of the source being executed
     std::string source_name;
-
-    // The user module being executed
-    JS::PersistentRootedObject mod;
-    // The internal generated bindings module being executed
-    JS::PersistentRootedObject mod_bindings;
 
     api::Engine *engine;
 

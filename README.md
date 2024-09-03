@@ -100,6 +100,23 @@ await writeFile('test.component.wasm', component);
 
 The component iself can be executed in any component runtime, see the [example](EXAMPLE.md) for an end to end workflow in Wasmtime.
 
+### Async Support
+
+To support asynchronous operations, all functions may optionally be written as sync or async functions, even though they will always be turned into sync component functions.
+
+For example, to use `fetch` which requires async calls, we can write the same example component using an async function:
+
+```js
+export async function sayHello (name) {
+  const text = await (await fetch(`http://localhost:8080/${name}`)).text();
+  console.log(text);
+}
+```
+
+ComponentizeJS will automatically resolve promises returned by functions to syncify their return values, running the event loop within the JS component to resolution.
+
+This asynchrony is only supported for exported functions - imported functions can only be synchronous pending component-model-level async support.
+
 ### CLI
 
 ComponentizeJS can be used as a CLI from `jco`:
@@ -125,13 +142,13 @@ The default set of features includes:
 * `'stdio'`: Output to stderr and stdout for errors and console logging, depends on `wasi:cli` and `wasi:io`.
 * `'random'`: Support for cryptographic random, depends on `wasi:random`. **When disabled, random numbers will still be generated but will not be random and instead fully deterministic.**
 * `'clocks'`: Support for clocks and duration polls, depends on `wasi:clocks` and `wasi:io`. **When disabled, using any timer functions like setTimeout or setInterval will panic.**
+* `'http'`: Support for outbound HTTP via the `fetch` global in JS.
 
-Setting `disableFeatures: ['random', 'stdio', 'clocks']` will disable all features creating a minimal "pure component", that does not depend on any WASI APIs at all and just the target world.
+Setting `disableFeatures: ['random', 'stdio', 'clocks', 'http']` will disable all features creating a minimal "pure component", that does not depend on any WASI APIs at all and just the target world.
 
 Note that pure components **will not report errors and will instead trap**, so that this should only be enabled after very careful testing.
 
-Note that features explicitly imported by the target world cannot be disabled - if you target a component to a world
-that imports `wasi:clocks`, then `disableFeatures: ['clocks']` will not be supported.
+Note that features explicitly imported by the target world cannot be disabled - if you target a component to a world that imports `wasi:clocks`, then `disableFeatures: ['clocks']` will not be supported.
 
 ## Using StarlingMonkey's `fetch-event`
 
@@ -147,8 +164,7 @@ export function componentize(jsSource: string, opts: {
   sourceName?: string,
   engine?: string,
   preview2Adapter?: string,
-  disableFeatures?: ('stdio' | 'random' | 'clocks')[],
-  enableFeatures?: ('http')[],
+  disableFeatures?: ('stdio' | 'random' | 'clocks' | 'http')[],
 }): {
   component: Uint8Array,
   imports: string[]

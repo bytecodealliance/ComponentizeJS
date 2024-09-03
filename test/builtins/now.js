@@ -8,9 +8,6 @@ export const source = `
       globalThis.stuff.push(i);
     console.log(Date.now());
   }
-  export function ready () {
-    return true;
-  }
 `;
 
 export async function test(run) {

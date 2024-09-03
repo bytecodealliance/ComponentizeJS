@@ -35,7 +35,7 @@ where
     let fid: FunctionID = iid as FunctionID;
 
     let f = module.functions.get(fid);
-    let ty_id= match f.kind() {
+    let ty_id = match f.kind() {
         FuncKind::Local(_) => bail!("Can't find type of '{import}#{name}'"),
         FuncKind::Import(i) => i.ty_id,
     };

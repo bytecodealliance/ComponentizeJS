@@ -26,16 +26,15 @@ interface ComponentizeOptions {
    * - stdio: console.log(), console.error and errors are provided to stderr
    * - random: Math.random() and crypto.randomBytes()
    * - clocks: Date.now()
+   * - http: fetch() support
    * 
    */
-  disableFeatures?: ('stdio' | 'random' | 'clocks')[],
+  disableFeatures?: ('stdio' | 'random' | 'clocks' | 'http')[],
   /**
    * Enable WASI features in the base engine
-   * 
-   * - http: fetch() API
-   * 
+   * (no experimental subsystems currently supported)
    */
-  enableFeatures?: ('http')[],
+  enableFeatures?: [],
 }
 
 /**

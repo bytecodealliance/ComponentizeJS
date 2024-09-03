@@ -11,5 +11,6 @@ example/hello.component.wasm
 /build-debug
 /build-release
 .vscode
+/package-lock.json
 .idea
 .DS_Store

@@ -81,7 +81,7 @@ fn map_core_fn(cfn: &bindgen::CoreFn) -> CoreFn {
 
 fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
     let mut resolve = Resolve::default();
-    let ids = if path.is_dir() {
+    let id = if path.is_dir() {
         resolve.push_dir(&path)?.0
     } else {
         let contents =
@@ -92,7 +92,7 @@ fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
         };
         resolve.push_str(&path, text)?
     };
-    Ok((resolve, ids))
+    Ok((resolve, id))
 }
 
 impl Guest for SpidermonkeyEmbeddingSplicerComponent {
@@ -119,19 +119,19 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
     ) -> Result<SpliceResult, String> {
         let source_name = source_name.unwrap_or("source.js".to_string());
 
-        let (mut resolve, ids) = if let Some(wit_source) = wit_source {
+        let (mut resolve, id) = if let Some(wit_source) = wit_source {
             let mut resolve = Resolve::default();
             let path = PathBuf::from("component.wit");
-            let ids = resolve
+            let id = resolve
                 .push_str(&path, &wit_source)
                 .map_err(|e| e.to_string())?;
-            (resolve, ids)
+            (resolve, id)
         } else {
             parse_wit(&PathBuf::from(wit_path.unwrap())).map_err(|e| format!("{:?}", e))?
         };
 
         let world = resolve
-            .select_world(ids, world_name.as_deref())
+            .select_world(id, world_name.as_deref())
             .map_err(|e| e.to_string())?;
 
         let mut wasm_bytes = wit_component::dummy_module(&resolve, world);

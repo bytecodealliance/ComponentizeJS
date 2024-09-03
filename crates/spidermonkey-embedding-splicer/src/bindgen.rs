@@ -85,6 +85,8 @@ struct JsBindgen<'a> {
     esm_bindgen: EsmBindgen,
     local_names: LocalNames,
 
+    local_package_name: String,
+
     resolve: &'a Resolve,
     world: WorldId,
     sizes: SizeAlign,
@@ -135,6 +137,7 @@ pub fn componentize_bindgen(
     guest_exports: &Vec<String>,
     features: Vec<Features>,
 ) -> Result<Componentization> {
+    let local_package_name = resolve.id_of_name(resolve.worlds[id].package.unwrap(), "");
     let mut bindgen = JsBindgen {
         src: Source::default(),
         esm_bindgen: EsmBindgen::default(),
@@ -145,6 +148,7 @@ pub fn componentize_bindgen(
         sizes: SizeAlign::default(),
         memory: "$memory".to_string(),
         realloc: "$realloc".to_string(),
+        local_package_name,
         exports: Vec::new(),
         imports: Vec::new(),
         resource_directions: HashMap::new(),
@@ -523,11 +527,13 @@ impl JsBindgen<'_> {
     fn imports_bindgen(&mut self, guest_imports: &Vec<String>) {
         for (key, impt) in &self.resolve.worlds[self.world].imports {
             let import_name = self.resolve.name_world_key(key);
-            if !guest_imports.contains(&import_name) {
-                continue;
-            }
             match &impt {
                 WorldItem::Function(f) => {
+                    if !guest_imports.contains(&import_name)
+                        && !import_name.starts_with(&self.local_package_name)
+                    {
+                        continue;
+                    }
                     self.import_bindgen(import_name, f, false, None);
                 }
                 WorldItem::Interface {
@@ -573,15 +579,21 @@ impl JsBindgen<'_> {
                             uwriteln!(self.src, "\nexport class import_{name} {{");
                         }
 
-                        for (_, func) in functions {
-                            self.import_bindgen(
-                                import_name.clone(),
-                                func,
-                                true,
-                                iface_name.clone(),
-                            );
+                        if guest_imports.contains(&import_name)
+                            || import_name.starts_with(&self.local_package_name)
+                        {
+                            for (_, func) in functions {
+                                self.import_bindgen(
+                                    import_name.clone(),
+                                    func,
+                                    true,
+                                    iface_name.clone(),
+                                );
+                            }
                         }
 
+                        // TODO: Resource tree-shaking, which requires resource use checks against used
+                        //       functions.
                         if let Some(ty) = resource {
                             let lower_camel = &self.resolve.types[ty]
                                 .name
@@ -900,7 +912,8 @@ impl JsBindgen<'_> {
             binding_name(&resource.func_name(fn_name), &iface_name)
         );
 
-        uwrite!(self.src, "\nexport function {binding_name}");
+        // all exports are supported as async functions
+        uwrite!(self.src, "\nexport async function {binding_name}");
 
         // exports are canonicalized as imports because
         // the function bindgen as currently written still makes this assumption
@@ -908,7 +921,7 @@ impl JsBindgen<'_> {
 
         self.bindgen(
             sig.params.len(),
-            &callee,
+            &format!("await {callee}"),
             string_encoding,
             func,
             AbiVariant::GuestImport,
