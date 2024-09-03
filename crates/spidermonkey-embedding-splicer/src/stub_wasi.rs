@@ -11,7 +11,6 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use wasmparser::{MemArg, TypeRef};
-
 use wit_parser::Resolve;
 
 use crate::{parse_wit, Features};
@@ -47,9 +46,10 @@ where
 
     // let ty_id = module.types.add(&*params, &*results); Do not need to add a new type as replacing a function with the same type
     // Pass in Import ID as function ID to preserve location
-    let local_func = builder.local_func(args, iid as FunctionID, ty_id);
+    builder.replace_import_in_module(module, iid);
+    // let local_func = builder.local_func(args, iid as FunctionID, ty_id);
 
-    module.convert_import_fn_to_local(iid, local_func);
+    // module.convert_import_fn_to_local(iid, local_func);
 
     Ok(Some(fid))
 }
@@ -170,7 +170,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
     // stubbed random implements random with a pseudorandom implementation
     // create a mutable random seed global
     let seed_val: i64 = 0;
-    let seed_global = module.globals.create(
+    let seed_global = module.add_global(
         InitExpr::Value(Value::I64(seed_val)),
         DataType::I64,
         true,

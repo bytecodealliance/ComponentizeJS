@@ -54,7 +54,7 @@ pub fn splice(
         {
             let expt = module.exports.get_func_by_id(run).unwrap();
             module.exports.delete(expt);
-            module.functions.delete(run); // TODO: Look at the intended behaviour here. Need to pass function ID to delete from functions. Was Previously passing Exports ID
+            module.delete_func(run); // TODO: Look at the intended behaviour here. Need to pass function ID to delete from functions. Was Previously passing Exports ID
         }
     }
 
@@ -68,7 +68,7 @@ pub fn splice(
         {
             let expt = module.exports.get_func_by_id(serve).unwrap();
             module.exports.delete(expt);
-            module.functions.delete(serve); // TODO: Look at the intended behaviour here. Same as above comment
+            module.delete_func(serve); // TODO: Look at the intended behaviour here. Same as above comment
         }
     }
 
@@ -230,7 +230,7 @@ fn synthesize_import_functions(
                     (*impt_specifier).clone(),
                     (*impt_name).clone(),
                     import_fn_type,
-                )
+                ).0
             };
 
             // create the native JS binding function
@@ -396,7 +396,7 @@ fn synthesize_import_functions(
             // return true
             func.i32_const(1);
 
-            let fid = func.finish_module(3, module);
+            let fid = func.finish_module(module);
             import_fnids.push(fid);
         }
 
@@ -669,7 +669,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
                 }
             }
 
-            let fid = func.finish_module(args.len(), module);
+            let fid = func.finish_module(module);
             module.exports.add_export_func((*expt_name).clone(), fid);
         }
 
@@ -694,7 +694,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
         // and that is currently done based on timing assumptions of calls
         func.i32_const(export_num as i32);
         func.call(post_call);
-        let fid = func.finish_module(0, module);
+        let fid = func.finish_module(module);
         module
             .exports
             .add_export_func(format!("cabi_post_{}", expt_name), fid);
