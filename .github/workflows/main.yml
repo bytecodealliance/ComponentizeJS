@@ -62,15 +62,7 @@ jobs:
     - name: Download and build orca
       run: |
         cd .. && git clone https://github.com/thesuhas/orca.git
-        cd orca && git fetch
-        git switch huge_refactor_for_more_apis
-        cargo build
-
-    - name: Download and build jco fork
-      run: |
-        cd .. && git clone https://github.com/thesuhas/jco.git
-        cd jco && git fetch
-        git switch wasm_tools_upgrade
+        cd orca
         cargo build
 
     - name: Build
