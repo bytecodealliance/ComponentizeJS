@@ -11,11 +11,13 @@
   "dependencies": {
     "@bytecodealliance/jco": "1.4.4",
     "@bytecodealliance/wizer": "^7.0.4",
+    "@cfallin/weval": "^0.2.12",
     "es-module-lexer": "^1.5.4"
   },
   "types": "types.d.ts",
   "scripts": {
     "build": "make release",
+    "build:weval": "make release-weval",
     "build:debug": "make debug",
     "test": "mocha -u tdd test/test.js --timeout 120000"
   },
@@ -23,6 +25,8 @@
     "lib/interfaces",
     "lib/spidermonkey-*",
     "lib/starlingmonkey_embedding.wasm",
+    "lib/starlingmonkey_embedding_weval.wasm",
+    "lib/starlingmonkey_ics.wevalcache",
     "src"
   ],
   "workspaces": [

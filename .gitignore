@@ -10,5 +10,6 @@ example/package-lock.json
 example/hello.component.wasm
 /build-debug
 /build-release
+/build-release-weval
 .vscode
 /package-lock.json

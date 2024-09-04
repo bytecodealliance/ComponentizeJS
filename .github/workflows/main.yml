@@ -56,11 +56,15 @@ jobs:
       uses: actions/cache@v3
       id: starlingmonkey-build
       with:
-        path: build-release
+        path: |
+          build-release
+          build-release-weval 
         key: engine-build-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
 
     - name: Build
-      run: npm run build
+      run: |
+        npm run build
+        npm run build:weval
 
     - name: Test
       run: npm run test
