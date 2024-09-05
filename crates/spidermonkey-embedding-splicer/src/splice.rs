@@ -1,10 +1,10 @@
-use orca::ir::function::{FunctionBuilder, FunctionModifier};
-use orca::ir::id::{ExportsID, FunctionID, LocalID};
-use orca::ir::module::Module;
-use orca::ir::types::{BlockType, ElementItems, InstrumentationMode};
-use orca::module_builder::AddLocal;
-use orca::opcode::{Inject, InjectAt};
-use orca::{DataType, Opcode};
+use orca_wasm::ir::function::{FunctionBuilder, FunctionModifier};
+use orca_wasm::ir::id::{ExportsID, FunctionID, LocalID};
+use orca_wasm::ir::module::Module;
+use orca_wasm::ir::types::{BlockType, ElementItems, InstrumentationMode};
+use orca_wasm::module_builder::AddLocal;
+use orca_wasm::opcode::{Inject, InjectAt};
+use orca_wasm::{DataType, Opcode};
 use wasmparser::ExternalKind;
 use wasmparser::MemArg;
 use wasmparser::Operator;

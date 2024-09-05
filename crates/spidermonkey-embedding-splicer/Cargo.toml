@@ -19,5 +19,5 @@ wit-component = { workspace = true }
 wit-parser = { workspace = true }
 wit-bindgen-core = { workspace = true }
 wit-bindgen = { workspace = true }
-orca.workspace = true
 wat.workspace = true
+orca-wasm.workspace = true

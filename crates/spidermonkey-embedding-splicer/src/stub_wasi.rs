@@ -1,10 +1,10 @@
 use anyhow::{bail, Result};
-use orca::ir::function::FunctionBuilder;
-use orca::ir::id::{FunctionID, LocalID};
-use orca::ir::module::module_functions::FuncKind;
-use orca::ir::types::{BlockType, Value};
-use orca::module_builder::AddLocal;
-use orca::{DataType, InitExpr, Module, Opcode};
+use orca_wasm::ir::function::FunctionBuilder;
+use orca_wasm::ir::id::{FunctionID, LocalID};
+use orca_wasm::ir::module::module_functions::FuncKind;
+use orca_wasm::ir::types::{BlockType, Value};
+use orca_wasm::module_builder::AddLocal;
+use orca_wasm::{DataType, InitExpr, Module, Opcode};
 use std::{
     collections::HashSet,
     path::PathBuf,

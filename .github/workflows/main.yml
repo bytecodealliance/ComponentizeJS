@@ -59,10 +59,10 @@ jobs:
         path: build-release
         key: engine-build-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
 
-    - name: Download and build orca
+    - name: Download and build orca_wasm
       run: |
-        cd .. && git clone https://github.com/thesuhas/orca.git
-        cd orca
+        cd .. && git clone https://github.com/thesuhas/orca_wasm.git
+        cd orca_wasm
         cargo build
 
     - name: Build
