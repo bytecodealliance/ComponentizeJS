@@ -1,16 +1,16 @@
 {
   "name": "@bytecodealliance/componentize-js",
-  "version": "0.11.4",
+  "version": "0.12.0",
   "homepage": "https://github.com/bytecodealliance/componentize-js#readme",
   "type": "module",
   "exports": "./src/componentize.js",
   "devDependencies": {
-    "@bytecodealliance/preview2-shim": "^0.16.5",
+    "@bytecodealliance/preview2-shim": "^0.16.7",
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "1.4.4",
-    "@bytecodealliance/wizer": "^7.0.4",
+    "@bytecodealliance/jco": "1.5.0",
+    "@bytecodealliance/wizer": "^7.0.5",
     "@cfallin/weval": "^0.2.14",
     "es-module-lexer": "^1.5.4"
   },
@@ -20,7 +20,8 @@
     "build:weval": "make release-weval",
     "build:debug": "make debug",
     "test": "mocha -u tdd test/test.js --timeout 120000",
-    "test:weval": "WEVAL_TEST=1 mocha -u tdd test/test.js --timeout 120000"
+    "test:weval": "WEVAL_TEST=1 mocha -u tdd test/test.js --timeout 120000",
+    "prepublishOnly": "npm run build && npm run build:weval"
   },
   "files": [
     "lib/interfaces",
