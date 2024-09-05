@@ -192,19 +192,21 @@ export async function componentize(jsSource, witWorld, opts) {
         [
           'weval',
           `--cache-ro ${aotCache}`,
+          `--dir ${maybeWindowsPath(sourceDir)}`,
           '-w',
           `-i ${input}`,
-          `-o ${output}`,
-          `--dir ${dirname(input)}`
-        ], {
-        stdio: [null, stdout, stderr],
-        env,
-        input: maybeWindowsPath(
-          join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')
-        ),
-        shell: true,
-        encoding: 'utf-8',
-      })
+          `-o ${output}`
+        ],
+        {
+          stdio: [null, stdout, stderr],
+          env,
+          input: maybeWindowsPath(
+            join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')
+          ),
+          shell: true,
+          encoding: 'utf-8',
+        }
+      );
       if (wevalProcess.status !== 0)
         throw new Error('Wevaling failed to complete');
     } catch (error) {
