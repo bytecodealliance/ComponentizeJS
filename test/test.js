@@ -9,6 +9,8 @@ const DEBUG_TRACING = false;
 
 const builtinsCases = await readdir(new URL('./builtins', import.meta.url));
 suite('Builtins', () => {
+  const enableAot = process.env.WEVAL_TEST == '1'
+
   for (const filename of builtinsCases) {
     const name = filename.slice(0, -3);
     test(name, async () => {
@@ -31,6 +33,7 @@ suite('Builtins', () => {
           sourceName: `${name}.js`,
           enableFeatures,
           disableFeatures,
+          enableAot
         }
       );
 
@@ -112,6 +115,8 @@ suite('Builtins', () => {
 
 const bindingsCases = await readdir(new URL('./cases', import.meta.url));
 suite('Bindings', () => {
+  const enableAot = process.env.WEVAL_TEST == '1'
+
   for (const name of bindingsCases) {
     test(name, async () => {
       const source = await readFile(
@@ -159,7 +164,8 @@ suite('Bindings', () => {
           witPath,
           worldName,
           enableFeatures,
-          disableFeatures
+          disableFeatures,
+          enableAot
         });
         const map = {
           'wasi:cli-base/*': '@bytecodealliance/preview2-shim/cli-base#*',
@@ -221,6 +227,8 @@ suite('Bindings', () => {
 
 suite('WASI', () => {
   test('basic app', async () => {
+    const enableAot = process.env.WEVAL_TEST == '1'
+
     const { component } = await componentize(
       `
       import { now } from 'wasi:clocks/wall-clock@0.2.0';
@@ -238,6 +246,7 @@ suite('WASI', () => {
       {
         witPath: fileURLToPath(new URL('./wit', import.meta.url)),
         worldName: 'test1',
+        enableAot
       }
     );
 

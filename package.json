@@ -19,7 +19,8 @@
     "build": "make release",
     "build:weval": "make release-weval",
     "build:debug": "make debug",
-    "test": "mocha -u tdd test/test.js --timeout 120000"
+    "test": "mocha -u tdd test/test.js --timeout 120000",
+    "test:weval": "WEVAL_TEST=1 mocha -u tdd test/test.js --timeout 120000"
   },
   "files": [
     "lib/interfaces",

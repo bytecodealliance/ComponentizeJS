@@ -21,8 +21,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+        config:
+          - { os: ubuntu-latest, build: "npm run build", test: "npm run test", cacheDirectory: "build-release", cacheKeySuffix: ""  }
+          - { os: ubuntu-latest, build: "npm run build:weval", test: "npm run test:weval", cacheDirectory: "build-release-weval", cacheKeySuffix: "-weval" }
+    runs-on: ${{ matrix.config.os }}
     steps:
     - uses: actions/checkout@v2
       with:
@@ -56,18 +58,14 @@ jobs:
       uses: actions/cache@v3
       id: starlingmonkey-build
       with:
-        path: |
-          build-release
-          build-release-weval 
-        key: engine-build-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+        path: ${{matrix.config.cacheDirectory}} 
+        key: engine-build${{matrix.config.cacheKeySuffix}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
 
     - name: Build
-      run: |
-        npm run build
-        npm run build:weval
-
+      run: ${{matrix.config.build}}
+    
     - name: Test
-      run: npm run test
+      run: ${{matrix.config.test}}
 
     - name: Cache Example build
       uses: actions/cache@v3
