@@ -12,6 +12,7 @@ endif
 all: release
 debug: lib/starlingmonkey_embedding.debug.wasm lib/spidermonkey-embedding-splicer.js
 release: lib/starlingmonkey_embedding.wasm lib/spidermonkey-embedding-splicer.js
+release-weval: lib/starlingmonkey_ics.wevalcache lib/spidermonkey-embedding-splicer.js
 
 lib/spidermonkey-embedding-splicer.js: target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj lib
 	@$(JCO) new target/wasm32-wasi/release/spidermonkey_embedding_splicer.wasm -o obj/spidermonkey-embedding-splicer.wasm --wasi-reactor
@@ -24,6 +25,14 @@ lib/starlingmonkey_embedding.wasm: StarlingMonkey/cmake/* embedding/* StarlingMo
 	cmake -B build-release -DCMAKE_BUILD_TYPE=Release
 	make -j16 -C build-release
 	@cp build-release/starling.wasm/starling.wasm $@
+
+lib/starlingmonkey_embedding_weval.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/*/* StarlingMonkey/builtins/*/*/* StarlingMonkey/include/* | lib
+	cmake -B build-release-weval -DCMAKE_BUILD_TYPE=Release -DWEVAL=ON
+	make -j16 -C build-release-weval
+	@cp build-release-weval/starling.wasm/starling.wasm $@
+
+lib/starlingmonkey_ics.wevalcache: lib/starlingmonkey_embedding_weval.wasm
+	@cp build-release-weval/starling.wasm/starling-ics.wevalcache $@
 
 lib/starlingmonkey_embedding.debug.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/*/* StarlingMonkey/builtins/*/*/* StarlingMonkey/include/* | lib
 	cmake -B build-debug -DCMAKE_BUILD_TYPE=RelWithDebInfo

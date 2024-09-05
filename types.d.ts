@@ -8,6 +8,14 @@ interface ComponentizeOptions {
    */
   engine?: string,
   /**
+   * Path to custom weval cache to use
+   */
+  aotCache?: string,
+  /**
+   * Enable AoT using weval
+   */
+  enableAot?: boolean,
+  /**
    * Path to custom Preview2 Adapter
    */
   preview2Adapter?: string,

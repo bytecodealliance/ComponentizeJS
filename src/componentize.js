@@ -1,4 +1,5 @@
 import wizer from '@bytecodealliance/wizer';
+import getWeval from '@cfallin/weval';
 import {
   componentNew,
   metadataAdd,
@@ -6,7 +7,7 @@ import {
 } from '@bytecodealliance/jco';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -37,15 +38,16 @@ export async function componentize(jsSource, witWorld, opts) {
   }
   const {
     sourceName = 'source.js',
-    engine = fileURLToPath(
-      new URL(`../lib/starlingmonkey_embedding.wasm`, import.meta.url)
-    ),
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
     worldName,
     disableFeatures = [],
     enableFeatures = [],
+    aotCache = fileURLToPath(new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url))
   } = opts || {};
+
+  const engine = opts.engine || fileURLToPath(
+    new URL(opts.enableAot ? `../lib/starlingmonkey_embedding_weval.wasm` : `../lib/starlingmonkey_embedding.wasm`, import.meta.url));
 
   await lexerInit;
   let jsImports = [];
@@ -181,42 +183,82 @@ export async function componentize(jsSource, witWorld, opts) {
     console.log('--- Wizer Env ---');
     console.log(env);
   }
+  if (opts.enableAot) {
+    const wevalBin = await getWeval();
 
-  try {
-    let wizerProcess = spawnSync(
-      wizer,
-      [
-        '--allow-wasi',
-        '--init-func',
-        'componentize.wizer',
-        `--dir=${maybeWindowsPath(sourceDir)}`,
-        `--wasm-bulk-memory=true`,
-        '--inherit-env=true',
-        `-o=${output}`,
-        input,
-      ],
-      {
-        stdio: [null, stdout, stderr],
-        env,
-        input: maybeWindowsPath(
-          join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')
-        ),
-        shell: true,
-        encoding: 'utf-8',
+    try {
+      let wevalProcess = spawnSync(
+        wevalBin,
+        [
+          'weval',
+          `--cache-ro ${aotCache}`,
+          `--dir ${maybeWindowsPath(sourceDir)}`,
+          '-w',
+          '--init-func',
+          'componentize.wizer',
+          `-i ${input}`,
+          `-o ${output}`
+        ],
+        {
+          stdio: [null, stdout, stderr],
+          env,
+          input: maybeWindowsPath(
+            join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')
+          ),
+          shell: true,
+          encoding: 'utf-8',
+        }
+      );
+      if (wevalProcess.status !== 0)
+        throw new Error('Wevaling failed to complete');
+    } catch (error) {
+      let err =
+        `Failed to initialize the compiled Wasm binary with Weval:\n` +
+        error.message;
+      if (DEBUG_BINDINGS) {
+        err += `\nBinary and sources available for debugging at ${tmpDir}\n`;
+      } else {
+        rmSync(tmpDir, { recursive: true });
       }
-    );
-    if (wizerProcess.status !== 0)
-      throw new Error('Wizering failed to complete');
-  } catch (error) {
-    let err =
-      `Failed to initialize the compiled Wasm binary with Wizer:\n` +
-      error.message;
-    if (DEBUG_BINDINGS) {
-      err += `\nBinary and sources available for debugging at ${tmpDir}\n`;
-    } else {
-      rmSync(tmpDir, { recursive: true });
+      throw new Error(err);
     }
-    throw new Error(err);
+  } else {
+    try {
+      let wizerProcess = spawnSync(
+        wizer,
+        [
+          '--allow-wasi',
+          '--init-func',
+          'componentize.wizer',
+          `--dir=${maybeWindowsPath(sourceDir)}`,
+          `--wasm-bulk-memory=true`,
+          '--inherit-env=true',
+          `-o=${output}`,
+          input,
+        ],
+        {
+          stdio: [null, stdout, stderr],
+          env,
+          input: maybeWindowsPath(
+            join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')
+          ),
+          shell: true,
+          encoding: 'utf-8',
+        }
+      );
+      if (wizerProcess.status !== 0)
+        throw new Error('Wizering failed to complete');
+    } catch (error) {
+      let err =
+        `Failed to initialize the compiled Wasm binary with Wizer:\n` +
+        error.message;
+      if (DEBUG_BINDINGS) {
+        err += `\nBinary and sources available for debugging at ${tmpDir}\n`;
+      } else {
+        rmSync(tmpDir, { recursive: true });
+      }
+      throw new Error(err);
+    }
   }
 
   const bin = await readFile(output);
