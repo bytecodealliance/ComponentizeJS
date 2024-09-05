@@ -193,7 +193,7 @@ export async function componentize(jsSource, witWorld, opts) {
           'weval',
           `--cache-ro ${aotCache}`,
           '-w',
-          `-i ${engine}`,
+          `-i ${input}`,
           `-o ${output}`,
           `--dir ${dirname(input)}`
         ], {
