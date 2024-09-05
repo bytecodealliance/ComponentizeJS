@@ -49,6 +49,10 @@ As more components are written in JavaScript, and there exist scenarios where mu
 
 Establishing this initial prototype as a singular flexible engine foundation that can be turned into a shared library is therefore the focus for this project.
 
+### Weval AOT Compilation
+
+
+
 ## Platform APIs
 
 The following APIs are available:
@@ -98,7 +102,13 @@ const { component } = await componentize(`
 await writeFile('test.component.wasm', component);
 ```
 
+See [types.d.ts](types.d.ts) for the full interface options.
+
 The component iself can be executed in any component runtime, see the [example](EXAMPLE.md) for an end to end workflow in Wasmtime.
+
+### AOT Compilation
+
+To enable AOT compilation, set the `enableAot: true` option to run [Weval](https://github.com/cfallin/weval) ahead-of-time compilation.
 
 ### Async Support
 
