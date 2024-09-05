@@ -96,7 +96,7 @@ fn get_export_fid(module: &Module, expt_id: &ExportsID) -> FunctionID {
     let expt = module.exports.get_by_id(*expt_id).unwrap();
 
     match expt.kind {
-        ExternalKind::Func => expt.index as FunctionID,
+        ExternalKind::Func =>  FunctionID::from(expt.index),
         _ => panic!("Missing coreabi_get_import"),
     }
 }
@@ -113,9 +113,9 @@ fn synthesize_import_functions(
     for (id, expt) in module.exports.iter().enumerate() {
         match expt.name.as_str() {
             "coreabi_sample_i32" | "coreabi_sample_i64" | "coreabi_sample_f32"
-            | "coreabi_sample_f64" => coreabi_sample_ids.push(id as ExportsID),
-            "coreabi_get_import" => coreabi_get_import = Some(id as ExportsID),
-            "cabi_realloc" => cabi_realloc = Some(id as ExportsID),
+            | "coreabi_sample_f64" => coreabi_sample_ids.push(ExportsID::from(id)),
+            "coreabi_get_import" => coreabi_get_import = Some(ExportsID::from(id)),
+            "cabi_realloc" => cabi_realloc = Some(ExportsID::from(id)),
             _ => {}
         };
     }
@@ -460,7 +460,7 @@ fn synthesize_import_functions(
             table_instr_idx,
             InstrumentationMode::Before,
             Operator::LocalGet {
-                local_index: arg_idx,
+                local_index: *arg_idx,
             },
         );
         builder.inject_at(
@@ -533,7 +533,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
             let args: Vec<LocalID> = params
                 .iter()
                 .enumerate()
-                .map(|(idx, _)| idx as LocalID)
+                .map(|(idx, _)| LocalID::from(idx))
                 .collect(); // Collect the arguments of the function
 
             let arg_ptr = func.add_local(DataType::I32);
@@ -670,7 +670,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
             }
 
             let fid = func.finish_module(module);
-            module.exports.add_export_func((*expt_name).clone(), fid);
+            module.exports.add_export_func((*expt_name).clone(), *fid);
         }
 
         // Post export function synthesis
@@ -697,7 +697,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
         let fid = func.finish_module(module);
         module
             .exports
-            .add_export_func(format!("cabi_post_{}", expt_name), fid);
+            .add_export_func(format!("cabi_post_{}", expt_name), *fid);
     }
 
     // remove unnecessary exports

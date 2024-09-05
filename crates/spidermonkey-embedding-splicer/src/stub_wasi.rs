@@ -31,7 +31,7 @@ where
     let TypeRef::Func(_) = module.imports.get(iid).ty else {
         bail!("'{import}#{name}' is not a function.")
     };
-    let fid: FunctionID = iid as FunctionID;
+    let fid: FunctionID = FunctionID(*iid);
 
     let f = module.functions.get(fid);
     let ty_id = match f.kind() {
@@ -56,7 +56,6 @@ where
 
 fn unreachable_stub(body: &mut FunctionBuilder) -> Result<Vec<LocalID>> {
     body.unreachable();
-    body.end();
     Ok(vec![])
 }
 
@@ -191,7 +190,6 @@ fn stub_random(module: &mut Module) -> Result<()> {
             func.i64_const(-0x18FC812E5F4BD725);
             func.i64_xor();
             func.i64_mul();
-            func.end();
             Ok(vec![])
         },
     )?
@@ -203,18 +201,18 @@ fn stub_random(module: &mut Module) -> Result<()> {
         "get-random-bytes",
         |body| {
             // let num_bytes = body.add_local(DataType::I64);
-            let num_bytes = 0; // First parameter
-            let retptr = 1; // Second parametr
+            let num_bytes: u32 = 0; // First parameter
+            let retptr:u32 = 1; // Second parametr
             let outptr = body.add_local(DataType::I32);
             let curptr = body.add_local(DataType::I32);
             // carries through to *retptr = outptr
-            body.local_get(retptr);
+            body.local_get(LocalID(retptr));
 
             // outptr = realloc(0, 0, 1, len rounded up to 8 bytes)
             body.i32_const(0);
             body.i32_const(0);
             body.i32_const(1);
-            body.local_get(num_bytes);
+            body.local_get(LocalID(num_bytes));
             body.i32_wrap_i64();
             body.i32_const(3);
             body.i32_shr_unsigned();
@@ -232,17 +230,17 @@ fn stub_random(module: &mut Module) -> Result<()> {
                 align: 2,
                 max_align: 0,
                 offset: 0,
-                memory,
+                memory: *memory,
             });
 
-            body.local_get(retptr);
-            body.local_get(num_bytes);
+            body.local_get(LocalID(retptr));
+            body.local_get(LocalID(num_bytes));
             body.i32_wrap_i64();
             body.i32_store(MemArg {
                 align: 2,
                 max_align: 0,
                 offset: 4,
-                memory,
+                memory: *memory,
             });
             body.local_get(outptr);
             body.local_set(curptr);
@@ -257,7 +255,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
                 align: 3,
                 max_align: 0,
                 offset: 0,
-                memory,
+                memory: *memory,
             });
             body.local_get(curptr);
             body.i32_const(8);
@@ -265,14 +263,12 @@ fn stub_random(module: &mut Module) -> Result<()> {
             body.local_tee(curptr);
             body.local_get(outptr);
             body.i32_sub();
-            body.local_get(num_bytes);
+            body.local_get(LocalID(num_bytes));
             body.i32_wrap_i64();
             body.i32_lt_unsigned();
             body.br_if(0);
             body.end(); // This is for the loop
-            body.end(); // This is for the function
-
-            Ok(vec![num_bytes, retptr])
+            Ok(vec![LocalID(num_bytes), LocalID(retptr)])
         },
     )?;
 
@@ -307,25 +303,23 @@ fn stub_clocks(module: &mut Module) -> Result<()> {
 
     // (func (param i32 i64 i32) (result i32)))
     stub_import(module, PREVIEW1, "clock_time_get", |body| {
-        let clock_id = 0; // First Parameter
-        let precision = 1; // Second Parameter
-        let time_ptr = 2; // Third Parameter
-        body.local_get(time_ptr);
-        body.local_get(time_ptr);
+        let clock_id:u32 = 0; // First Parameter
+        let precision:u32 = 1; // Second Parameter
+        let time_ptr:u32 = 2; // Third Parameter
+        body.local_get(LocalID(time_ptr));
+        body.local_get(LocalID(time_ptr));
         body.i64_const(i64::try_from(unix_time.as_nanos())?);
         body.i64_store(MemArg {
             align: 3,
             offset: 0,
             max_align: 0,
-            memory,
+            memory: *memory,
         });
-        body.end();
-        Ok(vec![clock_id, precision, time_ptr])
+        Ok(vec![LocalID(clock_id), LocalID(precision), LocalID(time_ptr)])
     })?;
 
     stub_import(module, "wasi:clocks/monotonic-clock@0.2.0", "now", |body| {
         body.i64_const(i64::try_from(unix_time.as_nanos())?);
-        body.end();
         Ok(vec![])
     })?;
     stub_import(
@@ -366,16 +360,14 @@ fn stub_stdio(module: &mut Module) -> Result<()> {
     // (func (param i32 i32) (result i32)))
     stub_import(module, PREVIEW1, "fd_fdstat_get", |body| {
         body.i32_const(0);
-        body.end();
         Ok(vec![])
     })?;
 
     // (func (param i32 i32 i32 i32) (result i32)))
     stub_import(module, PREVIEW1, "fd_write", |body| {
-        let len_local = 3; // Index of the last local
-        body.local_get(len_local);
-        body.end();
-        Ok(vec![len_local])
+        let len_local:u32 = 3; // Index of the last local
+        body.local_get(LocalID(len_local));
+        Ok(vec![LocalID(len_local)])
     })?;
 
     stub_import(
