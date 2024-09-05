@@ -202,7 +202,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
         |body| {
             // let num_bytes = body.add_local(DataType::I64);
             let num_bytes: u32 = 0; // First parameter
-            let retptr:u32 = 1; // Second parametr
+            let retptr: u32 = 1; // Second parametr
             let outptr = body.add_local(DataType::I32);
             let curptr = body.add_local(DataType::I32);
             // carries through to *retptr = outptr
@@ -303,9 +303,9 @@ fn stub_clocks(module: &mut Module) -> Result<()> {
 
     // (func (param i32 i64 i32) (result i32)))
     stub_import(module, PREVIEW1, "clock_time_get", |body| {
-        let clock_id:u32 = 0; // First Parameter
-        let precision:u32 = 1; // Second Parameter
-        let time_ptr:u32 = 2; // Third Parameter
+        let clock_id: u32 = 0; // First Parameter
+        let precision: u32 = 1; // Second Parameter
+        let time_ptr: u32 = 2; // Third Parameter
         body.local_get(LocalID(time_ptr));
         body.local_get(LocalID(time_ptr));
         body.i64_const(i64::try_from(unix_time.as_nanos())?);
@@ -315,7 +315,11 @@ fn stub_clocks(module: &mut Module) -> Result<()> {
             max_align: 0,
             memory: *memory,
         });
-        Ok(vec![LocalID(clock_id), LocalID(precision), LocalID(time_ptr)])
+        Ok(vec![
+            LocalID(clock_id),
+            LocalID(precision),
+            LocalID(time_ptr),
+        ])
     })?;
 
     stub_import(module, "wasi:clocks/monotonic-clock@0.2.0", "now", |body| {
@@ -365,7 +369,7 @@ fn stub_stdio(module: &mut Module) -> Result<()> {
 
     // (func (param i32 i32 i32 i32) (result i32)))
     stub_import(module, PREVIEW1, "fd_write", |body| {
-        let len_local:u32 = 3; // Index of the last local
+        let len_local: u32 = 3; // Index of the last local
         body.local_get(LocalID(len_local));
         Ok(vec![LocalID(len_local)])
     })?;

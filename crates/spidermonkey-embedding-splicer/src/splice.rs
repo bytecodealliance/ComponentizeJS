@@ -96,7 +96,7 @@ fn get_export_fid(module: &Module, expt_id: &ExportsID) -> FunctionID {
     let expt = module.exports.get_by_id(*expt_id).unwrap();
 
     match expt.kind {
-        ExternalKind::Func =>  FunctionID::from(expt.index),
+        ExternalKind::Func => FunctionID::from(expt.index),
         _ => panic!("Missing coreabi_get_import"),
     }
 }
@@ -226,11 +226,13 @@ fn synthesize_import_functions(
             {
                 existing
             } else {
-                module.add_import_func(
-                    (*impt_specifier).clone(),
-                    (*impt_name).clone(),
-                    import_fn_type,
-                ).0
+                module
+                    .add_import_func(
+                        (*impt_specifier).clone(),
+                        (*impt_name).clone(),
+                        import_fn_type,
+                    )
+                    .0
             };
 
             // create the native JS binding function
