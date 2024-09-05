@@ -443,6 +443,7 @@ dependencies = [
  "rand",
  "wasm-encoder 0.215.0",
  "wasmparser",
+ "wat",
  "wit-bindgen",
  "wit-bindgen-core",
  "wit-component",

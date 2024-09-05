@@ -407,4 +407,25 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
     }
 }
 
+// Has been added as an easy way to debug the rust code
+#[test]
+fn stub_test() {
+    // Step through componentizeJS and get the following inputs for stubWASI. The output can be written to a .wat/.wasm file.
+    // We can then use wasm-tools on the output to do an debugging
+    let features = vec![Features::Stdio, Features::Clocks, Features::Http, Features::Random];
+    let wit_world = "
+        package local:runworld;
+        world runworld {
+          export run: func() -> ();
+        }
+      ";
+    let wit_path = None;
+    let world_name = None;
+    let bin_path = "/Users/suhasthalanki/Documents/CMU/WASM/ComponentizeJS/splice_out.wat";
+    let buff = wat::parse_file(bin_path).expect("couldn't convert the input wat to Wasm");
+
+    let out = stub_wasi(buff, features, Some(wit_world.to_string()), wit_path, world_name).expect("TODO: panic message");
+}
+
+
 export!(SpidermonkeyEmbeddingSplicerComponent);
