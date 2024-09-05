@@ -22,8 +22,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-latest, build: "npm run build", test: "npm run test", cacheDirectory: "build-release", cacheKeySuffix: ""  }
-          - { os: ubuntu-latest, build: "npm run build:weval", test: "npm run test:weval", cacheDirectory: "build-release-weval", cacheKeySuffix: "-weval" }
+          - { os: ubuntu-latest, build: "npm run build", test: "npm run test", cacheDirectory: "build-release", cacheKeySuffix: "", enableAot: "0"  }
+          - { os: ubuntu-latest, build: "npm run build:weval", test: "npm run test:weval", cacheDirectory: "build-release-weval", cacheKeySuffix: "-weval", enableAot: "1" }
     runs-on: ${{ matrix.config.os }}
     steps:
     - uses: actions/checkout@v2
@@ -74,7 +74,7 @@ jobs:
         key: engine-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
 
     - name: Test Example
-      run: cd example && npm run build && ./test.sh
+      run: cd example && ENABLE_AOT=${{matrix.config.enableAot}} npm run build && ./test.sh
 
   rustfmt:
     name: Rustfmt
