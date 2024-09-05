@@ -11,7 +11,7 @@
   "dependencies": {
     "@bytecodealliance/jco": "1.4.4",
     "@bytecodealliance/wizer": "^7.0.4",
-    "@cfallin/weval": "^0.2.12",
+    "@cfallin/weval": "^0.2.14",
     "es-module-lexer": "^1.5.4"
   },
   "types": "types.d.ts",

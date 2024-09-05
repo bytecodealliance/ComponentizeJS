@@ -194,6 +194,8 @@ export async function componentize(jsSource, witWorld, opts) {
           `--cache-ro ${aotCache}`,
           `--dir ${maybeWindowsPath(sourceDir)}`,
           '-w',
+          '--init-func',
+          'componentize.wizer',
           `-i ${input}`,
           `-o ${output}`
         ],
