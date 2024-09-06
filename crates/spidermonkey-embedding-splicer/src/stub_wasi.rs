@@ -44,12 +44,7 @@ where
     let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
     let args = stub(&mut builder)?;
 
-    // let ty_id = module.types.add(&*params, &*results); Do not need to add a new type as replacing a function with the same type
-    // Pass in Import ID as function ID to preserve location
     builder.replace_import_in_module(module, iid);
-    // let local_func = builder.local_func(args, iid as FunctionID, ty_id);
-
-    // module.convert_import_fn_to_local(iid, local_func);
 
     Ok(Some(fid))
 }
@@ -201,18 +196,18 @@ fn stub_random(module: &mut Module) -> Result<()> {
         "get-random-bytes",
         |body| {
             // let num_bytes = body.add_local(DataType::I64);
-            let num_bytes: u32 = 0; // First parameter
-            let retptr: u32 = 1; // Second parametr
+            let num_bytes: LocalID = LocalID(0); // First parameter
+            let retptr: LocalID = LocalID(1); // Second parametr
             let outptr = body.add_local(DataType::I32);
             let curptr = body.add_local(DataType::I32);
             // carries through to *retptr = outptr
-            body.local_get(LocalID(retptr));
+            body.local_get(retptr);
 
             // outptr = realloc(0, 0, 1, len rounded up to 8 bytes)
             body.i32_const(0);
             body.i32_const(0);
             body.i32_const(1);
-            body.local_get(LocalID(num_bytes));
+            body.local_get(num_bytes);
             body.i32_wrap_i64();
             body.i32_const(3);
             body.i32_shr_unsigned();
@@ -233,8 +228,8 @@ fn stub_random(module: &mut Module) -> Result<()> {
                 memory: *memory,
             });
 
-            body.local_get(LocalID(retptr));
-            body.local_get(LocalID(num_bytes));
+            body.local_get(retptr);
+            body.local_get(num_bytes);
             body.i32_wrap_i64();
             body.i32_store(MemArg {
                 align: 2,
@@ -263,12 +258,12 @@ fn stub_random(module: &mut Module) -> Result<()> {
             body.local_tee(curptr);
             body.local_get(outptr);
             body.i32_sub();
-            body.local_get(LocalID(num_bytes));
+            body.local_get(num_bytes);
             body.i32_wrap_i64();
             body.i32_lt_unsigned();
             body.br_if(0);
             body.end(); // This is for the loop
-            Ok(vec![LocalID(num_bytes), LocalID(retptr)])
+            Ok(vec![num_bytes, retptr])
         },
     )?;
 
@@ -303,11 +298,11 @@ fn stub_clocks(module: &mut Module) -> Result<()> {
 
     // (func (param i32 i64 i32) (result i32)))
     stub_import(module, PREVIEW1, "clock_time_get", |body| {
-        let clock_id: u32 = 0; // First Parameter
-        let precision: u32 = 1; // Second Parameter
-        let time_ptr: u32 = 2; // Third Parameter
-        body.local_get(LocalID(time_ptr));
-        body.local_get(LocalID(time_ptr));
+        let clock_id: LocalID = LocalID(0); // First Parameter
+        let precision: LocalID = LocalID(1); // Second Parameter
+        let time_ptr: LocalID = LocalID(2); // Third Parameter
+        body.local_get(time_ptr);
+        body.local_get(time_ptr);
         body.i64_const(i64::try_from(unix_time.as_nanos())?);
         body.i64_store(MemArg {
             align: 3,
@@ -315,11 +310,7 @@ fn stub_clocks(module: &mut Module) -> Result<()> {
             max_align: 0,
             memory: *memory,
         });
-        Ok(vec![
-            LocalID(clock_id),
-            LocalID(precision),
-            LocalID(time_ptr),
-        ])
+        Ok(vec![clock_id, precision, time_ptr])
     })?;
 
     stub_import(module, "wasi:clocks/monotonic-clock@0.2.0", "now", |body| {
@@ -369,9 +360,9 @@ fn stub_stdio(module: &mut Module) -> Result<()> {
 
     // (func (param i32 i32 i32 i32) (result i32)))
     stub_import(module, PREVIEW1, "fd_write", |body| {
-        let len_local: u32 = 3; // Index of the last local
-        body.local_get(LocalID(len_local));
-        Ok(vec![LocalID(len_local)])
+        let len_local: LocalID = LocalID(3); // Index of the last local
+        body.local_get(len_local);
+        Ok(vec![len_local])
     })?;
 
     stub_import(

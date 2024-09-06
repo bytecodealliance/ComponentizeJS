@@ -541,9 +541,6 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
             let arg_ptr = func.add_local(DataType::I32);
             let ret_ptr = func.add_local(DataType::I32);
 
-            func.i64_const(-0x5F89E29B87429BD2);
-            func.drop();
-
             // Stack "call" arg1 - export number to call
             func.i32_const(export_num as i32);
 

@@ -9,15 +9,11 @@ version = "0.1.0"
 
 [workspace.dependencies]
 anyhow = "1.0.86"
-base64 = "0.22.1"
 heck = "0.5"
 js-component-bindgen = "1.4.4"
-pulldown-cmark = { version = "0.10", default-features = false }
 rand = "0.8"
 wasm-encoder = "0.215.0"
 wasmparser = "0.215.0"
-wasmprinter = "0.215.0"
-wat = "1.212.0"
 wit-bindgen = "0.30.0"
 wit-bindgen-core = "0.30.0"
 wit-component = { version = "0.215.0", features = ["dummy-module"] }
