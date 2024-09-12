@@ -1,7 +1,13 @@
-use walrus::{
-    ir::{BinaryOp, Binop, Const, Instr, LoadKind, MemArg, Store, StoreKind, UnaryOp, Unop, Value},
-    ExportId, ExportItem, FunctionBuilder, FunctionId, LocalId, ValType,
-};
+use orca_wasm::ir::function::{FunctionBuilder, FunctionModifier};
+use orca_wasm::ir::id::{ExportsID, FunctionID, LocalID};
+use orca_wasm::ir::module::Module;
+use orca_wasm::ir::types::{BlockType, ElementItems, InstrumentationMode};
+use orca_wasm::module_builder::AddLocal;
+use orca_wasm::opcode::{Inject, InjectAt};
+use orca_wasm::{DataType, Opcode};
+use wasmparser::ExternalKind;
+use wasmparser::MemArg;
+use wasmparser::Operator;
 
 use crate::*;
 
@@ -34,9 +40,7 @@ pub fn splice(
     exports: Vec<(String, CoreFn)>,
     debug: bool,
 ) -> Result<Vec<u8>> {
-    let mut config = walrus::ModuleConfig::new();
-    config.generate_dwarf(true);
-    let mut module = config.parse(&engine)?;
+    let mut module = Module::parse(&*engine, false).unwrap();
 
     // since StarlingMonkey implements CLI Run and incoming handler,
     // we override them only if the guest content exports those functions
@@ -44,10 +48,13 @@ pub fn splice(
         .iter()
         .any(|(name, _)| name == "wasi:cli/run@0.2.0#run")
     {
-        if let Ok(run) = module.exports.get_func("wasi:cli/run@0.2.0#run") {
-            let expt = module.exports.get_exported_func(run).unwrap();
-            module.exports.delete(expt.id());
-            module.funcs.delete(run);
+        if let Some(run) = module
+            .exports
+            .get_func_by_name("wasi:cli/run@0.2.0#run".to_string())
+        {
+            let expt = module.exports.get_func_by_id(run).unwrap();
+            module.exports.delete(expt);
+            module.delete_func(run); // TODO: Look at the intended behaviour here. Need to pass function ID to delete from functions. Was Previously passing Exports ID
         }
     }
 
@@ -55,25 +62,23 @@ pub fn splice(
         .iter()
         .any(|(name, _)| name == "wasi:http/incoming-handler@0.2.0#handle")
     {
-        if let Ok(serve) = module
+        if let Some(serve) = module
             .exports
-            .get_func("wasi:http/incoming-handler@0.2.0#handle")
+            .get_func_by_name("wasi:http/incoming-handler@0.2.0#handle".to_string())
         {
-            let expt = module.exports.get_exported_func(serve).unwrap();
-            module.exports.delete(expt.id());
-            module.funcs.delete(serve);
+            let expt = module.exports.get_func_by_id(serve).unwrap();
+            module.exports.delete(expt);
+            module.delete_func(serve); // TODO: Look at the intended behaviour here. Same as above comment
         }
     }
 
     // we reencode the WASI world component data, so strip it out from the
     // custom section
     let maybe_component_section_id = module
-        .customs
-        .iter()
-        .find(|(_, section)| section.name() == "component-type:bindings")
-        .map(|(id, _)| id);
+        .custom_sections
+        .get_id("component-type:bindings".to_string());
     if let Some(component_section_id) = maybe_component_section_id {
-        module.customs.delete(component_section_id);
+        module.custom_sections.delete(component_section_id);
     }
 
     // extract the native instructions from sample functions
@@ -84,61 +89,58 @@ pub fn splice(
     // create the exported functions as wrappers around the "cabi_call" function
     synthesize_export_functions(&mut module, &exports)?;
 
-    Ok(module.emit_wasm())
+    Ok(module.encode())
 }
 
-fn get_export_fid(module: &walrus::Module, expt_id: &ExportId) -> FunctionId {
-    match &module.exports.get(*expt_id).item {
-        ExportItem::Function(fid) => *fid,
+fn get_export_fid(module: &Module, expt_id: &ExportsID) -> FunctionID {
+    let expt = module.exports.get_by_id(*expt_id).unwrap();
+
+    match expt.kind {
+        ExternalKind::Func => FunctionID::from(expt.index),
         _ => panic!("Missing coreabi_get_import"),
     }
 }
 
 fn synthesize_import_functions(
-    module: &mut walrus::Module,
+    module: &mut Module,
     imports: &Vec<(String, String, CoreFn, Option<i32>)>,
     debug: bool,
 ) -> Result<()> {
-    let mut coreabi_get_import: Option<ExportId> = None;
-    let mut cabi_realloc: Option<ExportId> = None;
+    let mut coreabi_get_import: Option<ExportsID> = None;
+    let mut cabi_realloc: Option<ExportsID> = None;
 
     let mut coreabi_sample_ids = Vec::new();
-    for expt in module.exports.iter() {
-        let id = expt.id();
+    for (id, expt) in module.exports.iter().enumerate() {
         match expt.name.as_str() {
             "coreabi_sample_i32" | "coreabi_sample_i64" | "coreabi_sample_f32"
-            | "coreabi_sample_f64" => coreabi_sample_ids.push(id),
-            "coreabi_get_import" => coreabi_get_import = Some(id),
-            "cabi_realloc" => cabi_realloc = Some(id),
+            | "coreabi_sample_f64" => coreabi_sample_ids.push(ExportsID::from(id)),
+            "coreabi_get_import" => coreabi_get_import = Some(ExportsID::from(id)),
+            "cabi_realloc" => cabi_realloc = Some(ExportsID::from(id)),
             _ => {}
         };
     }
 
-    let memory = module.memories.iter().nth(0).unwrap().id();
-    let main_tid = module.tables.main_function_table()?.unwrap();
-    let import_fn_table_start_idx = module.tables.get(main_tid).initial as i32;
+    let memory = 0;
+
+    let main_tid = module.tables.main_function().unwrap();
+
+    let import_fn_table_start_idx = module.tables.get(main_tid).unwrap().initial as i32;
 
     let cabi_realloc_fid = get_export_fid(module, &cabi_realloc.unwrap());
 
-    let coreabi_sample_i32 = module
-        .funcs
-        .get(get_export_fid(module, &coreabi_sample_ids[0]))
-        .kind
-        .unwrap_local();
+    let fid = get_export_fid(module, &coreabi_sample_ids[0]);
+    let coreabi_sample_i32 = module.functions.get(fid).unwrap_local();
     let _coreabi_sample_i64 = module
-        .funcs
+        .functions
         .get(get_export_fid(module, &coreabi_sample_ids[1]))
-        .kind
         .unwrap_local();
     let _coreabi_sample_f32 = module
-        .funcs
+        .functions
         .get(get_export_fid(module, &coreabi_sample_ids[2]))
-        .kind
         .unwrap_local();
     let _coreabi_sample_f64 = module
-        .funcs
+        .functions
         .get(get_export_fid(module, &coreabi_sample_ids[3]))
-        .kind
         .unwrap_local();
 
     // These functions retrieve the corresponding type
@@ -148,40 +150,32 @@ fn synthesize_import_functions(
     // unless there are major ABI changes in Spidermonkey
     let coreabi_from_bigint64 = module
         .exports
-        .iter()
-        .find(|expt| expt.name.as_str() == "coreabi_from_bigint64")
-        .unwrap()
-        .id();
+        .get_export_id_by_name("coreabi_from_bigint64".to_string())
+        .unwrap();
 
     // Sets the return value on args from the stack
-    let args_ret_i32: Vec<Instr> = vec![
-        Instr::Unop(Unop {
-            op: UnaryOp::I64ExtendUI32,
-        }),
-        Instr::Const(Const {
-            value: Value::I64(-545460846592),
-        }),
-        Instr::Binop(Binop {
-            op: BinaryOp::I64Or,
-        }),
-        Instr::Store(Store {
-            memory,
-            kind: StoreKind::I64 { atomic: false },
-            arg: MemArg {
-                align: 8,
+    let args_ret_i32: Vec<Operator> = vec![
+        Operator::I64ExtendI32U,
+        Operator::I64Const {
+            value: -545460846592,
+        },
+        Operator::I64Or,
+        Operator::I64Store {
+            memarg: MemArg {
+                align: 2,
+                max_align: 0,
                 offset: 0,
+                memory,
             },
-        }),
+        },
     ];
 
     // BigInt instructions are a little more involved as we need to extract
     // the separate ToBigInt call from the get_i64 sample
     let coreabi_to_bigint64 = module
         .exports
-        .iter()
-        .find(|expt| expt.name.as_str() == "coreabi_to_bigint64")
-        .unwrap()
-        .id();
+        .get_export_id_by_name("coreabi_to_bigint64".to_string())
+        .unwrap();
 
     // create the import functions
     // All JS wrapper function bindings have the same type, the
@@ -189,17 +183,14 @@ fn synthesize_import_functions(
     //
     //     bool NativeFn(JSContext *cx, unsigned argc, JS::Value *vp)
     //
-    let mut import_fnids: Vec<FunctionId> = Vec::new();
+    let mut import_fnids: Vec<FunctionID> = Vec::new();
     {
         // synthesized native import function parameters (in order)
         let ctx_arg = coreabi_sample_i32.args[0];
-        let argc_arg = coreabi_sample_i32.args[1];
+        // let argc_arg = coreabi_sample_i32.args[1]; // Unused
         let vp_arg = coreabi_sample_i32.args[2];
 
         // if we need to tee the retptr
-        let retptr_local = module.locals.add(ValType::I32);
-        let tmp_local = module.locals.add(ValType::I64);
-
         for (impt_specifier, impt_name, impt_sig, retptr_size) in imports.iter() {
             if debug {
                 println!(
@@ -209,53 +200,58 @@ fn synthesize_import_functions(
             }
 
             // add the imported function type
-            let params: Vec<ValType> = impt_sig
+            let params: Vec<DataType> = impt_sig
                 .params
                 .iter()
                 .map(|ty| match ty {
-                    CoreTy::I32 => ValType::I32,
-                    CoreTy::I64 => ValType::I64,
-                    CoreTy::F32 => ValType::F32,
-                    CoreTy::F64 => ValType::F64,
+                    CoreTy::I32 => DataType::I32,
+                    CoreTy::I64 => DataType::I64,
+                    CoreTy::F32 => DataType::F32,
+                    CoreTy::F64 => DataType::F64,
                 })
                 .collect();
             let ret = match impt_sig.ret {
                 Some(ty) => vec![match ty {
-                    CoreTy::I32 => ValType::I32,
-                    CoreTy::I64 => ValType::I64,
-                    CoreTy::F32 => ValType::F32,
-                    CoreTy::F64 => ValType::F64,
+                    CoreTy::I32 => DataType::I32,
+                    CoreTy::I64 => DataType::I64,
+                    CoreTy::F32 => DataType::F32,
+                    CoreTy::F64 => DataType::F64,
                 }],
                 None => vec![],
             };
             let import_fn_type = module.types.add(&params, &ret);
-
-            let import_fn_fid =
-                if let Ok(existing) = module.imports.get_func(&impt_specifier, &impt_name) {
-                    existing
-                } else {
-                    module
-                        .add_import_func(&impt_specifier, &impt_name, import_fn_type)
-                        .0
-                };
+            let import_fn_fid = if let Some(existing) = module
+                .imports
+                .get_func((*impt_specifier).clone(), (*impt_name).clone())
+            {
+                existing
+            } else {
+                module
+                    .add_import_func(
+                        (*impt_specifier).clone(),
+                        (*impt_name).clone(),
+                        import_fn_type,
+                    )
+                    .0
+            };
 
             // create the native JS binding function
             let mut func = FunctionBuilder::new(
-                &mut module.types,
-                &vec![ValType::I32, ValType::I32, ValType::I32],
-                &vec![ValType::I32],
+                &[DataType::I32, DataType::I32, DataType::I32],
+                &[DataType::I32],
             );
 
-            let mut func_body = func.func_body();
+            let retptr_local = func.add_local(DataType::I32);
+            let tmp_local = func.add_local(DataType::I64);
 
             // stack the return arg now as it chains with the
             // args we're about to add to the stack
             if impt_sig.ret.is_some() {
-                func_body.local_get(vp_arg);
+                func.local_get(vp_arg);
 
                 // if an i64 return, then we need to stack the extra BigInt constructor arg for that now
                 if matches!(impt_sig.ret.unwrap(), CoreTy::I64) {
-                    func_body.local_get(ctx_arg);
+                    func.local_get(ctx_arg);
                 }
             }
 
@@ -265,83 +261,67 @@ fn synthesize_import_functions(
                     break;
                 }
                 // JS args
-                func_body.local_get(vp_arg);
+                func.local_get(vp_arg);
                 // JS args offset
-                func_body.i32_const(16 + 8 * idx as i32);
-                func_body.binop(BinaryOp::I32Add);
+                func.i32_const(16 + 8 * idx as i32);
+                func.i32_add();
                 match arg {
                     CoreTy::I32 => {
-                        func_body.load(
+                        func.i64_load(MemArg {
+                            align: 3,
+                            max_align: 0,
+                            offset: 0,
                             memory,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 8,
-                                offset: 0,
-                            },
-                        );
-                        func_body.unop(UnaryOp::I32WrapI64);
+                        });
+                        func.i32_wrap_i64();
                     }
                     CoreTy::I64 => {
-                        func_body.call(get_export_fid(&module, &coreabi_from_bigint64));
+                        func.call(get_export_fid(&module, &coreabi_from_bigint64));
                     }
                     CoreTy::F32 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
-                        func_body.load(
+                        func.i64_load(MemArg {
+                            align: 3,
+                            max_align: 0,
+                            offset: 0,
                             memory,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 8,
-                                offset: 0,
-                            },
-                        );
-                        func_body.local_tee(tmp_local);
-                        func_body.i64_const(32);
-                        func_body.binop(BinaryOp::I64ShrU);
-                        func_body.i64_const(0xFFFFFF81);
-                        func_body.binop(BinaryOp::I64Eq);
-                        func_body.if_else(
-                            ValType::F32,
-                            |then| {
-                                // value is a uint32
-                                then.local_get(tmp_local);
-                                then.unop(UnaryOp::I32WrapI64);
-                                then.unop(UnaryOp::F32ConvertSI32);
-                            },
-                            |else_| {
-                                else_.local_get(tmp_local);
-                                else_.unop(UnaryOp::F64ReinterpretI64);
-                                else_.unop(UnaryOp::F32DemoteF64);
-                            },
-                        );
+                        });
+                        func.local_tee(tmp_local);
+                        func.i64_const(32);
+                        func.i64_shr_unsigned();
+                        func.i64_const(0xFFFFFF81);
+                        func.i64_eq();
+                        func.if_stmt(BlockType::Type(DataType::F32));
+                        func.local_get(tmp_local);
+                        func.i32_wrap_i64();
+                        func.f32_convert_i32s();
+                        func.else_stmt();
+                        func.local_get(tmp_local);
+                        func.f64_reinterpret_i64();
+                        func.f32_demote_f64();
+                        func.end(); // This is for the if - else block
                     }
                     CoreTy::F64 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
-                        func_body.load(
+                        func.i64_load(MemArg {
+                            align: 3,
+                            max_align: 0,
+                            offset: 0,
                             memory,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 8,
-                                offset: 0,
-                            },
-                        );
-                        func_body.local_tee(tmp_local);
-                        func_body.i64_const(32);
-                        func_body.binop(BinaryOp::I64ShrU);
-                        func_body.i64_const(0xFFFFFF81);
-                        func_body.binop(BinaryOp::I64Eq);
-                        func_body.if_else(
-                            ValType::F64,
-                            |then| {
-                                // value is a uint32
-                                then.local_get(tmp_local);
-                                then.unop(UnaryOp::I32WrapI64);
-                                then.unop(UnaryOp::F64ConvertSI32);
-                            },
-                            |else_| {
-                                else_.local_get(tmp_local);
-                                else_.unop(UnaryOp::F64ReinterpretI64);
-                            },
-                        );
+                        });
+                        func.local_tee(tmp_local);
+                        func.i64_const(32);
+                        func.i64_shr_unsigned();
+                        func.i64_const(0xFFFFFF81);
+                        func.i64_eq();
+                        func.if_stmt(BlockType::Type(DataType::F64));
+                        func.local_get(tmp_local);
+                        func.i32_wrap_i64();
+                        func.f64_convert_i32s();
+                        func.else_stmt();
+                        func.local_get(tmp_local);
+                        func.f64_reinterpret_i64();
+                        func.end(); // This is for the if - else block
                     }
                 };
             }
@@ -351,92 +331,91 @@ fn synthesize_import_functions(
             if impt_sig.retptr {
                 assert!(!impt_sig.ret.is_some());
                 // prepare the context arg for the return set shortly
-                func_body.local_get(vp_arg);
+                func.local_get(vp_arg);
 
                 // allocate the retptr
-                func_body.i32_const(0);
-                func_body.i32_const(0);
-                func_body.i32_const(4);
+                func.i32_const(0);
+                func.i32_const(0);
+                func.i32_const(4);
                 // Last realloc arg is byte length to allocate
-                func_body.i32_const(retptr_size.unwrap());
+                func.i32_const(retptr_size.unwrap());
 
                 // Call realloc, getting back the retptr
-                func_body.call(cabi_realloc_fid);
+                func.call(cabi_realloc_fid);
 
                 // tee the retptr into a local
-                func_body.local_tee(retptr_local);
+                func.local_tee(retptr_local);
 
                 // also set the retptr as the return value of the JS function
                 // (consumes the context arg above)
                 args_ret_i32.iter().for_each(|instr| {
-                    func_body.instr(instr.clone());
+                    func.inject(instr.clone());
                 });
 
                 // add the retptr back on the stack for the call
-                func_body.local_get(retptr_local);
+                func.local_get(retptr_local);
             }
 
             // main call to the import lowering function
-            func_body.call(import_fn_fid);
+            func.call(import_fn_fid);
 
             match impt_sig.ret {
                 None => {}
                 Some(CoreTy::I32) => args_ret_i32.iter().for_each(|instr| {
-                    func_body.instr(instr.clone());
+                    func.inject(instr.clone());
                 }),
                 Some(CoreTy::I64) => {
-                    func_body.call(get_export_fid(&module, &coreabi_to_bigint64));
-                    func_body.unop(UnaryOp::I64ExtendUI32);
-                    func_body.i64_const(-511101108224);
-                    func_body.binop(BinaryOp::I64Or);
-                    func_body.store(
+                    func.call(get_export_fid(&module, &coreabi_to_bigint64));
+                    func.i64_extend_i32u();
+                    func.i64_const(-511101108224);
+                    func.i64_or();
+                    func.i64_store(MemArg {
+                        align: 3,
+                        max_align: 0,
+                        offset: 0,
                         memory,
-                        StoreKind::I64 { atomic: false },
-                        MemArg {
-                            align: 8,
-                            offset: 0,
-                        },
-                    );
+                    });
                 }
                 Some(CoreTy::F32) => {
-                    func_body.unop(UnaryOp::F64PromoteF32);
-                    func_body.store(
+                    func.f64_promote_f32();
+                    func.f64_store(MemArg {
+                        align: 3,
+                        max_align: 0,
+                        offset: 0,
                         memory,
-                        StoreKind::F64,
-                        MemArg {
-                            align: 8,
-                            offset: 0,
-                        },
-                    );
+                    });
                 }
                 Some(CoreTy::F64) => {
-                    func_body.store(
+                    func.f64_store(MemArg {
+                        align: 3,
+                        max_align: 0,
+                        offset: 0,
                         memory,
-                        StoreKind::F64,
-                        MemArg {
-                            align: 8,
-                            offset: 0,
-                        },
-                    );
+                    });
                 }
             }
 
             // return true
-            func_body.i32_const(1);
+            func.i32_const(1);
 
-            let fid = func.finish(vec![ctx_arg, argc_arg, vp_arg], &mut module.funcs);
+            let fid = func.finish_module(module);
             import_fnids.push(fid);
         }
 
         // extend the main table to include indices for generated imported functions
         let table = module.tables.get_mut(main_tid);
-        table.initial += imports.len() as u32;
-        table.maximum = Some(table.maximum.unwrap() + imports.len() as u32);
+        table.initial += imports.len() as u64;
+        table.maximum = Some(table.maximum.unwrap() + imports.len() as u64);
 
         // create imported function table
         let els = module.elements.iter_mut().next().unwrap();
-        for fid in import_fnids {
-            els.members.push(Some(fid.clone()));
+        match &mut els.1 {
+            ElementItems::Functions(ref mut funcs) => {
+                for fid in import_fnids {
+                    funcs.push(fid);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -452,29 +431,23 @@ fn synthesize_import_functions(
         let coreabi_get_import_fid = get_export_fid(module, &coreabi_get_import.unwrap());
 
         let args = &module
-            .funcs
+            .functions
             .get(coreabi_get_import_fid)
-            .kind
+            .kind()
             .unwrap_local()
             .args;
-        let arg_idx = args[0].clone();
 
-        let builder: &mut FunctionBuilder = &mut module
-            .funcs
-            .get_mut(coreabi_get_import_fid)
-            .kind
-            .unwrap_local_mut()
-            .builder_mut();
+        let arg_idx = args[0];
 
-        let mut func_body = builder.func_body();
+        let builder: &mut FunctionModifier = &mut module
+            .functions
+            .get_fn_modifier(coreabi_get_import_fid)
+            .unwrap();
 
         // walk until we get to the const representing the table index
         let mut table_instr_idx = 0;
-        for (idx, (instr, _)) in func_body.instrs_mut().iter_mut().enumerate() {
-            if let Instr::Const(Const {
-                value: Value::I32(ref mut v),
-            }) = instr
-            {
+        for (idx, instr) in builder.body.instructions.iter_mut().enumerate() {
+            if let Operator::I32Const { value: ref mut v } = instr.op {
                 // we specifically need the const "around" 3393
                 // which is the coreabi_sample_i32 table offset
                 if *v < 1000 || *v > 5000 {
@@ -485,8 +458,18 @@ fn synthesize_import_functions(
                 break;
             }
         }
-        func_body.local_get_at(table_instr_idx, arg_idx);
-        func_body.binop_at(table_instr_idx + 2, BinaryOp::I32Add);
+        builder.inject_at(
+            table_instr_idx,
+            InstrumentationMode::Before,
+            Operator::LocalGet {
+                local_index: *arg_idx,
+            },
+        );
+        builder.inject_at(
+            table_instr_idx + 1,
+            InstrumentationMode::Before,
+            Operator::I32Add,
+        );
     }
 
     // remove unnecessary exports
@@ -500,86 +483,78 @@ fn synthesize_import_functions(
     Ok(())
 }
 
-fn synthesize_export_functions(
-    module: &mut walrus::Module,
-    exports: &Vec<(String, CoreFn)>,
-) -> Result<()> {
+fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreFn)>) -> Result<()> {
     let cabi_realloc = get_export_fid(
         module,
         &module
             .exports
-            .iter()
-            .find(|expt| expt.name.as_str() == "cabi_realloc")
-            .unwrap()
-            .id(),
+            .get_export_id_by_name("cabi_realloc".to_string())
+            .unwrap(),
     );
     let call_expt = module
         .exports
-        .iter()
-        .find(|expt| expt.name.as_str() == "call")
-        .unwrap()
-        .id();
+        .get_export_id_by_name("call".to_string())
+        .unwrap();
     let call = get_export_fid(module, &call_expt);
     let post_call_expt = module
         .exports
-        .iter()
-        .find(|expt| expt.name.as_str() == "post_call")
-        .unwrap()
-        .id();
+        .get_export_id_by_name("post_call".to_string())
+        .unwrap();
     let post_call = get_export_fid(module, &post_call_expt);
 
-    let memory = module.memories.iter().nth(0).unwrap().id();
-
+    let memory = 0;
     // (2) Export call function synthesis
-    let arg_ptr = module.locals.add(ValType::I32);
-    let ret_ptr = module.locals.add(ValType::I32);
     for (export_num, (expt_name, expt_sig)) in exports.iter().enumerate() {
         // Export function synthesis
         {
             // add the function type
-            let params: Vec<ValType> = expt_sig
+            let params: Vec<DataType> = expt_sig
                 .params
                 .iter()
                 .map(|ty| match ty {
-                    CoreTy::I32 => ValType::I32,
-                    CoreTy::I64 => ValType::I64,
-                    CoreTy::F32 => ValType::F32,
-                    CoreTy::F64 => ValType::F64,
+                    CoreTy::I32 => DataType::I32,
+                    CoreTy::I64 => DataType::I64,
+                    CoreTy::F32 => DataType::F32,
+                    CoreTy::F64 => DataType::F64,
                 })
                 .collect();
             let ret = expt_sig
                 .ret
                 .iter()
                 .map(|ty| match ty {
-                    CoreTy::I32 => ValType::I32,
-                    CoreTy::I64 => ValType::I64,
-                    CoreTy::F32 => ValType::F32,
-                    CoreTy::F64 => ValType::F64,
+                    CoreTy::I32 => DataType::I32,
+                    CoreTy::I64 => DataType::I64,
+                    CoreTy::F32 => DataType::F32,
+                    CoreTy::F64 => DataType::F64,
                 })
-                .collect::<Vec<ValType>>();
+                .collect::<Vec<DataType>>();
 
-            let mut func = FunctionBuilder::new(&mut module.types, &params, &ret);
-            func.name(expt_name.to_string());
-            let func_body = &mut func.func_body();
-            let args: Vec<LocalId> = params
+            let mut func = FunctionBuilder::new(&params, &ret);
+            func.set_name(expt_name.to_string());
+
+            let args: Vec<LocalID> = params
                 .iter()
-                .map(|param| module.locals.add(*param))
-                .collect();
+                .enumerate()
+                .map(|(idx, _)| LocalID::from(idx))
+                .collect(); // Collect the arguments of the function
+
+            let arg_ptr = func.add_local(DataType::I32);
+            let ret_ptr = func.add_local(DataType::I32);
 
             // Stack "call" arg1 - export number to call
-            func_body.i32_const(export_num as i32);
+            func.i32_const(export_num as i32);
 
             // Now we just have to add the argptr
-            if expt_sig.params.len() == 0 {
-                func_body.i32_const(0);
+            if expt_sig.params.is_empty() {
+                func.i32_const(0);
             } else if expt_sig.paramptr {
                 // param ptr is the first arg with indirect params
-                func_body.local_get(args[0]);
+                func.local_get(args[0]);
             } else {
                 // realloc call to allocate params
-                func_body.i32_const(0);
-                func_body.i32_const(0);
-                func_body.i32_const(4);
+                func.i32_const(0);
+                func.i32_const(0);
+                func.i32_const(4);
                 // Last realloc arg is byte length to allocate
                 let mut byte_size = 0;
                 for param in expt_sig.params.iter() {
@@ -592,106 +567,109 @@ fn synthesize_export_functions(
                         }
                     }
                 }
-                func_body.i32_const(byte_size);
+                func.i32_const(byte_size);
                 // Call realloc, getting back the argptr
-                func_body.call(cabi_realloc);
+                func.call(cabi_realloc);
 
                 // Tee the argptr into its local var
-                func_body.local_tee(arg_ptr);
+                func.local_tee(arg_ptr);
 
                 let mut offset = 0;
                 for (idx, param) in expt_sig.params.iter().enumerate() {
-                    func_body.local_get(args[idx]);
+                    func.local_get(args[idx]);
                     match param {
                         CoreTy::I32 => {
-                            func_body.store(
+                            func.i32_store(MemArg {
+                                align: 2,
+                                max_align: 0,
+                                offset,
                                 memory,
-                                StoreKind::I32 { atomic: false },
-                                MemArg { align: 4, offset },
-                            );
+                            });
                             offset += 4;
                         }
                         CoreTy::I64 => {
-                            func_body.store(
+                            func.i64_store(MemArg {
+                                align: 3,
+                                offset,
                                 memory,
-                                StoreKind::I64 { atomic: false },
-                                MemArg { align: 8, offset },
-                            );
+                                max_align: 0,
+                            });
                             offset += 8;
                         }
                         CoreTy::F32 => {
-                            func_body.store(memory, StoreKind::F32, MemArg { align: 4, offset });
+                            func.f32_store(MemArg {
+                                align: 2,
+                                max_align: 0,
+                                offset,
+                                memory,
+                            });
                             offset += 4;
                         }
                         CoreTy::F64 => {
-                            func_body.store(memory, StoreKind::F64, MemArg { align: 8, offset });
+                            func.f64_store(MemArg {
+                                align: 3,
+                                offset,
+                                memory,
+                                max_align: 0,
+                            });
                             offset += 8;
                         }
                     }
-                    func_body.local_get(arg_ptr);
+                    func.local_get(arg_ptr);
                 }
 
                 // argptr stays on stack
             }
 
             // Call "call" (returns retptr)
-            func_body.call(call);
+            func.call(call);
 
             if expt_sig.ret.is_none() {
-                func_body.drop();
+                func.drop();
             } else if !expt_sig.retptr {
                 // Tee retptr into its local var
-                func_body.local_tee(ret_ptr);
+                func.local_tee(ret_ptr);
 
                 // if it's a direct return, we must read the return
                 // value type from the retptr
                 match expt_sig.ret.unwrap() {
                     CoreTy::I32 => {
-                        func_body.load(
+                        func.i32_load(MemArg {
+                            align: 2,
+                            max_align: 0,
+                            offset: 0,
                             memory,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 4,
-                                offset: 0,
-                            },
-                        );
+                        });
                     }
                     CoreTy::I64 => {
-                        func_body.load(
+                        func.i64_load(MemArg {
+                            align: 3,
+                            max_align: 0,
+                            offset: 0,
                             memory,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 8,
-                                offset: 0,
-                            },
-                        );
+                        });
                     }
                     CoreTy::F32 => {
-                        func_body.load(
+                        func.f32_load(MemArg {
+                            align: 2,
+                            max_align: 0,
+                            offset: 0,
                             memory,
-                            LoadKind::F32,
-                            MemArg {
-                                align: 4,
-                                offset: 0,
-                            },
-                        );
+                        });
                     }
                     CoreTy::F64 => {
-                        func_body.load(
+                        func.f64_load(MemArg {
+                            align: 3,
+                            offset: 0,
                             memory,
-                            LoadKind::F64,
-                            MemArg {
-                                align: 8,
-                                offset: 0,
-                            },
-                        );
+                            max_align: 0,
+                        });
                     }
                 }
             }
 
-            let fid = func.finish(args, &mut module.funcs);
-
-            module.exports.add(&expt_name, ExportItem::Function(fid));
+            let fid = func.finish_module(module);
+            module.exports.add_export_func((*expt_name).clone(), *fid);
         }
 
         // Post export function synthesis
@@ -699,29 +677,26 @@ fn synthesize_export_functions(
         // add the function type
         let params = if let Some(ret) = expt_sig.ret {
             vec![match ret {
-                CoreTy::I32 => ValType::I32,
-                CoreTy::I64 => ValType::I64,
-                CoreTy::F32 => ValType::F32,
-                CoreTy::F64 => ValType::F64,
+                CoreTy::I32 => DataType::I32,
+                CoreTy::I64 => DataType::I64,
+                CoreTy::F32 => DataType::F32,
+                CoreTy::F64 => DataType::F64,
             }]
         } else {
             vec![]
         };
-        let mut func = FunctionBuilder::new(&mut module.types, &params, &[]);
-        func.name(format!("post_{}", expt_name));
-        let mut func_body = func.func_body();
+        let mut func = FunctionBuilder::new(&params, &[]);
+        func.set_name(format!("post_{}", expt_name));
 
         // calls post_call with just the function number argument
         // internally post_call is already tracking the frees needed
         // and that is currently done based on timing assumptions of calls
-        func_body.i32_const(export_num as i32);
-        func_body.call(post_call);
-        let fid = func.finish(vec![], &mut module.funcs);
-
-        module.exports.add(
-            &format!("cabi_post_{}", expt_name),
-            ExportItem::Function(fid),
-        );
+        func.i32_const(export_num as i32);
+        func.call(post_call);
+        let fid = func.finish_module(module);
+        module
+            .exports
+            .add_export_func(format!("cabi_post_{}", expt_name), *fid);
     }
 
     // remove unnecessary exports

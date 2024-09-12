@@ -8,16 +8,15 @@ edition.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
-
 [dependencies]
 anyhow = { workspace = true }
 heck = { workspace = true }
 js-component-bindgen = { workspace = true }
 rand = { workspace = true }
-walrus = { workspace = true }
 wasmparser = { workspace = true }
 wasm-encoder = { workspace = true }
 wit-component = { workspace = true }
 wit-parser = { workspace = true }
 wit-bindgen-core = { workspace = true }
 wit-bindgen = { workspace = true }
+orca-wasm.workspace = true
