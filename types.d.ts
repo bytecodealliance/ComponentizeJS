@@ -43,6 +43,12 @@ interface ComponentizeOptions {
    * (no experimental subsystems currently supported)
    */
   enableFeatures?: [],
+  /**
+   * Pass environment variables to the spawned Wizer or Weval Process If set to
+   * true, all host environment variables are passed. To pass only a subset,
+   * provide an object with the desired variables.   
+   */
+  env: boolean | Record<string, string>,
 }
 
 /**
