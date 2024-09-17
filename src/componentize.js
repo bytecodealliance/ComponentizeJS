@@ -158,7 +158,16 @@ export async function componentize(jsSource, witWorld, opts) {
     )
   );
 
+  let hostenv = {};
+
+  if (opts.env) {
+    hostenv = (typeof opts.env === 'object')
+      ? opts.env
+      : process.env;
+  };
+
   const env = {
+    ...hostenv,
     DEBUG: DEBUG_CALLS ? '1' : '',
     SOURCE_NAME: sourceName,
     IMPORT_WRAPPER_CNT: Object.keys(importWrappers).length.toString(),
