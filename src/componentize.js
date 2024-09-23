@@ -1,5 +1,5 @@
 import wizer from '@bytecodealliance/wizer';
-import getWeval from '@cfallin/weval';
+import getWeval from '@bytecodealliance/weval';
 import {
   componentNew,
   metadataAdd,
