@@ -577,27 +577,19 @@ impl JsBindgen<'_> {
                             );
 
                             uwriteln!(self.src, "\nexport class import_{name} {{");
-                        }
 
-                        // TODO: Imports tree-shaking is disabled since it is not functioning correctly.
-                        // To make this work properly, we need to trace recursively through the type graph
-                        // to include all resources across argument types.
-                        // if guest_imports.contains(&import_name)
-                        // || import_name.starts_with(&self.local_package_name)
-                        // {
-                        for (_, func) in functions {
-                            self.import_bindgen(
-                                import_name.clone(),
-                                func,
-                                true,
-                                iface_name.clone(),
-                            );
-                        }
-                        // }
+                            // TODO: Imports tree-shaking for resources is disabled since it is not functioning correctly.
+                            // To make this work properly, we need to trace recursively through the type graph
+                            // to include all resources across argument types.
+                            for (_, func) in functions {
+                                self.import_bindgen(
+                                    import_name.clone(),
+                                    func,
+                                    true,
+                                    iface_name.clone(),
+                                );
+                            }
 
-                        // TODO: Resource tree-shaking, which requires resource use checks against used
-                        //       functions.
-                        if let Some(ty) = resource {
                             let lower_camel = &self.resolve.types[ty]
                                 .name
                                 .as_ref()
@@ -620,9 +612,20 @@ impl JsBindgen<'_> {
                                         $resource_import${prefix}drop${lower_camel}(this[{resource_symbol}]);
                                         this[{resource_symbol}] = null;
                                     }}
-                               }}
-                               "
+                            }}
+                            "
                             );
+                        } else if guest_imports.contains(&import_name)
+                            || import_name.starts_with(&self.local_package_name)
+                        {
+                            for (_, func) in functions {
+                                self.import_bindgen(
+                                    import_name.clone(),
+                                    func,
+                                    true,
+                                    iface_name.clone(),
+                                );
+                            }
                         }
                     }
                 }
