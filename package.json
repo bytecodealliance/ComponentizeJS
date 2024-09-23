@@ -9,9 +9,9 @@
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "1.5.0",
+    "@bytecodealliance/jco": "^1.5.0",
+    "@bytecodealliance/weval": "^0.3.2",
     "@bytecodealliance/wizer": "^7.0.5",
-    "@cfallin/weval": "^0.2.14",
     "es-module-lexer": "^1.5.4"
   },
   "types": "types.d.ts",

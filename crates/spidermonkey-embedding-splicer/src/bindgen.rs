@@ -956,7 +956,7 @@ impl JsBindgen<'_> {
             retsize: if sig.retptr {
                 let mut retsize: u32 = 0;
                 for ret_ty in func.results.iter_types() {
-                    retsize += self.sizes.size(ret_ty) as u32;
+                    retsize += self.sizes.size(ret_ty).size_wasm32() as u32;
                 }
                 retsize
             } else {
