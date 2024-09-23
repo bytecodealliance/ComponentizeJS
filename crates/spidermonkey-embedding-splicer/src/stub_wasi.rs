@@ -42,7 +42,7 @@ where
     let ty = module.types.get(ty_id).unwrap();
     let (params, results) = (ty.params.to_vec(), ty.results.to_vec());
     let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
-    let args = stub(&mut builder)?;
+    let _args = stub(&mut builder)?;
 
     builder.replace_import_in_module(module, iid);
 
