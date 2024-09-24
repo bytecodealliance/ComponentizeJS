@@ -24,6 +24,7 @@ const { version } = JSON.parse(
 const isWindows = platform === 'win32';
 const DEBUG_BINDINGS = false;
 const DEBUG_CALLS = false;
+const DEBUG_BUILD = false;
 
 function maybeWindowsPath(path) {
   if (!path) return path;
@@ -47,7 +48,7 @@ export async function componentize(jsSource, witWorld, opts) {
   } = opts || {};
 
   const engine = opts.engine || fileURLToPath(
-    new URL(opts.enableAot ? `../lib/starlingmonkey_embedding_weval.wasm` : `../lib/starlingmonkey_embedding.wasm`, import.meta.url));
+    new URL(opts.enableAot ? `../lib/starlingmonkey_embedding_weval.wasm` : `../lib/starlingmonkey_embedding${DEBUG_BUILD ? '.debug' : ''}.wasm`, import.meta.url));
 
   await lexerInit;
   let jsImports = [];
