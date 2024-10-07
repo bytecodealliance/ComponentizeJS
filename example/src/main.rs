@@ -3,8 +3,8 @@ use wasmtime::{
     component::{Component, Linker},
     Config, Engine, Store, WasmBacktraceDetails,
 };
-use wasmtime_wasi::{command, ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
-use wasmtime_wasi_http::{proxy, WasiHttpCtx, WasiHttpView};
+use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
+use wasmtime_wasi_http::{WasiHttpCtx, WasiHttpView};
 
 wasmtime::component::bindgen!({
     world: "hello",
@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
     struct CommandExtendedCtx {
         table: ResourceTable,
         wasi: WasiCtx,
-        wasi_http: WasiHttpCtx,
+        http: WasiHttpCtx,
     }
     impl WasiView for CommandExtendedCtx {
         fn table(&mut self) -> &mut ResourceTable {
@@ -48,26 +48,23 @@ async fn main() -> Result<()> {
             &mut self.table
         }
         fn ctx(&mut self) -> &mut WasiHttpCtx {
-            &mut self.wasi_http
+            &mut self.http
         }
     }
 
-    let wasi_http = WasiHttpCtx;
-
-    command::add_to_linker(&mut linker)?;
-    proxy::add_only_http_to_linker(&mut linker)?;
+    wasmtime_wasi::add_to_linker_sync(&mut linker)?;
+    wasmtime_wasi_http::add_only_http_to_linker_sync(&mut linker)?;
     let mut store = Store::new(
         &engine,
         CommandExtendedCtx {
             table,
             wasi,
-            wasi_http,
+            http: WasiHttpCtx::new(),
         },
     );
 
-    let (instance, _instance) = Hello::instantiate_async(&mut store, &component, &linker).await?;
-
-    let res = instance.call_hello(&mut store, "ComponentizeJS").await?;
+    let hello = Hello::instantiate_async(&mut store, &component, &linker).await?;
+    let res = hello.call_hello(&mut store, "ComponentizeJS").await?;
     println!("{}", res);
     Ok(())
 }
