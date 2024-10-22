@@ -361,6 +361,7 @@ componentize_initialize() {
     Runtime.clocks = true;
   }
 
+  builtins::web::performance::Performance::timeOrigin = std::chrono::steady_clock::now();
   __wizer_initialize();
   char env_name[100];
   LOG("(wizer) retrieve and generate the export bindings");
