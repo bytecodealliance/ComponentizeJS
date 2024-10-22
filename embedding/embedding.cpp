@@ -1,4 +1,5 @@
 #include "embedding.h"
+#include "builtins/web/performance.h"
 
 namespace builtins::web::console {
 
@@ -350,6 +351,7 @@ componentize_initialize() {
     Runtime.debug = true;
   }
 
+  builtins::web::performance::Performance::timeOrigin = std::chrono::steady_clock::now();
   __wizer_initialize();
   char env_name[100];
   LOG("(wizer) retrieve and generate the export bindings");
