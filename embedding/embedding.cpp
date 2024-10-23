@@ -146,6 +146,10 @@ cabi_realloc(void *ptr, size_t orig_size, size_t org_align, size_t new_size) {
 
 __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
                                                    void *argptr) {
+  if (!builtins::web::performance::Performance::timeOrigin.has_value()) {
+    builtins::web::performance::Performance::timeOrigin =
+        std::chrono::steady_clock::now();
+  }
   if (Runtime.first_call) {
     js::ResetMathRandomSeed(Runtime.cx);
     Runtime.first_call = false;
@@ -351,7 +355,6 @@ componentize_initialize() {
     Runtime.debug = true;
   }
 
-  builtins::web::performance::Performance::timeOrigin = std::chrono::steady_clock::now();
   __wizer_initialize();
   char env_name[100];
   LOG("(wizer) retrieve and generate the export bindings");
