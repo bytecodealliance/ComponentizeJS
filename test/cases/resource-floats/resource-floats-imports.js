@@ -1,4 +1,4 @@
-export class Float {
+export class MyFloat {
     constructor(value) {
         this.value = value + 2
     }
@@ -8,6 +8,6 @@ export class Float {
     }
 
     static add(a, b) {
-        return new Float(a.value + b + 6)
+        return new MyFloat(a.value + b + 6)
     }
 }

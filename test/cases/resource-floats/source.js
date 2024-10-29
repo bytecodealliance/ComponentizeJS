@@ -1,9 +1,9 @@
-import { Float as ImportFloat } from "resource-floats-imports";
-import { Float as ImportFloat2 } from "test:test/resource-floats";
+import { MyFloat as ImportFloat } from "resource-floats-imports";
+import { MyFloat as ImportFloat2 } from "test:test/resource-floats";
 
 const symbolDispose = Symbol.for('dispose');
 
-class Float {
+class MyFloat {
     constructor(value) {
         this.value = new ImportFloat(value + 1);
     }
@@ -13,11 +13,11 @@ class Float {
     }
 
     static add(a, b) {
-        return new Float(ImportFloat.add(a.value, b).get() + 5);
+        return new MyFloat(ImportFloat.add(a.value, b).get() + 5);
     }
 }
 
-export const resourceFloatsExports = { Float }
+export const resourceFloatsExports = { MyFloat }
 
 export function add(a, b) {
     const out = new ImportFloat2(a.get() + b.get() + 5);

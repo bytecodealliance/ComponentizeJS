@@ -1,30 +1,30 @@
 package test:test;
 
 interface resource-floats {
-  resource float {
+  resource my-float {
     constructor(v: f64);
     get: func() -> f64;
   }
 }
 
 world test {
-  use resource-floats.{float};
+  use resource-floats.{my-float};
 
   export resource-floats-exports: interface {
-    resource float {
+    resource my-float {
       constructor(v: f64);
       get: func() -> f64;
-      add: static func(a: float, b: f64) -> float;
+      add: static func(a: my-float, b: f64) -> my-float;
     }
   }
 
   import resource-floats-imports: interface {
-    resource float {
+    resource my-float {
       constructor(v: f64);
       get: func() -> f64;
-      add: static func(a: float, b: f64) -> float;
+      add: static func(a: my-float, b: f64) -> my-float;
     }
   }
 
-  export add: func(a: borrow<float>, b: borrow<float>) -> own<float>;
+  export add: func(a: borrow<my-float>, b: borrow<my-float>) -> own<my-float>;
 }
