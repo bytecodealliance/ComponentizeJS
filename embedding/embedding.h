@@ -46,6 +46,8 @@ namespace componentize::embedding
     bool debug = false;
     bool first_call = true;
 
+    bool clocks = false;
+
     JSContext *cx;
 
     InitError init_err = InitError::OK;

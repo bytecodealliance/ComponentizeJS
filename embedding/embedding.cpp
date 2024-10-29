@@ -150,8 +150,10 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
   if (Runtime.first_call) {
     js::ResetMathRandomSeed(Runtime.cx);
     Runtime.first_call = false;
-    builtins::web::performance::Performance::timeOrigin.emplace(
-        std::chrono::high_resolution_clock::now());
+    if (Runtime.clocks) {
+      builtins::web::performance::Performance::timeOrigin.emplace(
+          std::chrono::high_resolution_clock::now());
+    }
   }
   if (Runtime.cur_fn_idx != -1) {
     LOG("(call) unexpected call state, post_call was not called after last "
@@ -352,6 +354,11 @@ componentize_initialize() {
   uint32_t is_debug = atoi(getenv("DEBUG"));
   if (is_debug) {
     Runtime.debug = true;
+  }
+
+  uint32_t feature_clocks = atoi(getenv("FEATURE_CLOCKS"));
+  if (feature_clocks) {
+    Runtime.clocks = true;
   }
 
   __wizer_initialize();
