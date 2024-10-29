@@ -1,12 +1,12 @@
 package local:floats;
 
 interface floats {
-  float32-param: func(x: float32);
-  float64-param: func(x: float64);
-  float32-result: func() -> float32;
-  float64-result: func() -> float64;
-  float64-result2: func() -> float64;
-  float32-result2: func() -> float32;
+  float32-param: func(x: f32);
+  float64-param: func(x: f64);
+  float32-result: func() -> f32;
+  float64-result: func() -> f64;
+  float64-result2: func() -> f64;
+  float32-result2: func() -> f32;
 }
 
 world the-world {
