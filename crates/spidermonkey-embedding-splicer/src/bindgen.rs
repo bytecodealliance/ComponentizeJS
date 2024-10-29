@@ -252,30 +252,32 @@ pub fn componentize_bindgen(
                     let iface_prefix = interface_name(resolve, *iface_id)
                         .map(|s| format!("{s}$"))
                         .unwrap_or_else(String::new);
-                    let resource_name = ty.name.as_ref().unwrap().to_lower_camel_case();
+                    let resource_name_camel = ty.name.as_ref().unwrap().to_lower_camel_case();
+                    let resource_name_kebab = ty.name.as_ref().unwrap().to_kebab_case();
                     let module_name = format!("[export]{key_name}");
-                    resource_bindings.push(format!("{iface_prefix}new${resource_name}"));
+                    resource_bindings.push(format!("{iface_prefix}new${resource_name_camel}"));
                     resource_imports.push((
                         module_name.clone(),
-                        format!("[resource-new]{resource_name}"),
+                        format!("[resource-new]{resource_name_kebab}"),
                         1,
                     ));
-                    resource_bindings.push(format!("{iface_prefix}rep${resource_name}"));
+                    resource_bindings.push(format!("{iface_prefix}rep${resource_name_camel}"));
                     resource_imports.push((
                         module_name.clone(),
-                        format!("[resource-rep]{resource_name}"),
+                        format!("[resource-rep]{resource_name_kebab}"),
                         1,
                     ));
-                    resource_bindings.push(format!("export${iface_prefix}drop${resource_name}"));
+                    resource_bindings
+                        .push(format!("export${iface_prefix}drop${resource_name_camel}"));
                     resource_imports.push((
                         module_name.clone(),
-                        format!("[resource-drop]{resource_name}"),
+                        format!("[resource-drop]{resource_name_kebab}"),
                         0,
                     ));
                     finalization_registries.push(format!(
-                        "const finalizationRegistry_export${iface_prefix}{resource_name} = \
+                        "const finalizationRegistry_export${iface_prefix}{resource_name_camel} = \
                          new FinalizationRegistry((handle) => {{
-                             $resource_export${iface_prefix}drop${resource_name}(handle);
+                             $resource_export${iface_prefix}drop${resource_name_camel}(handle);
                          }});
                         "
                     ));
@@ -312,6 +314,7 @@ pub fn componentize_bindgen(
         let resource_name = ty.name.as_deref().unwrap();
         let prefix = prefix.as_deref().unwrap_or("");
         let resource_name_camel = resource_name.to_lower_camel_case();
+        let resource_name_kebab = resource_name.to_kebab_case();
 
         finalization_registries.push(format!(
             "const finalizationRegistry_import${prefix}{resource_name_camel} = \
@@ -323,7 +326,7 @@ pub fn componentize_bindgen(
         resource_bindings.push(format!("import${prefix}drop${resource_name_camel}"));
         resource_imports.push((
             imported_resource_modules.get(&id).unwrap().clone(),
-            format!("[resource-drop]{resource_name}"),
+            format!("[resource-drop]{resource_name_kebab}"),
             0,
         ));
     }

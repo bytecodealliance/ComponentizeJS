@@ -1,4 +1,4 @@
-export class Float {
+export class MyFloat {
     constructor(value) {
         this.value = value + 1
     }
