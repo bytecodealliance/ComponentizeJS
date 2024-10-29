@@ -27,7 +27,7 @@ lib/starlingmonkey_embedding.wasm: StarlingMonkey/cmake/* embedding/* StarlingMo
 	@cp build-release/starling-raw.wasm/starling-raw.wasm $@
 
 lib/starlingmonkey_embedding_weval.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/*/* StarlingMonkey/builtins/*/*/* StarlingMonkey/include/* | lib
-	cmake -B build-release-weval -DCMAKE_BUILD_TYPE=Release -DWEVAL=ON
+	cmake -B build-release-weval -DCMAKE_BUILD_TYPE=Release -DUSE_WASM_OPT=OFF -DWEVAL=ON
 	make -j16 -C build-release-weval
 	@cp build-release-weval/starling-raw.wasm/starling-raw.wasm $@
 
