@@ -1,4 +1,5 @@
 #include "embedding.h"
+#include "builtins/web/performance.h"
 
 namespace builtins::web::console {
 
@@ -65,7 +66,8 @@ from_bigint64(JS::MutableHandleValue handle) {
   JS::BigInt *arg0 = handle.toBigInt();
   uint64_t arg0_uint64;
   if (!JS::detail::BigIntIsUint64(arg0, &arg0_uint64)) {
-    Runtime.engine->abort("Internal bindgen error in coreabi_from_bigint64 validation");
+    Runtime.engine->abort(
+        "Internal bindgen error in coreabi_from_bigint64 validation");
   }
   return arg0_uint64;
 }
@@ -148,6 +150,10 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
   if (Runtime.first_call) {
     js::ResetMathRandomSeed(Runtime.cx);
     Runtime.first_call = false;
+    if (Runtime.clocks) {
+      builtins::web::performance::Performance::timeOrigin.emplace(
+          std::chrono::high_resolution_clock::now());
+    }
   }
   if (Runtime.cur_fn_idx != -1) {
     LOG("(call) unexpected call state, post_call was not called after last "
@@ -348,6 +354,11 @@ componentize_initialize() {
   uint32_t is_debug = atoi(getenv("DEBUG"));
   if (is_debug) {
     Runtime.debug = true;
+  }
+
+  uint32_t feature_clocks = atoi(getenv("FEATURE_CLOCKS"));
+  if (feature_clocks) {
+    Runtime.clocks = true;
   }
 
   __wizer_initialize();

@@ -173,6 +173,7 @@ export async function componentize(jsSource, witWorld, opts) {
     SOURCE_NAME: sourceName,
     IMPORT_WRAPPER_CNT: Object.keys(importWrappers).length.toString(),
     EXPORT_CNT: exports.length.toString(),
+    FEATURE_CLOCKS: features.includes('clocks') ? '1' : '',
   };
 
   for (const [idx, [export_name, expt]] of exports.entries()) {
