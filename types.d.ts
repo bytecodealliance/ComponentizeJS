@@ -33,7 +33,7 @@ interface ComponentizeOptions {
    * 
    * - stdio: console.log(), console.error and errors are provided to stderr
    * - random: Math.random() and crypto.randomBytes()
-   * - clocks: Date.now()
+   * - clocks: Date.now(), performance.now()
    * - http: fetch() support
    * 
    */
