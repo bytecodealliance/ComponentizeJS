@@ -157,7 +157,11 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             let maybe_run = engine_resolve.worlds[engine_world]
                 .exports
                 .iter()
-                .find(|(key, _)| engine_resolve.name_world_key(key) == "wasi:cli/run@0.2.0")
+                .find(|(key, _)| {
+                    engine_resolve
+                        .name_world_key(key)
+                        .starts_with("wasi:cli/run@0.2")
+                })
                 .map(|(key, _)| key.clone());
             if let Some(run) = maybe_run {
                 engine_resolve.worlds[engine_world]
@@ -169,7 +173,9 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
                 .exports
                 .iter()
                 .find(|(key, _)| {
-                    engine_resolve.name_world_key(key) == "wasi:http/incoming-handler@0.2.0"
+                    engine_resolve
+                        .name_world_key(key)
+                        .starts_with("wasi:http/incoming-handler@0.2")
                 })
                 .map(|(key, _)| key.clone());
 

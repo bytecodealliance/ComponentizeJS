@@ -11,6 +11,8 @@ use wasmparser::Operator;
 
 use crate::*;
 
+const WASI_VERSIONS: [&str; 3] = ["0.2.0", "0.2.1", "0.2.2"];
+
 //
 // Parses the Spidermonkey binary into section data for reserialization
 // into an output binary, and in the process:
@@ -44,31 +46,25 @@ pub fn splice(
 
     // since StarlingMonkey implements CLI Run and incoming handler,
     // we override them only if the guest content exports those functions
-    if exports
-        .iter()
-        .any(|(name, _)| name == "wasi:cli/run@0.2.0#run")
-    {
-        if let Some(run) = module
-            .exports
-            .get_func_by_name("wasi:cli/run@0.2.0#run".to_string())
-        {
-            let expt = module.exports.get_func_by_id(run).unwrap();
-            module.exports.delete(expt);
-            module.delete_func(run); // TODO: Look at the intended behaviour here. Need to pass function ID to delete from functions. Was Previously passing Exports ID
+    for wasi_version in WASI_VERSIONS {
+        let import = format!("wasi:cli/run@{wasi_version}#run");
+        if exports.iter().any(|(name, _)| *name == import) {
+            if let Some(run) = module.exports.get_func_by_name(import) {
+                let expt = module.exports.get_func_by_id(run).unwrap();
+                module.exports.delete(expt);
+                module.delete_func(run); // TODO: Look at the intended behaviour here. Need to pass function ID to delete from functions. Was Previously passing Exports ID
+            }
         }
     }
 
-    if exports
-        .iter()
-        .any(|(name, _)| name == "wasi:http/incoming-handler@0.2.0#handle")
-    {
-        if let Some(serve) = module
-            .exports
-            .get_func_by_name("wasi:http/incoming-handler@0.2.0#handle".to_string())
-        {
-            let expt = module.exports.get_func_by_id(serve).unwrap();
-            module.exports.delete(expt);
-            module.delete_func(serve); // TODO: Look at the intended behaviour here. Same as above comment
+    for wasi_version in WASI_VERSIONS {
+        let import = format!("wasi:http/incoming-handler@{wasi_version}#handle");
+        if exports.iter().any(|(name, _)| *name == import) {
+            if let Some(serve) = module.exports.get_func_by_name(import) {
+                let expt = module.exports.get_func_by_id(serve).unwrap();
+                module.exports.delete(expt);
+                module.delete_func(serve); // TODO: Look at the intended behaviour here. Same as above comment
+            }
         }
     }
 
