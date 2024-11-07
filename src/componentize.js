@@ -37,6 +37,7 @@ export async function componentize(jsSource, witWorld, opts) {
     opts = witWorld;
     witWorld = opts?.witWorld;
   }
+  opts = opts || {};
   const {
     sourceName = 'source.js',
     preview2Adapter = preview1AdapterReactorPath(),
@@ -45,7 +46,7 @@ export async function componentize(jsSource, witWorld, opts) {
     disableFeatures = [],
     enableFeatures = [],
     aotCache = fileURLToPath(new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url))
-  } = opts || {};
+  } = opts;
 
   const engine = opts.engine || fileURLToPath(
     new URL(opts.enableAot ? `../lib/starlingmonkey_embedding_weval.wasm` : `../lib/starlingmonkey_embedding${DEBUG_BUILD ? '.debug' : ''}.wasm`, import.meta.url));
