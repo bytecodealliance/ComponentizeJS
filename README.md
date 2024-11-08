@@ -208,6 +208,14 @@ npm run build
 npm run test
 ```
 
+Before being able to use `componetize-js` (ex. via `npm link`, from `jco`), you'll need to run:
+
+```
+npm run build:weval
+```
+
+This will produce a few files, most importantly `lib/starlingmonkey_embedding_weval.wasm`.
+
 To clean up a local installation (i.e. remove the installation of StarlingMonkey):
 
 ```console
