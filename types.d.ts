@@ -16,6 +16,10 @@ interface ComponentizeOptions {
    */
   enableAot?: boolean,
   /**
+   * Use a pre-existing path to the `weval` binary, if present
+   */
+  wevalBin?: string,
+  /**
    * Path to custom Preview2 Adapter
    */
   preview2Adapter?: string,
