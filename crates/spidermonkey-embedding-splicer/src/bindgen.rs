@@ -289,16 +289,27 @@ pub fn componentize_bindgen(
     let mut imported_resource_modules = HashMap::new();
     for (key, import) in &resolve.worlds[id].imports {
         let key_name = resolve.name_world_key(key);
-        if let WorldItem::Interface {
-            id: iface_id,
-            stability: _,
-        } = import
-        {
-            let iface = &resolve.interfaces[*iface_id];
-            for ty_id in iface.types.values() {
-                let ty = &resolve.types[*ty_id];
-                if let TypeDefKind::Resource = &ty.kind {
-                    imported_resource_modules.insert(*ty_id, key_name.clone());
+        match import {
+            WorldItem::Interface {
+                id: iface_id,
+                stability: _,
+            } => {
+                let iface = &resolve.interfaces[*iface_id];
+                for ty_id in iface.types.values() {
+                    let ty = &resolve.types[*ty_id];
+                    if let TypeDefKind::Resource = &ty.kind {
+                        imported_resource_modules.insert(*ty_id, key_name.clone());
+                    }
+                }
+            }
+            WorldItem::Function(_) => {}
+            WorldItem::Type(id) => {
+                let ty = &resolve.types[*id];
+                match ty.kind {
+                    TypeDefKind::Resource => {
+                        imported_resource_modules.insert(*id, key_name.clone());
+                    }
+                    _ => {}
                 }
             }
         }
@@ -306,8 +317,15 @@ pub fn componentize_bindgen(
 
     for &id in &bindgen.imported_resources {
         let ty = &resolve.types[id];
+        let mut impt = imported_resource_modules.get(&id).unwrap().clone();
         let prefix = match &ty.owner {
-            TypeOwner::World(_) => todo!("handle resources with world owners"),
+            TypeOwner::World(w) => {
+                impt = "$root".into();
+                Some(format!(
+                    "$world${}$",
+                    &resolve.worlds[*w].name.to_lower_camel_case()
+                ))
+            }
             TypeOwner::Interface(id) => interface_name(resolve, *id).map(|s| format!("{s}$")),
             TypeOwner::None => unreachable!(),
         };
@@ -324,11 +342,7 @@ pub fn componentize_bindgen(
             "
         ));
         resource_bindings.push(format!("import${prefix}drop${resource_name_camel}"));
-        resource_imports.push((
-            imported_resource_modules.get(&id).unwrap().clone(),
-            format!("[resource-drop]{resource_name_kebab}"),
-            0,
-        ));
+        resource_imports.push((impt, format!("[resource-drop]{resource_name_kebab}"), 0));
     }
 
     let finalization_registries = finalization_registries.concat();
@@ -632,7 +646,16 @@ impl JsBindgen<'_> {
                         }
                     }
                 }
-                WorldItem::Type(_) => {}
+                WorldItem::Type(id) => {
+                    let ty = &self.resolve.types[*id];
+                    match ty.kind {
+                        TypeDefKind::Resource => {
+                            self.resource_directions
+                                .insert(*id, AbiVariant::GuestImport);
+                        }
+                        _ => {}
+                    }
+                }
             };
         }
     }
@@ -762,7 +785,10 @@ impl JsBindgen<'_> {
                 let ty = &self.resolve.types[resource];
 
                 let prefix = match &ty.owner {
-                    TypeOwner::World(_) => todo!("handle resources with world owners"),
+                    TypeOwner::World(w) => Some(format!(
+                        "$world${}$",
+                        &self.resolve.worlds[*w].name.to_lower_camel_case()
+                    )),
                     TypeOwner::Interface(id) => {
                         interface_name(self.resolve, *id).map(|s| format!("{s}$"))
                     }

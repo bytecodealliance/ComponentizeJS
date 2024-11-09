@@ -22,7 +22,7 @@ const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8')
 );
 const isWindows = platform === 'win32';
-const DEBUG_BINDINGS = false;
+const DEBUG_BINDINGS = true;
 const DEBUG_CALLS = false;
 const DEBUG_BUILD = false;
 

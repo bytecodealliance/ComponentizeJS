@@ -1,0 +1,12 @@
+package test:test;
+
+world test {
+  resource thing {
+    constructor(v: u32);
+
+    get: func() -> u32;
+    set: func(v: u32);
+  }
+
+  export f: func (thing: borrow<thing>);
+}
