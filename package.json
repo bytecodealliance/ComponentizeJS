@@ -4,7 +4,10 @@
   "homepage": "https://github.com/bytecodealliance/componentize-js#readme",
   "description": "ESM -> WebAssembly Component creator, via a SpiderMonkey JS engine embedding",
   "type": "module",
-  "exports": "./src/componentize.js",
+  "exports": {
+    "types": "./types.d.ts",
+    "import": "./src/componentize.js"
+  },
   "devDependencies": {
     "@bytecodealliance/preview2-shim": "^0.16.7",
     "mocha": "^10.2.0"
@@ -30,7 +33,8 @@
     "lib/starlingmonkey_embedding.wasm",
     "lib/starlingmonkey_embedding_weval.wasm",
     "lib/starlingmonkey_ics.wevalcache",
-    "src"
+    "src",
+    "types.d.ts"
   ],
   "workspaces": [
     "."
