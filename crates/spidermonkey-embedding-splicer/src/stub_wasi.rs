@@ -875,7 +875,7 @@ fn stub_io(module: &mut Module) -> Result<()> {
         "[resource-drop]output-stream",
         unreachable_stub,
     )?;
-    stub_wasi_imports(module, "wasi:io/poll@0.2.0", "poll", unreachable_stub)?;
+    stub_wasi_imports(module, "wasi:io/poll", "poll", unreachable_stub)?;
     stub_wasi_imports(
         module,
         "wasi:io/streams",
