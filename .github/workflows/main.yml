@@ -48,7 +48,7 @@ jobs:
         key: engine-build-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
 
     - name: Install NPM packages
-      run: npm ci
+      run: npm install
 
     - name: Get StarlingMonkey Commit
       id: starlingmonkey-commit
