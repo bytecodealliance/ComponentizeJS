@@ -38,7 +38,7 @@ jobs:
 
     - uses: actions/setup-node@v2
       with:
-        node-version: '20'
+        node-version: '22'
 
     - name: Cache Rust dependencies
       uses: actions/cache@v3
@@ -48,7 +48,7 @@ jobs:
         key: engine-build-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
 
     - name: Install NPM packages
-      run: npm install
+      run: npm ci
 
     - name: Get StarlingMonkey Commit
       id: starlingmonkey-commit

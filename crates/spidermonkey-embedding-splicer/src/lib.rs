@@ -134,7 +134,8 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             .select_world(id, world_name.as_deref())
             .map_err(|e| e.to_string())?;
 
-        let mut wasm_bytes = wit_component::dummy_module(&resolve, world);
+        let mut wasm_bytes =
+            wit_component::dummy_module(&resolve, world, wit_parser::Mangling::Standard32);
 
         // merge the engine world with the target world, retaining the engine producers
         let producers = if let Ok((

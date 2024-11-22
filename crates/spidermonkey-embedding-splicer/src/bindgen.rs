@@ -131,20 +131,20 @@ pub struct Componentization {
 
 pub fn componentize_bindgen(
     resolve: &Resolve,
-    id: WorldId,
+    wid: WorldId,
     name: &str,
     guest_imports: &Vec<String>,
     guest_exports: &Vec<String>,
     features: Vec<Features>,
 ) -> Result<Componentization> {
-    let local_package_name = resolve.id_of_name(resolve.worlds[id].package.unwrap(), "");
+    let local_package_name = resolve.id_of_name(resolve.worlds[wid].package.unwrap(), "");
     let mut bindgen = JsBindgen {
         src: Source::default(),
         esm_bindgen: EsmBindgen::default(),
         local_names: LocalNames::default(),
         all_intrinsics: BTreeSet::new(),
         resolve,
-        world: id,
+        world: wid,
         sizes: SizeAlign::default(),
         memory: "$memory".to_string(),
         realloc: "$realloc".to_string(),
@@ -238,7 +238,7 @@ pub fn componentize_bindgen(
     let mut resource_bindings = Vec::new();
     let mut resource_imports = Vec::new();
     let mut finalization_registries = Vec::new();
-    for (key, export) in &resolve.worlds[id].exports {
+    for (key, export) in &resolve.worlds[wid].exports {
         let key_name = resolve.name_world_key(key);
         if let WorldItem::Interface {
             id: iface_id,
@@ -287,18 +287,29 @@ pub fn componentize_bindgen(
     }
 
     let mut imported_resource_modules = HashMap::new();
-    for (key, import) in &resolve.worlds[id].imports {
+    for (key, import) in &resolve.worlds[wid].imports {
         let key_name = resolve.name_world_key(key);
-        if let WorldItem::Interface {
-            id: iface_id,
-            stability: _,
-        } = import
-        {
-            let iface = &resolve.interfaces[*iface_id];
-            for ty_id in iface.types.values() {
-                let ty = &resolve.types[*ty_id];
-                if let TypeDefKind::Resource = &ty.kind {
-                    imported_resource_modules.insert(*ty_id, key_name.clone());
+        match import {
+            WorldItem::Interface {
+                id: iface_id,
+                stability: _,
+            } => {
+                let iface = &resolve.interfaces[*iface_id];
+                for ty_id in iface.types.values() {
+                    let ty = &resolve.types[*ty_id];
+                    if let TypeDefKind::Resource = &ty.kind {
+                        imported_resource_modules.insert(*ty_id, key_name.clone());
+                    }
+                }
+            }
+            WorldItem::Function(_) => {}
+            WorldItem::Type(id) => {
+                let ty = &resolve.types[*id];
+                match ty.kind {
+                    TypeDefKind::Resource => {
+                        imported_resource_modules.insert(*id, key_name.clone());
+                    }
+                    _ => {}
                 }
             }
         }
@@ -306,8 +317,17 @@ pub fn componentize_bindgen(
 
     for &id in &bindgen.imported_resources {
         let ty = &resolve.types[id];
+        let mut impt = imported_resource_modules.get(&id).unwrap().clone();
         let prefix = match &ty.owner {
-            TypeOwner::World(_) => todo!("handle resources with world owners"),
+            TypeOwner::World(w) => {
+                impt = "$root".into();
+                let world = &resolve.worlds[*w];
+                if *w == wid {
+                    None
+                } else {
+                    Some(format!("$world${}$", world.name.to_lower_camel_case()))
+                }
+            }
             TypeOwner::Interface(id) => interface_name(resolve, *id).map(|s| format!("{s}$")),
             TypeOwner::None => unreachable!(),
         };
@@ -324,11 +344,7 @@ pub fn componentize_bindgen(
             "
         ));
         resource_bindings.push(format!("import${prefix}drop${resource_name_camel}"));
-        resource_imports.push((
-            imported_resource_modules.get(&id).unwrap().clone(),
-            format!("[resource-drop]{resource_name_kebab}"),
-            0,
-        ));
+        resource_imports.push((impt, format!("[resource-drop]{resource_name_kebab}"), 0));
     }
 
     let finalization_registries = finalization_registries.concat();
@@ -527,6 +543,58 @@ impl JsBindgen<'_> {
         Ok(())
     }
 
+    fn resource_bindgen(
+        &mut self,
+        resource: TypeId,
+        import_name: &str,
+        iface_name: &Option<String>,
+        functions: Vec<(&str, &Function)>,
+    ) {
+        let name = binding_name(
+            &self.resolve.types[resource]
+                .name
+                .as_ref()
+                .unwrap()
+                .to_upper_camel_case(),
+            &iface_name,
+        );
+
+        uwriteln!(self.src, "\nexport class import_{name} {{");
+
+        // TODO: Imports tree-shaking for resources is disabled since it is not functioning correctly.
+        // To make this work properly, we need to trace recursively through the type graph
+        // to include all resources across argument types.
+        for (_, func) in functions {
+            self.import_bindgen(import_name.to_string(), func, true, iface_name.clone());
+        }
+
+        let lower_camel = &self.resolve.types[resource]
+            .name
+            .as_ref()
+            .unwrap()
+            .to_lower_camel_case();
+
+        let prefix = iface_name
+            .as_deref()
+            .map(|s| format!("{s}$"))
+            .unwrap_or(String::new());
+
+        let resource_symbol = self.intrinsic(Intrinsic::SymbolResourceHandle);
+        let dispose_symbol = self.intrinsic(Intrinsic::SymbolDispose);
+
+        uwriteln!(
+            self.src,
+            "
+                [{dispose_symbol}]() {{
+                    finalizationRegistry_import${prefix}{lower_camel}.unregister(this);
+                    $resource_import${prefix}drop${lower_camel}(this[{resource_symbol}]);
+                    this[{resource_symbol}] = undefined;
+                }}
+        }}
+        "
+        );
+    }
+
     fn imports_bindgen(&mut self, guest_imports: &Vec<String>) {
         for (key, impt) in &self.resolve.worlds[self.world].imports {
             let import_name = self.resolve.name_world_key(key);
@@ -561,7 +629,7 @@ impl JsBindgen<'_> {
                                 | FunctionKind::Constructor(ty) => Some(*ty),
                             })
                             .or_default()
-                            .push((name, func));
+                            .push((name.as_str(), func));
                             map
                         },
                     );
@@ -570,54 +638,7 @@ impl JsBindgen<'_> {
 
                     for (resource, functions) in by_resource {
                         if let Some(ty) = resource {
-                            let name = binding_name(
-                                &self.resolve.types[ty]
-                                    .name
-                                    .as_ref()
-                                    .unwrap()
-                                    .to_upper_camel_case(),
-                                &iface_name,
-                            );
-
-                            uwriteln!(self.src, "\nexport class import_{name} {{");
-
-                            // TODO: Imports tree-shaking for resources is disabled since it is not functioning correctly.
-                            // To make this work properly, we need to trace recursively through the type graph
-                            // to include all resources across argument types.
-                            for (_, func) in functions {
-                                self.import_bindgen(
-                                    import_name.clone(),
-                                    func,
-                                    true,
-                                    iface_name.clone(),
-                                );
-                            }
-
-                            let lower_camel = &self.resolve.types[ty]
-                                .name
-                                .as_ref()
-                                .unwrap()
-                                .to_lower_camel_case();
-
-                            let prefix = iface_name
-                                .as_deref()
-                                .map(|s| format!("{s}$"))
-                                .unwrap_or(String::new());
-
-                            let resource_symbol = self.intrinsic(Intrinsic::SymbolResourceHandle);
-                            let dispose_symbol = self.intrinsic(Intrinsic::SymbolDispose);
-
-                            uwriteln!(
-                                self.src,
-                                "
-                                    [{dispose_symbol}]() {{
-                                        finalizationRegistry_import${prefix}{lower_camel}.unregister(this);
-                                        $resource_import${prefix}drop${lower_camel}(this[{resource_symbol}]);
-                                        this[{resource_symbol}] = null;
-                                    }}
-                            }}
-                            "
-                            );
+                            self.resource_bindgen(ty, &import_name, &iface_name, functions);
                         } else if guest_imports.contains(&import_name)
                             || import_name.starts_with(&self.local_package_name)
                         {
@@ -632,7 +653,48 @@ impl JsBindgen<'_> {
                         }
                     }
                 }
-                WorldItem::Type(_) => {}
+                WorldItem::Type(id) => {
+                    let ty = &self.resolve.types[*id];
+                    match ty.kind {
+                        TypeDefKind::Resource => {
+                            self.resource_directions
+                                .insert(*id, AbiVariant::GuestImport);
+
+                            let resource_name = ty.name.as_ref().unwrap();
+
+                            let mut resource_fns = Vec::new();
+                            for (_, impt) in &self.resolve.worlds[self.world].imports {
+                                match impt {
+                                    WorldItem::Function(function) => {
+                                        let stripped = if let Some(stripped) =
+                                            function.name.strip_prefix("[constructor]")
+                                        {
+                                            stripped
+                                        } else if let Some(stripped) =
+                                            function.name.strip_prefix("[method]")
+                                        {
+                                            stripped
+                                        } else if let Some(stripped) =
+                                            function.name.strip_prefix("[static]")
+                                        {
+                                            stripped
+                                        } else {
+                                            continue;
+                                        };
+
+                                        if stripped.starts_with(resource_name) {
+                                            resource_fns.push((function.name.as_str(), function));
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+
+                            self.resource_bindgen(*id, "$root", &None, resource_fns);
+                        }
+                        _ => {}
+                    }
+                }
             };
         }
     }
@@ -762,7 +824,14 @@ impl JsBindgen<'_> {
                 let ty = &self.resolve.types[resource];
 
                 let prefix = match &ty.owner {
-                    TypeOwner::World(_) => todo!("handle resources with world owners"),
+                    TypeOwner::World(w) => {
+                        let world = &self.resolve.worlds[*w];
+                        if *w == self.world {
+                            None
+                        } else {
+                            Some(format!("$world${}$", world.name.to_lower_camel_case()))
+                        }
+                    }
                     TypeOwner::Interface(id) => {
                         interface_name(self.resolve, *id).map(|s| format!("{s}$"))
                     }
