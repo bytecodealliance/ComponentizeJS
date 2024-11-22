@@ -6,6 +6,15 @@ import { fileURLToPath } from 'node:url';
 import { strictEqual } from 'node:assert';
 
 const DEBUG_TRACING = false;
+const LOG_DEBUGGING = false;
+
+function maybeLogging (disableFeatures) {
+  if (!LOG_DEBUGGING) return disableFeatures;
+  if (disableFeatures && disableFeatures.includes('stdio')) {
+    disableFeatures.splice(disableFeatures.indexOf('stdio'), 1);
+  }
+  return disableFeatures;
+}
 
 const builtinsCases = await readdir(new URL('./builtins', import.meta.url));
 suite('Builtins', () => {
@@ -32,7 +41,7 @@ suite('Builtins', () => {
         {
           sourceName: `${name}.js`,
           enableFeatures,
-          disableFeatures,
+          disableFeatures: maybeLogging(disableFeatures),
           enableAot
         }
       );
@@ -164,7 +173,7 @@ suite('Bindings', () => {
           witPath,
           worldName,
           enableFeatures,
-          disableFeatures,
+          disableFeatures: maybeLogging(disableFeatures),
           enableAot
         });
         const map = {
@@ -178,8 +187,10 @@ suite('Bindings', () => {
           'wasi:random/*': '@bytecodealliance/preview2-shim/random#*',
           'wasi:sockets/*': '@bytecodealliance/preview2-shim/sockets#*',
         };
-        for (const [impt] of imports) {
+        for (let [impt] of imports) {
           if (impt.startsWith('wasi:')) continue;
+          if (impt.startsWith('['))
+            impt = impt.slice(impt.indexOf(']') + 1);
           let importName = impt.split('/').pop();
           if (importName === 'test') importName = 'imports';
           map[impt] = `../../cases/${name}/${importName}.js`;

@@ -2,9 +2,9 @@ use anyhow::{bail, Result};
 use orca_wasm::ir::function::FunctionBuilder;
 use orca_wasm::ir::id::{FunctionID, LocalID};
 use orca_wasm::ir::module::module_functions::FuncKind;
-use orca_wasm::ir::types::{BlockType, Value};
+use orca_wasm::ir::types::{BlockType, InitExpr, Value};
 use orca_wasm::module_builder::AddLocal;
-use orca_wasm::{DataType, InitExpr, Module, Opcode};
+use orca_wasm::{DataType, Instructions, Module, Opcode};
 use std::{
     collections::HashSet,
     path::PathBuf,
@@ -44,7 +44,7 @@ where
         };
 
         let ty = module.types.get(ty_id).unwrap();
-        let (params, results) = (ty.params.to_vec(), ty.results.to_vec());
+        let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
         let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
         let _args = stub(&mut builder)?;
 
@@ -80,7 +80,7 @@ where
     };
 
     let ty = module.types.get(ty_id).unwrap();
-    let (params, results) = (ty.params.to_vec(), ty.results.to_vec());
+    let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
     let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
     let _args = stub(&mut builder)?;
 
@@ -205,7 +205,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
     // create a mutable random seed global
     let seed_val: i64 = 0;
     let seed_global = module.add_global(
-        InitExpr::Value(Value::I64(seed_val)),
+        InitExpr::new(vec![Instructions::Value(Value::I64(seed_val))]),
         DataType::I64,
         true,
         false,

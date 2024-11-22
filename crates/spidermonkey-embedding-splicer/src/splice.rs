@@ -215,7 +215,7 @@ fn synthesize_import_functions(
                 }],
                 None => vec![],
             };
-            let import_fn_type = module.types.add(&params, &ret);
+            let import_fn_type = module.types.add_func_type(&params, &ret);
             let import_fn_fid = if let Some(existing) = module
                 .imports
                 .get_func((*impt_specifier).clone(), (*impt_name).clone())
