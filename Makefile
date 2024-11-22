@@ -1,5 +1,5 @@
 # WASM_OPT ?= $(shell rm node_modules/.bin/wasm-opt ; which wasm-opt)
-JCO ?= ./node_modules/@bytecodealliance/jco/src/jco.js
+JCO ?= ./node_modules/.bin/jco
 
 ifndef JCO
 	JCO = $(error No jco in PATH. Run npm install -g @bytecodealliance/jco)
