@@ -130,8 +130,7 @@ jobs:
       - name: Build ComponentizeJS
         if: steps.starlingmonkey-jit.outputs.cache-hit != 'true'
         run: |
-          make release
-          make lib/starlingmonkey_embedding.wasm
+          npm run build
 
       - uses: actions/upload-artifact@v4
         if: steps.starlingmonkey-jit.outputs.cache-hit != 'true'
@@ -200,9 +199,7 @@ jobs:
       - name: Build Weval
         if: steps.starlingmonkey-aot.outputs.cache-hit != 'true'
         run: |
-          make release-weval
-          make lib/starlingmonkey_embedding_weval.wasm
-          make lib/starlingmonkey_ics.wevalcache
+          npm run build:weval
 
       - uses: actions/upload-artifact@v4
         if: steps.starlingmonkey-aot.outputs.cache-hit != 'true'
