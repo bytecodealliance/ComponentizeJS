@@ -130,6 +130,7 @@ jobs:
       - name: Build ComponentizeJS
         if: steps.starlingmonkey-jit.outputs.cache-hit != 'true'
         run: |
+          npm run clean
           npm run build
 
       - uses: actions/upload-artifact@v4
@@ -199,6 +200,7 @@ jobs:
       - name: Build Weval
         if: steps.starlingmonkey-aot.outputs.cache-hit != 'true'
         run: |
+          npm run clean
           npm run build:weval
 
       - uses: actions/upload-artifact@v4
@@ -244,19 +246,22 @@ jobs:
             lib/spidermonkey-embedding-splicer.js
             target
 
-      - name: Restore StarlingMonkey from cache
+      - name: Restore StarlingMonkey build from cache
         uses: actions/cache/restore@v4
-        id: starlingmonkey-jit
+        id: restore-starlingmonkey-jit-build
         with:
           key: output-starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: |
             lib/starlingmonkey_embedding.wasm
-            target
+            build-release
 
       - uses: actions/download-artifact@v4
-        if: steps.starlingmonkey-jit.outputs.cache-hit != 'true'
+        if: steps.restore-starlingmonkey-jit-build.outputs.cache-hit != 'true'
         with:
           name: starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+          path: |
+            lib/starlingmonkey_embedding.wasm
+            build-release
 
       - uses: actions/setup-node@v4
         with:
@@ -308,20 +313,24 @@ jobs:
             lib/spidermonkey-embedding-splicer.js
             target
 
-      - name: Restore StarlingMonkey (Weval) from cache
+      - name: Restore StarlingMonkey AOT build from cache
         uses: actions/cache/restore@v4
-        id: starlingmonkey-aot
+        id: restore-starlingmonkey-aot-build
         with:
           key: output-starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: |
             lib/starlingmonkey_embedding_weval.wasm
             lib/starlingmonkey_ics.wevalcache
-            target
+            build-release-weval
 
       - uses: actions/download-artifact@v4
-        if: steps.starlingmonkey-aot.outputs.cache-hit != 'true'
+        if: steps.restore-starlingmonkey-aot-build.outputs.cache-hit != 'true'
         with:
           name: starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+          path: |
+            lib/starlingmonkey_embedding_weval.wasm
+            lib/starlingmonkey_ics.wevalcache
+            build-release-weval
 
       - uses: actions/setup-node@v4
         with:
