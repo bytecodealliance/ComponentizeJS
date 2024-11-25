@@ -19,7 +19,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+      - uses: actions/checkout@v4
       - name: Install Rust
         run: |
           rustup update stable
@@ -41,7 +41,7 @@ jobs:
           - '22'
           - latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+      - uses: actions/checkout@v4
 
       - name: Install Rust Toolchain
         run: |
@@ -49,7 +49,7 @@ jobs:
           rustup target add wasm32-wasi --toolchain 1.77.1
           rustup target add wasm32-wasi
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # 4.1.0
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{matrix.node-version}}
 
@@ -57,7 +57,7 @@ jobs:
         run: npm install
 
       - name: Cache Splicer build
-        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # 4.1.2
+        uses: actions/cache@v4
         id: splicer-build
         with:
           key: output-splicer-node-${{matrix.node-version}}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
@@ -84,7 +84,7 @@ jobs:
           - '22'
           - latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -99,7 +99,7 @@ jobs:
           rustup target add wasm32-wasi
 
       - name: Restore Embedding Splicer from cache
-        uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a # 4.1.2
+        uses: actions/cache/restore@v4
         id: splicer-build
         with:
           key: output-splicer-node-${{matrix.node-version}}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
@@ -110,7 +110,7 @@ jobs:
             lib/spidermonkey-embedding-splicer.js
             target
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # 4.1.0
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{matrix.node-version}}
 
@@ -118,7 +118,7 @@ jobs:
         run: npm install
 
       - name: Cache StarlingMonkey
-        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # 4.1.2
+        uses: actions/cache@v4
         id: starlingmonkey-jit
         with:
           key: output-starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
@@ -152,7 +152,7 @@ jobs:
           - '22'
           - latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -167,7 +167,7 @@ jobs:
           rustup target add wasm32-wasi
 
       - name: Restore Embedding Splicer from cache
-        uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a # 4.1.2
+        uses: actions/cache/restore@v4
         id: splicer-build
         with:
           key: output-splicer-node-${{matrix.node-version}}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
@@ -178,7 +178,7 @@ jobs:
             lib/spidermonkey-embedding-splicer.js
             target
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # 4.1.0
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{matrix.node-version}}
 
@@ -186,7 +186,7 @@ jobs:
         run: npm install
 
       - name: Cache StarlingMonkey (Weval)
-        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # 4.1.2
+        uses: actions/cache@v4
         id: starlingmonkey-aot
         with:
           key: output-starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
@@ -226,14 +226,14 @@ jobs:
           - '22'
           - latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+      - uses: actions/checkout@v4
 
       - name: Get StarlingMonkey Commit
         id: starlingmonkey-commit
         run: echo "STARLINGMONKEY_HASH=$(git submodule status | head -c9 | tail -c8)" >> "$GITHUB_OUTPUT"
 
       - name: Restore Embedding Splicer from cache
-        uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a # 4.1.2
+        uses: actions/cache/restore@v4
         id: splicer-build
         with:
           key: output-splicer-node-${{matrix.node-version}}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
@@ -245,7 +245,7 @@ jobs:
             target
 
       - name: Restore StarlingMonkey from cache
-        uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a # 4.1.2
+        uses: actions/cache/restore@v4
         id: starlingmonkey-jit
         with:
           key: output-starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
@@ -258,7 +258,7 @@ jobs:
         with:
           name: starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # 4.1.0
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{matrix.node-version}}
 
@@ -290,14 +290,14 @@ jobs:
     env:
       ENABLE_AOT: "1"
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+      - uses: actions/checkout@v4
 
       - name: Get StarlingMonkey Commit
         id: starlingmonkey-commit
         run: echo "STARLINGMONKEY_HASH=$(git submodule status | head -c9 | tail -c8)" >> "$GITHUB_OUTPUT"
 
       - name: Restore Embedding Splicer from cache
-        uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a # 4.1.2
+        uses: actions/cache/restore@v4
         id: splicer-build
         with:
           key: output-splicer-node-${{matrix.node-version}}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
@@ -309,7 +309,7 @@ jobs:
             target
 
       - name: Restore StarlingMonkey (Weval) from cache
-        uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a # 4.1.2
+        uses: actions/cache/restore@v4
         id: starlingmonkey-aot
         with:
           key: output-starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
@@ -323,7 +323,7 @@ jobs:
         with:
           name: starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
 
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # 4.1.0
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{matrix.node-version}}
 
@@ -334,7 +334,7 @@ jobs:
         run: npm run test:weval
 
       - name: Cache Example build
-        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # 4.1.2
+        uses: actions/cache@v4
         with:
           path: example/target
           key: output-example-aot-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
