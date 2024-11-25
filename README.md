@@ -108,7 +108,13 @@ The component iself can be executed in any component runtime, see the [example](
 
 ### AOT Compilation
 
-To enable AOT compilation, set the `enableAot: true` option to run [Weval](https://github.com/cfallin/weval) ahead-of-time compilation.
+To enable AOT compilation, set the `enableAot: true` option to run [Weval][weval] ahead-of-time compilation.
+
+[weval]: https://github.com/bytecodealliance/weval
+
+### Custom `weval` binary
+
+To use a custom (pre-downloaded) [`weval`][weval] binary, set the `wevalBin` option to the path to your desired weval binary.
 
 ### Async Support
 
