@@ -20,6 +20,8 @@
   },
   "types": "types.d.ts",
   "scripts": {
+    "clean": "npm run clean:starlingmonkey",
+    "clean:starlingmonkey": "rm -rf build-release",
     "build": "make release",
     "build:weval": "make release-weval",
     "build:debug": "make debug",

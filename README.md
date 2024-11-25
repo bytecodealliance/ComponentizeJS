@@ -94,7 +94,7 @@ const { component } = await componentize(`
     log: func(msg: string);
   }
   world hello {
-    import logger; 
+    import logger;
     export say-hello: func(name: string);
   }
 `);
@@ -108,7 +108,13 @@ The component iself can be executed in any component runtime, see the [example](
 
 ### AOT Compilation
 
-To enable AOT compilation, set the `enableAot: true` option to run [Weval](https://github.com/cfallin/weval) ahead-of-time compilation.
+To enable AOT compilation, set the `enableAot: true` option to run [Weval][weval] ahead-of-time compilation.
+
+[weval]: https://github.com/bytecodealliance/weval
+
+### Custom `weval` binary
+
+To use a custom (pre-downloaded) [`weval`][weval] binary, set the `wevalBin` option to the path to your desired weval binary.
 
 ### Async Support
 
@@ -162,7 +168,7 @@ Note that features explicitly imported by the target world cannot be disabled - 
 
 ## Using StarlingMonkey's `fetch-event`
 
-The StarlingMonkey engine provides the ability to use `fetchEvent` to handle calls to `wasi:http/incoming-handler@0.2.0#handle`. When targeting worlds that export `wasi:http/incoming-handler@0.2.0` the fetch event will automatically be attached. Alternatively, to override the fetch event with a custom handler, export an explict `incomingHandler` or `'wasi:http/incoming-handler@0.2.0'` object. Using the `fetchEvent` requires enabling the `http` feature. 
+The StarlingMonkey engine provides the ability to use `fetchEvent` to handle calls to `wasi:http/incoming-handler@0.2.0#handle`. When targeting worlds that export `wasi:http/incoming-handler@0.2.0` the fetch event will automatically be attached. Alternatively, to override the fetch event with a custom handler, export an explict `incomingHandler` or `'wasi:http/incoming-handler@0.2.0'` object. Using the `fetchEvent` requires enabling the `http` feature.
 
 ## API
 
@@ -200,7 +206,27 @@ imports. Direct component analysis should be used to correctly infer the real im
 
 ### Building and testing
 
-Building and testing is based on a `npm install && npm run build && npm run test` workflow.
+Building and testing the project can be performed via NPM scripts (see [`package.json`](./package.json)):
+
+```console
+npm install
+npm run build
+npm run test
+```
+
+Before being able to use `componetize-js` (ex. via `npm link`, from `jco`), you'll need to run:
+
+```
+npm run build:weval
+```
+
+This will produce a few files, most importantly `lib/starlingmonkey_embedding_weval.wasm`.
+
+To clean up a local installation (i.e. remove the installation of StarlingMonkey):
+
+```console
+npm run clean
+```
 
 # License
 

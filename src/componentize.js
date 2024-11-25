@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve, join, dirname } from 'node:path';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
-import { rmSync } from 'node:fs';
+import { rmSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import {
   spliceBindings,
@@ -196,7 +196,13 @@ export async function componentize(jsSource, witWorld, opts) {
     console.log(env);
   }
   if (opts.enableAot) {
-    const wevalBin = await getWeval();
+    // Determine the weval bin path, possibly using a pre-downloaded version
+    let wevalBin;
+    if (opts.wevalBin && existsSync(opts.wevalBin)) {
+      wevalBin = opts.wevalBin;
+    } else {
+      wevalBin = await getWeval();
+    }
 
     try {
       let wevalProcess = spawnSync(
