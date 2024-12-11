@@ -1,0 +1,12 @@
+package local:%char;
+
+interface chars {
+  /// A function that returns a character
+  return-char: func() -> char;
+  /// A function that accepts a character
+  take-char: func(x: char);
+}
+
+world the-world {
+  import chars;
+}

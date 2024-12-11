@@ -134,6 +134,10 @@ export async function componentize(jsSource, witWorld, opts) {
     curIdx = 0;
   for (const jsImpt of jsImports) {
     if (jsImpt.t !== 1 && jsImpt.t !== 2) continue;
+    if (!jsImpt.n) continue;
+    if (!imports.some(([impt]) => jsImpt.n === impt)) {
+      throw new Error(`Import '${jsImpt.n}' is not defined by the WIT world. Make sure to use a bundler for JS dependencies such as esbuild or RollupJS. Future ComponentizeJS versions may include Node.js builtins and bundling.`);
+    }
     const specifier = jsSource.slice(jsImpt.s, jsImpt.e);
     source += jsSource.slice(curIdx, jsImpt.s);
     source += `./${specifier.replace(':', '__').replace('/', '$')}.js`;
