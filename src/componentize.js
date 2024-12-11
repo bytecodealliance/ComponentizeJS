@@ -144,7 +144,7 @@ export async function componentize(jsSource, witWorld, opts) {
   // rewrite the JS source import specifiers to reference import wrappers
   let source = '',
     curIdx = 0;
-  const importSpecifiers = new Set([...imports.map(([impt]) => impt)]);
+  const importSpecifiers = new Set([...importWrappers.map(([impt]) => impt)]);
   for (const jsImpt of jsImports) {
     if (jsImpt.t !== 1 && jsImpt.t !== 2) continue;
     if (!jsImpt.n) continue;
