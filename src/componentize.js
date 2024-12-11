@@ -25,6 +25,7 @@ const isWindows = platform === 'win32';
 const DEBUG_BINDINGS = false;
 const DEBUG_CALLS = false;
 const DEBUG_BUILD = false;
+const DEBUG_BINARY = false;
 
 function maybeWindowsPath(path) {
   if (!path) return path;
@@ -61,13 +62,13 @@ export async function componentize(jsSource, witWorld, opts) {
   }
 
   let guestImports = [];
-  jsImports.map((k) => {
-    guestImports.push(k.n);
+  jsImports.map(({ t, n }) => {
+    if (typeof n === 'string' && (t === 1 || t === 2)) guestImports.push(n);
   });
 
   let guestExports = [];
   jsExports.map((k) => {
-    guestExports.push(k.n);
+    if (k.n) guestExports.push(k.n);
   });
 
   // we never disable a feature that is already in the target world usage
@@ -132,6 +133,7 @@ export async function componentize(jsSource, witWorld, opts) {
   let source = '',
     curIdx = 0;
   for (const jsImpt of jsImports) {
+    if (jsImpt.t !== 1 && jsImpt.t !== 2) continue;
     const specifier = jsSource.slice(jsImpt.s, jsImpt.e);
     source += jsSource.slice(curIdx, jsImpt.s);
     source += `./${specifier.replace(':', '__').replace('/', '$')}.js`;
@@ -383,6 +385,10 @@ export async function componentize(jsSource, witWorld, opts) {
     maybeWindowsPath(witPath),
     worldName
   );
+
+  if (DEBUG_BINARY) {
+    await writeFile('binary.wasm', finalBin);
+  }
 
   const component = await metadataAdd(
     await componentNew(
