@@ -25,6 +25,7 @@ const isWindows = platform === 'win32';
 const DEBUG_BINDINGS = false;
 const DEBUG_CALLS = false;
 const DEBUG_BUILD = false;
+const DEBUG_BINARY = false;
 
 function maybeWindowsPath(path) {
   if (!path) return path;
@@ -45,11 +46,23 @@ export async function componentize(jsSource, witWorld, opts) {
     worldName,
     disableFeatures = [],
     enableFeatures = [],
-    aotCache = fileURLToPath(new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url))
+    aotCache = fileURLToPath(
+      new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url)
+    ),
   } = opts;
 
-  const engine = opts.engine || fileURLToPath(
-    new URL(opts.enableAot ? `../lib/starlingmonkey_embedding_weval.wasm` : `../lib/starlingmonkey_embedding${DEBUG_BUILD ? '.debug' : ''}.wasm`, import.meta.url));
+  const engine =
+    opts.engine ||
+    fileURLToPath(
+      new URL(
+        opts.enableAot
+          ? `../lib/starlingmonkey_embedding_weval.wasm`
+          : `../lib/starlingmonkey_embedding${
+              DEBUG_BUILD ? '.debug' : ''
+            }.wasm`,
+        import.meta.url
+      )
+    );
 
   await lexerInit;
   let jsImports = [];
@@ -61,13 +74,13 @@ export async function componentize(jsSource, witWorld, opts) {
   }
 
   let guestImports = [];
-  jsImports.map((k) => {
-    guestImports.push(k.n);
+  jsImports.map(({ t, n }) => {
+    if (typeof n === 'string' && (t === 1 || t === 2)) guestImports.push(n);
   });
 
   let guestExports = [];
   jsExports.map((k) => {
-    guestExports.push(k.n);
+    if (k.n) guestExports.push(k.n);
   });
 
   // we never disable a feature that is already in the target world usage
@@ -131,7 +144,23 @@ export async function componentize(jsSource, witWorld, opts) {
   // rewrite the JS source import specifiers to reference import wrappers
   let source = '',
     curIdx = 0;
+  const importSpecifiers = new Set([...importWrappers.map(([impt]) => impt)]);
   for (const jsImpt of jsImports) {
+    if (jsImpt.t !== 1 && jsImpt.t !== 2) continue;
+    if (!jsImpt.n) continue;
+    if (!importSpecifiers.has(jsImpt.n)) {
+      throw new Error(
+        `Import '${
+          jsImpt.n
+        }' is not defined by the WIT world. Available imports are: ${[
+          ...importSpecifiers,
+        ]
+          .map((impt) => `'${impt}'`)
+          .join(
+            ', '
+          )}.\nMake sure to use a bundler for JS dependencies such as esbuild or RollupJS.`
+      );
+    }
     const specifier = jsSource.slice(jsImpt.s, jsImpt.e);
     source += jsSource.slice(curIdx, jsImpt.s);
     source += `./${specifier.replace(':', '__').replace('/', '$')}.js`;
@@ -163,10 +192,8 @@ export async function componentize(jsSource, witWorld, opts) {
   let hostenv = {};
 
   if (opts.env) {
-    hostenv = (typeof opts.env === 'object')
-      ? opts.env
-      : process.env;
-  };
+    hostenv = typeof opts.env === 'object' ? opts.env : process.env;
+  }
 
   const env = {
     ...hostenv,
@@ -215,7 +242,7 @@ export async function componentize(jsSource, witWorld, opts) {
           '--init-func',
           'componentize.wizer',
           `-i ${input}`,
-          `-o ${output}`
+          `-o ${output}`,
         ],
         {
           stdio: [null, stdout, stderr],
@@ -383,6 +410,10 @@ export async function componentize(jsSource, witWorld, opts) {
     maybeWindowsPath(witPath),
     worldName
   );
+
+  if (DEBUG_BINARY) {
+    await writeFile('binary.wasm', finalBin);
+  }
 
   const component = await metadataAdd(
     await componentNew(
