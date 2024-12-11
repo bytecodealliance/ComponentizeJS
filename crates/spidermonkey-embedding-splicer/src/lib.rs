@@ -138,7 +138,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
             wit_component::dummy_module(&resolve, world, wit_parser::Mangling::Standard32);
 
         // merge the engine world with the target world, retaining the engine producers
-        let producers = if let Ok((
+        let (engine_world, producers) = if let Ok((
             _,
             Bindgen {
                 resolve: mut engine_resolve,
@@ -186,12 +186,13 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
                     .shift_remove(&serve)
                     .unwrap();
             }
-            resolve
+            let map = resolve
                 .merge(engine_resolve)
                 .expect("unable to merge with engine world");
-            producers
+            let engine_world = map.map_world(engine_world, None).unwrap();
+            (engine_world, producers)
         } else {
-            None
+            unreachable!();
         };
 
         let componentized = bindgen::componentize_bindgen(
@@ -204,11 +205,6 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
         )
         .map_err(|err| err.to_string())?;
 
-        let (engine_world, _) = resolve
-            .worlds
-            .iter()
-            .find(|(world, _)| resolve.worlds[*world].name == "root")
-            .unwrap();
         resolve
             .merge_worlds(engine_world, world)
             .expect("unable to merge with engine world");
