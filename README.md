@@ -85,7 +85,7 @@ const { component } = await componentize(`
   import { log } from 'local:hello/logger';
 
   export function sayHello (name) {
-    log(`Hello ${name}`);
+    log(\`Hello \${name}\`);
   }
 
 `, `
