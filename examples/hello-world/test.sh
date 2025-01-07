@@ -20,7 +20,7 @@ fi
 CMD_OUTPUT=$($TEST_BINARY_PATH)
 
 # Ensure hte output contained what we expected
-if ! echo $CMD_OUTPUT | grep -q 'Hello ComponentizeJSz'; then
+if ! echo $CMD_OUTPUT | grep -q 'Hello ComponentizeJS'; then
     echo "[error] test binary output (below) does not contain 'Hello ComponentizeJS':";
     echo "$CMD_OUTPUT";
     exit 1;

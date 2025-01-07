@@ -280,7 +280,8 @@ jobs:
           key: output-example-jit-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
 
       - name: Test Example
-        run: cd example && npm run build && ./test.sh
+        working-directory: examples/hello-world
+        run: bash test.sh
 
   test-aot:
     runs-on: ubuntu-latest
@@ -349,4 +350,5 @@ jobs:
           key: output-example-aot-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
 
       - name: Test Example
-        run: cd example && npm run build && ./test.sh
+        working-directory: examples/hello-world
+        run: bash test.sh
