@@ -176,7 +176,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
                 .find(|(key, _)| {
                     engine_resolve
                         .name_world_key(key)
-                        .starts_with("wasi:http/incoming-handler@0.2")
+                        .starts_with("wasi:http/incoming-handler@0.2.")
                 })
                 .map(|(key, _)| key.clone());
 

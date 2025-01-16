@@ -429,7 +429,7 @@ impl JsBindgen<'_> {
                                 // can be used when an explicit export is not
                                 // defined by the guest content.
                                 if iface_name == "incoming-handler"
-                                    || name.starts_with("wasi:http/incoming-handler@0.2")
+                                    || name.starts_with("wasi:http/incoming-handler@0.2.")
                                 {
                                     if !features.contains(&Features::Http) {
                                         bail!(
