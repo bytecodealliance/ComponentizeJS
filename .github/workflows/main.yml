@@ -47,7 +47,7 @@ jobs:
         run: |
           rustup toolchain install 1.77.1
           rustup target add wasm32-wasi --toolchain 1.77.1
-          rustup target add wasm32-wasi
+          rustup target add wasm32-wasip1
 
       - uses: actions/setup-node@v4
         with:
@@ -96,7 +96,7 @@ jobs:
         run: |
           rustup toolchain install 1.77.1
           rustup target add wasm32-wasi --toolchain 1.77.1
-          rustup target add wasm32-wasi
+          rustup target add wasm32-wasip1
 
       - name: Restore Embedding Splicer from cache
         uses: actions/cache/restore@v4
@@ -165,7 +165,7 @@ jobs:
         run: |
           rustup toolchain install 1.77.1
           rustup target add wasm32-wasi --toolchain 1.77.1
-          rustup target add wasm32-wasi
+          rustup target add wasm32-wasip1
 
       - name: Restore Embedding Splicer from cache
         uses: actions/cache/restore@v4
