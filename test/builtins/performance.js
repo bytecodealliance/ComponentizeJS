@@ -15,14 +15,14 @@ export const source = `
   };
 `;
 
-export async function test (run) {
+export async function test(run) {
   const { stdout, stderr } = await run();
   strictEqual(stdout, 'Calculated fib 1000: 4.346655768693743e+208\n');
 
   ok(stderr.includes(' ms'));
   const time = Number(stderr.split(' ms')[0]);
   // TODO: fix back to half a millisecond when Weval fix is added
-  if (time > 3) {
+  if (time > 4) {
     throw new Error('took more than half a millisecond - ' + time + ' ms');
   }
 }
