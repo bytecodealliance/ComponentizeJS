@@ -15,7 +15,7 @@ use wit_parser::Resolve;
 
 use crate::{parse_wit, Features};
 
-const WASI_VERSIONS: [&str; 3] = ["0.2.0", "0.2.1", "0.2.2"];
+const WASI_VERSIONS: [&str; 4] = ["0.2.0", "0.2.1", "0.2.2", "0.2.3"];
 
 fn stub_wasi_imports<StubFn>(
     module: &mut Module,
