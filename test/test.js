@@ -8,7 +8,7 @@ import { strictEqual } from 'node:assert';
 const DEBUG_TRACING = false;
 const LOG_DEBUGGING = false;
 
-function maybeLogging (disableFeatures) {
+function maybeLogging(disableFeatures) {
   if (!LOG_DEBUGGING) return disableFeatures;
   if (disableFeatures && disableFeatures.includes('stdio')) {
     disableFeatures.splice(disableFeatures.indexOf('stdio'), 1);
@@ -242,8 +242,8 @@ suite('WASI', () => {
 
     const { component } = await componentize(
       `
-      import { now } from 'wasi:clocks/wall-clock@0.2.2';
-      import { getRandomBytes } from 'wasi:random/random@0.2.2';
+      import { now } from 'wasi:clocks/wall-clock@0.2.3';
+      import { getRandomBytes } from 'wasi:random/random@0.2.3';
 
       let result;
       export const run = {

@@ -1,5 +1,5 @@
-import { handle } from 'wasi:http/outgoing-handler@0.2.2';
-import { Fields, OutgoingRequest } from 'wasi:http/types@0.2.2';
+import { handle } from 'wasi:http/outgoing-handler@0.2.3';
+import { Fields, OutgoingRequest } from 'wasi:http/types@0.2.3';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
