@@ -13,7 +13,7 @@
     "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "^1.8.1",
+    "@bytecodealliance/jco": "^1.9.1",
     "@bytecodealliance/weval": "^0.3.3",
     "@bytecodealliance/wizer": "^7.0.5",
     "es-module-lexer": "^1.5.4"
