@@ -490,7 +490,7 @@ bool ReportAndClearException(JSContext *cx) {
   return true;
 }
 
-void *LAST_SBRK;
+void *LAST_SBRK = nullptr;
 JS::PersistentRootedObject AB;
 static bool GetMemBuffer(JSContext *cx, unsigned argc, JS::Value *vp) {
   if (sbrk(0) != LAST_SBRK) {
@@ -502,7 +502,7 @@ static bool GetMemBuffer(JSContext *cx, unsigned argc, JS::Value *vp) {
 #endif
     JS::RootedObject mem_buffer(cx, JS::NewArrayBufferWithUserOwnedContents(
                                         cx, (size_t)LAST_SBRK, base));
-    AB.init(cx, mem_buffer);
+    AB.set(mem_buffer);
   }
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   args.rval().setObject(*AB);
@@ -512,6 +512,7 @@ static bool GetMemBuffer(JSContext *cx, unsigned argc, JS::Value *vp) {
 bool install(api::Engine *engine) {
   Runtime.engine = engine;
   Runtime.cx = engine->cx();
+  AB.init(engine->cx());
 
   char env_name[100];
 
