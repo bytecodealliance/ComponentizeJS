@@ -48,6 +48,7 @@ where
         let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
         let _args = stub(&mut builder)?;
 
+        println!("Warning: the component import '{full_import}#{name}' isn't listed in the target WIT world, and will abort execution when called.");
         builder.replace_import_in_module(module, iid);
 
         return Ok(Some(fid));
@@ -117,7 +118,7 @@ pub fn stub_wasi(
     let mut target_world_imports = HashSet::new();
 
     for (key, _) in &target_world.imports {
-        target_world_imports.insert(resolve.name_world_key(key));
+        target_world_imports.insert(resolve.name_canonicalized_world_key(key));
     }
 
     let mut module = Module::parse(wasm.as_slice(), false).unwrap();
@@ -174,22 +175,6 @@ fn target_world_requires_io(target_world_imports: &HashSet<String>) -> bool {
 
 const PREVIEW1: &str = "wasi_snapshot_preview1";
 fn stub_preview1(module: &mut Module) -> Result<()> {
-    stub_import(module, PREVIEW1, "environ_get", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "environ_sizes_get", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "fd_close", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "fd_fdstat_set_flags", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "fd_prestat_get", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "fd_readdir", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "args_get", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "args_sizes_get", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "path_filestat_get", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "fd_prestat_dir_name", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "fd_read", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "fd_seek", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "path_open", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "path_remove_directory", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "path_unlink_file", unreachable_stub)?;
-    stub_import(module, PREVIEW1, "proc_exit", unreachable_stub)?;
     // random comes from prevew2 only in StarlingMonkey
     stub_import(module, PREVIEW1, "random_get", unreachable_stub)?;
     Ok(())
@@ -1478,6 +1463,18 @@ fn stub_filesystem(module: &mut Module, world_imports: &HashSet<String>) -> Resu
             "[resource-drop]directory-entry-stream",
             unreachable_stub,
         )?;
+
+        stub_import(module, PREVIEW1, "fd_close", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "fd_fdstat_set_flags", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "fd_prestat_get", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "fd_readdir", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "fd_prestat_dir_name", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "fd_read", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "fd_seek", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "path_open", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "path_filestat_get", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "path_remove_directory", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "path_unlink_file", unreachable_stub)?;
     }
 
     if !world_imports.contains("wasi:filesystem/preopens@0.2") {
@@ -1513,10 +1510,16 @@ fn stub_cli(module: &mut Module, world_imports: &HashSet<String>) -> Result<()> 
             "initial-cwd",
             unreachable_stub,
         )?;
+
+        stub_import(module, PREVIEW1, "args_get", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "args_sizes_get", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "environ_get", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "environ_sizes_get", unreachable_stub)?;
     }
 
     if !world_imports.contains("wasi:cli/exit@0.2") {
         stub_wasi_imports(module, "wasi:cli/exit", "exit", unreachable_stub)?;
+        stub_import(module, PREVIEW1, "proc_exit", unreachable_stub)?;
     }
 
     if !world_imports.contains("wasi:cli/terminal-stdin@0.2") {
