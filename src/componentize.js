@@ -18,7 +18,7 @@ import {
 import { fileURLToPath } from 'node:url';
 import { stdout, stderr, exit, platform } from 'node:process';
 import { init as lexerInit, parse } from 'es-module-lexer';
-const { version } = JSON.parse(
+export const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8')
 );
 const isWindows = platform === 'win32';
