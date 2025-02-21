@@ -48,7 +48,6 @@ where
         let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
         let _args = stub(&mut builder)?;
 
-        println!("Warning: the component import '{full_import}#{name}' isn't listed in the target WIT world, and will abort execution when called.");
         builder.replace_import_in_module(module, iid);
 
         return Ok(Some(fid));
