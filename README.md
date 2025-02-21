@@ -2,7 +2,7 @@
   <h1><code>ComponentizeJS</code></h1>
 
   <p>
-    <strong>ESM -> WebAssembly Component creator,<br />via a SpiderMonkey JS engine embedding</a></strong>
+    <strong>ESM -> WebAssembly Component creator,<br />via a SpiderMonkey JS engine embedding</strong>
   </p>
 
   <strong>A <a href="https://bytecodealliance.org/">Bytecode Alliance</a> project</strong>
@@ -67,6 +67,7 @@ The following APIs are available:
 * **Encoding**: `TextEncoder`, `TextDecoder`, `CompressionStream`, `DecompressionStream`
 * **Structured Clone**: `structuredClone`
 * **Fetch**: `fetch` `Request` `Response` `Headers`
+* **Forms, Files, and Blobs**: `FormData`, `MultipartFormData`, `File`, `Blob`
 * **Crypto**: `SubtleCrypto` `Crypto` `crypto` `CryptoKey`
 
 ## Usage
