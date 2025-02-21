@@ -8,14 +8,14 @@ edition = "2021"
 version = "0.1.0"
 
 [workspace.dependencies]
-anyhow = "1.0.91"
+anyhow = "1.0.95"
 heck = "0.5"
-js-component-bindgen = "1.8.1"
+js-component-bindgen = "1.10.0"
 rand = "0.8"
-wasm-encoder = "0.219.1"
-wasmparser = "0.219.1"
-wit-bindgen = "0.34.0"
-wit-bindgen-core = "0.34.0"
-wit-component = { version = "0.219.1", features = ["dummy-module"] }
-wit-parser = "0.219.1"
-orca-wasm = "0.2.0"
+wasm-encoder = "0.225.0"
+wasmparser = "0.224.0"
+wit-bindgen = "0.39.0"
+wit-bindgen-core = "0.39.0"
+wit-component = { version = "0.225.0", features = ["dummy-module"] }
+wit-parser = "0.225.0"
+orca-wasm = "0.9.0"
