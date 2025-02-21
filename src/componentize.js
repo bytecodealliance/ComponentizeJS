@@ -39,13 +39,14 @@ export async function componentize(jsSource, witWorld, opts) {
     witWorld = opts?.witWorld;
   }
   opts = opts || {};
-  const {
+  let {
     sourceName = 'source.js',
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
     worldName,
     disableFeatures = [],
     enableFeatures = [],
+    runtimeArgs,
     aotCache = fileURLToPath(
       new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url)
     ),
@@ -222,6 +223,10 @@ export async function componentize(jsSource, witWorld, opts) {
     console.log('--- Wizer Env ---');
     console.log(env);
   }
+
+  let sourcePath = maybeWindowsPath(join(sourceDir, sourceName.slice(0, -3) + '.bindings.js'));
+  runtimeArgs = runtimeArgs ? `${runtimeArgs} ${sourcePath}` : sourcePath;
+
   if (opts.enableAot) {
     // Determine the weval bin path, possibly using a pre-downloaded version
     let wevalBin;
@@ -247,9 +252,7 @@ export async function componentize(jsSource, witWorld, opts) {
         {
           stdio: [null, stdout, stderr],
           env,
-          input: maybeWindowsPath(
-            join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')
-          ),
+          input: runtimeArgs,
           shell: true,
           encoding: 'utf-8',
         }
@@ -284,9 +287,7 @@ export async function componentize(jsSource, witWorld, opts) {
         {
           stdio: [null, stdout, stderr],
           env,
-          input: maybeWindowsPath(
-            join(sourceDir, sourceName.slice(0, -3) + '.bindings.js')
-          ),
+          input: runtimeArgs,
           shell: true,
           encoding: 'utf-8',
         }
