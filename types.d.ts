@@ -53,6 +53,11 @@ interface ComponentizeOptions {
    * To pass only a subset, provide an object with the desired variables
    */
   env?: boolean | Record<string, string>,
+  /**
+   * Runtime arguments to provide to the StarlingMonkey engine initialization
+   * (see https://github.com/bytecodealliance/StarlingMonkey/blob/main/include/config-parser.h)
+   */
+  runtimeArgs?: string,
 }
 
 /**

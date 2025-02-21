@@ -39,18 +39,18 @@ export async function componentize(jsSource, witWorld, opts) {
     witWorld = opts?.witWorld;
   }
   opts = opts || {};
-  const {
+  let {
     sourceName = 'source.js',
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
     worldName,
     disableFeatures = [],
     enableFeatures = [],
+    runtimeArgs,
     aotCache = fileURLToPath(
       new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url)
     ),
   } = opts;
-  let runtimeArgs = opts.runtimeArgs;
 
   const engine =
     opts.engine ||
