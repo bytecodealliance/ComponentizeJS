@@ -182,6 +182,7 @@ export function componentize(jsSource: string, opts: {
   engine?: string,
   preview2Adapter?: string,
   disableFeatures?: ('stdio' | 'random' | 'clocks' | 'http')[],
+  runtimeArgs?: string,
 }): {
   component: Uint8Array,
   imports: string[]
