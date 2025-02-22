@@ -197,7 +197,7 @@ jobs:
       - name: Cache Example build
         uses: actions/cache@v4
         with:
-          path: example/target
+          path: examples/target
           key: example-jit-cargo-${{ hashFiles('examples/src/main.rs', 'examples/Cargo.lock', 'examples/hello.wit') }}
 
       - name: Test Example
