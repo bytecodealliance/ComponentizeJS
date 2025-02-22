@@ -141,6 +141,7 @@ jobs:
           if-no-files-found: 'error'
           path: |
             lib/starlingmonkey_embedding.wasm
+            lib/starlingmonkey_embedding.debug.wasm
             build-release
 
   build-aot:
@@ -212,6 +213,7 @@ jobs:
           if-no-files-found: 'error'
           path: |
             lib/starlingmonkey_embedding_weval.wasm
+            lib/starlingmonkey_embedding.debug.wasm
             lib/starlingmonkey_ics.wevalcache
             build-release-weval
 
@@ -323,6 +325,7 @@ jobs:
           key: output-starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: |
             lib/starlingmonkey_embedding_weval.wasm
+            lib/starlingmonkey_embedding.debug.wasm
             lib/starlingmonkey_ics.wevalcache
             build-release-weval
 
@@ -332,6 +335,7 @@ jobs:
           name: starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: |
             lib/starlingmonkey_embedding_weval.wasm
+            lib/starlingmonkey_embedding.debug.wasm
             lib/starlingmonkey_ics.wevalcache
             build-release-weval
 
