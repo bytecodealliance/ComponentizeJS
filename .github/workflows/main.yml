@@ -42,11 +42,7 @@ jobs:
         id: splicer-build
         with:
           key: splicer-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
-          path: |
-            lib/spidermonkey-embedding-splicer.core2.wasm
-            lib/spidermonkey-embedding-splicer.core.wasm
-            lib/spidermonkey-embedding-splicer.d.ts
-            lib/spidermonkey-embedding-splicer.js
+          path: lib
 
       - name: Install Rust Toolchain
         if: steps.splicer-build.outputs.cache-hit != 'true'
