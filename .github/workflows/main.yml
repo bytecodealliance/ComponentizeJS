@@ -169,12 +169,6 @@ jobs:
       - name: Test
         run: npm run test:${{matrix.build-type}}
 
-      - name: Cache Example build
-        uses: actions/cache@v4
-        with:
-          path: example/target
-          key: example-jit-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
-
   test-example:
     runs-on: ubuntu-latest
     needs:
@@ -204,4 +198,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: example/target
-          key: example-jit-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
+          key: example-jit-cargo-${{ hashFiles('examples/src/main.rs', 'examples/Cargo.lock', 'examples/hello.wit') }}
+
+      - name: Test Example
+        run: |
+          cd example/hello-world
+          ./test.sh
