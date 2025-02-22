@@ -35,6 +35,8 @@ jobs:
   build-splicer:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Cache Splicer build
         uses: actions/cache@v4
         id: splicer-build
@@ -45,9 +47,6 @@ jobs:
             lib/spidermonkey-embedding-splicer.core.wasm
             lib/spidermonkey-embedding-splicer.d.ts
             lib/spidermonkey-embedding-splicer.js
-
-      - uses: actions/checkout@v4
-        if: steps.splicer-build.outputs.cache-hit != 'true'
 
       - name: Install Rust Toolchain
         if: steps.splicer-build.outputs.cache-hit != 'true'
