@@ -202,5 +202,5 @@ jobs:
 
       - name: Test Example
         run: |
-          cd example/hello-world
+          cd examples/hello-world
           ./test.sh
