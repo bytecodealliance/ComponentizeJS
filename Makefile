@@ -37,7 +37,7 @@ lib/starlingmonkey_ics.wevalcache: lib/starlingmonkey_embedding_weval.wasm
 lib/starlingmonkey_embedding.debug.wasm: StarlingMonkey/cmake/* embedding/* StarlingMonkey/runtime/* StarlingMonkey/builtins/* StarlingMonkey/builtins/*/* StarlingMonkey/builtins/*/*/* StarlingMonkey/include/* | lib
 	cmake -B build-debug -DCMAKE_BUILD_TYPE=RelWithDebInfo
 	make -j16 -C build-debug
-	@cp build-debug/starling-raw.wasm/starling-raw.wasm $@
+	wasm-tools strip build-debug/starling-raw.wasm/starling-raw.wasm -d ".debug_(info|loc|ranges|abbrev|line|str)" -o $@
 
 obj:
 	mkdir -p obj

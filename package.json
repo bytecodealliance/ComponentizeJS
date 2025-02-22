@@ -22,7 +22,8 @@
   "scripts": {
     "clean": "npm run clean:starlingmonkey",
     "clean:starlingmonkey": "rm -rf build-release",
-    "build": "make release",
+    "build": "make release && make release-weval && make debug",
+    "build:release": "make release",
     "build:weval": "make release-weval",
     "build:debug": "make debug",
     "test": "mocha -u tdd test/test.js --timeout 120000",
@@ -33,6 +34,7 @@
     "lib/interfaces",
     "lib/spidermonkey-*",
     "lib/starlingmonkey_embedding.wasm",
+    "lib/starlingmonkey_embedding.debug.wasm",
     "lib/starlingmonkey_embedding_weval.wasm",
     "lib/starlingmonkey_ics.wevalcache",
     "src",

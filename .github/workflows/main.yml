@@ -131,7 +131,8 @@ jobs:
         if: steps.starlingmonkey-jit.outputs.cache-hit != 'true'
         run: |
           npm run clean
-          npm run build
+          npm run build:debug
+          npm run build:release
 
       - uses: actions/upload-artifact@v4
         if: steps.starlingmonkey-jit.outputs.cache-hit != 'true'
@@ -201,6 +202,7 @@ jobs:
         if: steps.starlingmonkey-aot.outputs.cache-hit != 'true'
         run: |
           npm run clean
+          npm run build:debug
           npm run build:weval
 
       - uses: actions/upload-artifact@v4
