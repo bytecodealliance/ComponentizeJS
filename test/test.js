@@ -40,8 +40,8 @@ suite('Builtins', () => {
       `,
         {
           sourceName: `${name}.js`,
-          // also test the debug build while we are about it
-          debugBuild: true,
+          // also test the debug build while we are about it (unless testing Weval)
+          debugBuild: !enableAot,
           enableFeatures,
           disableFeatures: maybeLogging(disableFeatures),
           enableAot

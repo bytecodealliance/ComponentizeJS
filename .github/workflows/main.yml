@@ -209,7 +209,6 @@ jobs:
         if: steps.starlingmonkey-aot.outputs.cache-hit != 'true'
         run: |
           npm run clean
-          npm run build:debug
           npm run build:weval
 
       - uses: actions/upload-artifact@v4
@@ -219,7 +218,6 @@ jobs:
           if-no-files-found: 'error'
           path: |
             lib/starlingmonkey_embedding_weval.wasm
-            lib/starlingmonkey_embedding.debug.wasm
             lib/starlingmonkey_ics.wevalcache
             build-release-weval
 
@@ -331,7 +329,6 @@ jobs:
           key: starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: |
             lib/starlingmonkey_embedding_weval.wasm
-            lib/starlingmonkey_embedding.debug.wasm
             lib/starlingmonkey_ics.wevalcache
             build-release-weval
 
@@ -341,7 +338,6 @@ jobs:
           name: starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: |
             lib/starlingmonkey_embedding_weval.wasm
-            lib/starlingmonkey_embedding.debug.wasm
             lib/starlingmonkey_ics.wevalcache
             build-release-weval
 
