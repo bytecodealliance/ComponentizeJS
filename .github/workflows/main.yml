@@ -35,21 +35,6 @@ jobs:
   build-splicer:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust Toolchain
-        run: |
-          rustup toolchain install 1.77.1
-          rustup target add wasm32-wasi --toolchain 1.77.1
-          rustup target add wasm32-wasip1
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install NPM packages
-        run: npm install
-
       - name: Cache Splicer build
         uses: actions/cache@v4
         id: splicer-build
@@ -60,6 +45,25 @@ jobs:
             lib/spidermonkey-embedding-splicer.core.wasm
             lib/spidermonkey-embedding-splicer.d.ts
             lib/spidermonkey-embedding-splicer.js
+
+      - uses: actions/checkout@v4
+        if: steps.splicer-build.outputs.cache-hit != 'true'
+
+      - name: Install Rust Toolchain
+        if: steps.splicer-build.outputs.cache-hit != 'true'
+        run: |
+          rustup toolchain install 1.77.1
+          rustup target add wasm32-wasi --toolchain 1.77.1
+          rustup target add wasm32-wasip1
+
+      - uses: actions/setup-node@v4
+        if: steps.splicer-build.outputs.cache-hit != 'true'
+        with:
+          node-version: '22'
+
+      - name: Install NPM packages
+        if: steps.splicer-build.outputs.cache-hit != 'true'
+        run: npm install
 
       - name: Build splicer
         if: steps.splicer-build.outputs.cache-hit != 'true'
@@ -84,14 +88,22 @@ jobs:
       - name: Get StarlingMonkey Commit
         id: starlingmonkey-commit
         run: echo "STARLINGMONKEY_HASH=$(git submodule status | head -c9 | tail -c8)" >> "$GITHUB_OUTPUT"
+      
+      - uses: actions/cache@v4
+        id: starlingmonkey-build
+        with:
+          key: starlingmonkey-${{matrix.build-type}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+          path: lib
 
       - name: Install Rust Toolchain
+        if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
         run: |
           rustup toolchain install 1.77.1
           rustup target add wasm32-wasi --toolchain 1.77.1
           rustup target add wasm32-wasip1
 
       - name: Install wasm-tools
+        if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
         run: cargo install wasm-tools
 
       - name: Restore Embedding Splicer from cache
@@ -102,21 +114,19 @@ jobs:
           path: lib
 
       - uses: actions/setup-node@v4
+        if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
         with:
           node-version: '22'
 
       - name: Install NPM packages
+        if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
         run: npm install
 
       - name: Build ComponentizeJS
+        if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
         run: |
           npm run clean
           npm run build:${{matrix.build-type}}
-
-      - uses: actions/cache/save@v4
-        with:
-          key: starlingmonkey-${{matrix.build-type}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
-          path: lib
 
   ########
   # Test #
