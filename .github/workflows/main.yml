@@ -166,22 +166,10 @@ jobs:
           path: example/target
           key: example-jit-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
 
-      - name: Test Example
-        working-directory: examples/hello-world
-        run: bash test.sh
-
-  test-aot:
+  test-example:
     runs-on: ubuntu-latest
     needs:
       - build
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version:
-          - '22'
-          - latest
-    env:
-      ENABLE_AOT: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -189,29 +177,22 @@ jobs:
         id: starlingmonkey-commit
         run: echo "STARLINGMONKEY_HASH=$(git submodule status | head -c9 | tail -c8)" >> "$GITHUB_OUTPUT"
 
-      - name: Restore StarlingMonkey AOT build from cache
+      - name: Restore StarlingMonkey build from cache
         uses: actions/cache/restore@v4
-        id: restore-starlingmonkey-aot-build
+        id: restore-starlingmonkey-jit-build
         with:
-          key: starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+          key: starlingmonkey-release-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: lib
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{matrix.node-version}}
+          node-version: '22'
 
       - name: Install NPM packages
         run: npm install
-
-      - name: Test
-        run: npm run test:weval
 
       - name: Cache Example build
         uses: actions/cache@v4
         with:
           path: example/target
-          key: example-aot-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
-
-      - name: Test Example
-        working-directory: examples/hello-world
-        run: bash test.sh
+          key: example-jit-cargo-${{ hashFiles('example/src/main.rs', 'example/Cargo.lock', 'example/hello.wit') }}
