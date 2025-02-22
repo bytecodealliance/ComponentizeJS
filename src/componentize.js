@@ -24,7 +24,6 @@ export const { version } = JSON.parse(
 const isWindows = platform === 'win32';
 const DEBUG_BINDINGS = false;
 const DEBUG_CALLS = false;
-const DEBUG_BUILD = false;
 const DEBUG_BINARY = false;
 
 function maybeWindowsPath(path) {
@@ -46,6 +45,7 @@ export async function componentize(jsSource, witWorld, opts) {
     worldName,
     disableFeatures = [],
     enableFeatures = [],
+    debugBuild = false,
     runtimeArgs,
     aotCache = fileURLToPath(
       new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url)
@@ -59,7 +59,7 @@ export async function componentize(jsSource, witWorld, opts) {
         opts.enableAot
           ? `../lib/starlingmonkey_embedding_weval.wasm`
           : `../lib/starlingmonkey_embedding${
-              DEBUG_BUILD ? '.debug' : ''
+              debugBuild ? '.debug' : ''
             }.wasm`,
         import.meta.url
       )

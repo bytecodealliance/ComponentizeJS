@@ -8,6 +8,9 @@ import { strictEqual } from 'node:assert';
 const DEBUG_TRACING = false;
 const LOG_DEBUGGING = false;
 
+const enableAot = process.env.WEVAL_TEST == '1';
+const debugBuild = process.env.DEBUG_TEST == '1';
+
 function maybeLogging(disableFeatures) {
   if (!LOG_DEBUGGING) return disableFeatures;
   if (disableFeatures && disableFeatures.includes('stdio')) {
@@ -18,8 +21,6 @@ function maybeLogging(disableFeatures) {
 
 const builtinsCases = await readdir(new URL('./builtins', import.meta.url));
 suite('Builtins', () => {
-  const enableAot = process.env.WEVAL_TEST == '1'
-
   for (const filename of builtinsCases) {
     const name = filename.slice(0, -3);
     test(name, async () => {
@@ -27,7 +28,7 @@ suite('Builtins', () => {
         source,
         test: runTest,
         disableFeatures,
-        enableFeatures
+        enableFeatures,
       } = await import(`./builtins/${filename}`);
 
       const { component } = await componentize(
@@ -40,13 +41,19 @@ suite('Builtins', () => {
       `,
         {
           sourceName: `${name}.js`,
+          // also test the debug build while we are about it (unless testing Weval)
+          debugBuild,
           enableFeatures,
           disableFeatures: maybeLogging(disableFeatures),
-          enableAot
+          enableAot,
         }
       );
 
-      const { files } = await transpile(component, { name, wasiShim: true, tracing: DEBUG_TRACING });
+      const { files } = await transpile(component, {
+        name,
+        wasiShim: true,
+        tracing: DEBUG_TRACING,
+      });
 
       await mkdir(new URL(`./output/${name}/interfaces`, import.meta.url), {
         recursive: true,
@@ -99,23 +106,26 @@ suite('Builtins', () => {
                 code === 0 ? resolve() : reject(new Error(stderr || stdout))
               );
               timeout = setTimeout(() => {
-                reject(new Error("test timed out with output:\n" + stdout + '\n\nstderr:\n' + stderr));
+                reject(
+                  new Error(
+                    'test timed out with output:\n' +
+                      stdout +
+                      '\n\nstderr:\n' +
+                      stderr
+                  )
+                );
               }, 10_000);
             });
-          }
-          catch (err) {
+          } catch (err) {
             throw { err, stdout, stderr };
-          }
-          finally {
+          } finally {
             clearTimeout(timeout);
           }
 
           return { stdout, stderr };
         });
-      }
-      catch (err) {
-        if (err.stderr)
-          console.error(err.stderr);
+      } catch (err) {
+        if (err.stderr) console.error(err.stderr);
         throw err.err || err;
       }
     });
@@ -124,8 +134,6 @@ suite('Builtins', () => {
 
 const bindingsCases = await readdir(new URL('./cases', import.meta.url));
 suite('Bindings', () => {
-  const enableAot = process.env.WEVAL_TEST == '1'
-
   for (const name of bindingsCases) {
     test(name, async () => {
       const source = await readFile(
@@ -133,7 +141,10 @@ suite('Bindings', () => {
         'utf8'
       );
 
-      let witWorld, witPath, worldName, isWasiTarget = false;
+      let witWorld,
+        witPath,
+        worldName,
+        isWasiTarget = false;
       try {
         witWorld = await readFile(
           new URL(`./cases/${name}/world.wit`, import.meta.url),
@@ -163,7 +174,9 @@ suite('Bindings', () => {
       const test = await import(`./cases/${name}/test.js`);
 
       const enableFeatures = test.enableFeatures || ['http'];
-      const disableFeatures = test.disableFeatures || (isWasiTarget ? [] : ['random', 'clocks', 'http', 'stdio']);
+      const disableFeatures =
+        test.disableFeatures ||
+        (isWasiTarget ? [] : ['random', 'clocks', 'http', 'stdio']);
 
       let testArg;
       try {
@@ -174,7 +187,8 @@ suite('Bindings', () => {
           worldName,
           enableFeatures,
           disableFeatures: maybeLogging(disableFeatures),
-          enableAot
+          enableAot,
+          debugBuild,
         });
         const map = {
           'wasi:cli-base/*': '@bytecodealliance/preview2-shim/cli-base#*',
@@ -189,19 +203,22 @@ suite('Bindings', () => {
         };
         for (let [impt] of imports) {
           if (impt.startsWith('wasi:')) continue;
-          if (impt.startsWith('['))
-            impt = impt.slice(impt.indexOf(']') + 1);
+          if (impt.startsWith('[')) impt = impt.slice(impt.indexOf(']') + 1);
           let importName = impt.split('/').pop();
           if (importName === 'test') importName = 'imports';
           map[impt] = `../../cases/${name}/${importName}.js`;
         }
 
-        const { files, imports: componentImports, exports: componentExports } = await transpile(component, {
+        const {
+          files,
+          imports: componentImports,
+          exports: componentExports,
+        } = await transpile(component, {
           name,
           map,
           wasiShim: true,
           validLiftingOptimization: false,
-          tracing: DEBUG_TRACING
+          tracing: DEBUG_TRACING,
         });
 
         testArg = { imports, componentImports, componentExports };
@@ -238,8 +255,6 @@ suite('Bindings', () => {
 
 suite('WASI', () => {
   test('basic app', async () => {
-    const enableAot = process.env.WEVAL_TEST == '1'
-
     const { component } = await componentize(
       `
       import { now } from 'wasi:clocks/wall-clock@0.2.3';
@@ -257,7 +272,8 @@ suite('WASI', () => {
       {
         witPath: fileURLToPath(new URL('./wit', import.meta.url)),
         worldName: 'test1',
-        enableAot
+        enableAot,
+        debugBuild,
       }
     );
 

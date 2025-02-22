@@ -178,6 +178,7 @@ export function componentize(jsSource: string, opts: {
   witPath: string,
   worldName: string,
   debug?: bool,
+  debugBuild?: bool,
   sourceName?: string,
   engine?: string,
   preview2Adapter?: string,

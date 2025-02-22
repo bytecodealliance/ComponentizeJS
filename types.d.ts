@@ -1,5 +1,11 @@
 interface ComponentizeOptions {
   /**
+   * Use a debug build
+   * Note that the debug build only includes the names section only for size optimization, and not DWARF
+   * debugging sections, due to a lack of support in Node.js for these debugging workflows currently.
+   */
+  debugBuild?: boolean,
+  /**
    * Source name for debugging
    */
   sourceName?: string,
