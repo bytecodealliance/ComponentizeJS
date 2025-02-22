@@ -11,10 +11,13 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write;
 use wit_bindgen_core::abi::{self, LiftLower};
 use wit_bindgen_core::wit_parser::Resolve;
+use wit_bindgen_core::wit_parser::{
+    Function, FunctionKind, Handle, InterfaceId, SizeAlign, Type, TypeDefKind, TypeId, TypeOwner,
+    WorldId, WorldItem, WorldKey,
+};
 use wit_component::StringEncoding;
 use wit_parser::abi::WasmType;
 use wit_parser::abi::{AbiVariant, WasmSignature};
-use wit_parser::*;
 
 #[derive(Debug)]
 pub enum Resource {
@@ -912,6 +915,7 @@ impl JsBindgen<'_> {
         }
 
         let mut f = FunctionBindgen {
+            is_async: false,
             tracing_prefix: None,
             intrinsics: &mut self.all_intrinsics,
             valid_lifting_optimization: true,
@@ -920,6 +924,9 @@ impl JsBindgen<'_> {
                 match abi {
                     AbiVariant::GuestExport => ErrHandling::ThrowResultErr,
                     AbiVariant::GuestImport => ErrHandling::ResultCatchHandler,
+                    AbiVariant::GuestImportAsync => todo!(),
+                    AbiVariant::GuestExportAsync => todo!(),
+                    AbiVariant::GuestExportAsyncStackful => todo!(),
                 }
             } else {
                 ErrHandling::None
@@ -949,9 +956,13 @@ impl JsBindgen<'_> {
             match abi {
                 AbiVariant::GuestImport => LiftLower::LiftArgsLowerResults,
                 AbiVariant::GuestExport => LiftLower::LowerArgsLiftResults,
+                AbiVariant::GuestImportAsync => todo!(),
+                AbiVariant::GuestExportAsync => todo!(),
+                AbiVariant::GuestExportAsyncStackful => todo!(),
             },
             func,
             &mut f,
+            false,
         );
         self.src.push_str(&f.src);
         self.src.push_str("}");
