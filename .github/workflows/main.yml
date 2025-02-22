@@ -66,7 +66,6 @@ jobs:
             lib/spidermonkey-embedding-splicer.core.wasm
             lib/spidermonkey-embedding-splicer.d.ts
             lib/spidermonkey-embedding-splicer.js
-            target
 
       - name: Build splicer
         if: steps.splicer-build.outputs.cache-hit != 'true'
@@ -106,12 +105,7 @@ jobs:
         id: splicer-build
         with:
           key: splicer-node-${{matrix.node-version}}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
-          path: |
-            lib/spidermonkey-embedding-splicer.core2.wasm
-            lib/spidermonkey-embedding-splicer.core.wasm
-            lib/spidermonkey-embedding-splicer.d.ts
-            lib/spidermonkey-embedding-splicer.js
-            target
+          path: lib
 
       - uses: actions/setup-node@v4
         with:
@@ -120,33 +114,17 @@ jobs:
       - name: Install NPM packages
         run: npm install
 
-      - name: Cache StarlingMonkey
-        uses: actions/cache@v4
-        id: starlingmonkey-jit
-        with:
-          key: key-starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
-          lookup-only: 'true'
-          path: |
-            lib/starlingmonkey_embedding.wasm
-            lib/starlingmonkey_embedding.debug.wasm
-            build-release
-
       - name: Build ComponentizeJS
-        if: steps.starlingmonkey-jit.outputs.cache-hit != 'true'
         run: |
           npm run clean
           npm run build:debug
           npm run build:release
 
       - uses: actions/upload-artifact@v4
-        if: steps.starlingmonkey-jit.outputs.cache-hit != 'true'
         with:
-          name: key-starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+          name: starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           if-no-files-found: 'error'
-          path: |
-            lib/starlingmonkey_embedding.wasm
-            lib/starlingmonkey_embedding.debug.wasm
-            build-release
+          path: lib
 
   build-aot:
     runs-on: ubuntu-latest
@@ -176,18 +154,6 @@ jobs:
       - name: Install wasm-tools
         run: cargo install wasm-tools
 
-      - name: Restore Embedding Splicer from cache
-        uses: actions/cache/restore@v4
-        id: splicer-build
-        with:
-          key: splicer-node-${{matrix.node-version}}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
-          path: |
-            lib/spidermonkey-embedding-splicer.core2.wasm
-            lib/spidermonkey-embedding-splicer.core.wasm
-            lib/spidermonkey-embedding-splicer.d.ts
-            lib/spidermonkey-embedding-splicer.js
-            target
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{matrix.node-version}}
@@ -195,32 +161,15 @@ jobs:
       - name: Install NPM packages
         run: npm install
 
-      - name: Cache StarlingMonkey (Weval)
-        uses: actions/cache@v4
-        id: starlingmonkey-aot
-        with:
-          key: starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
-          lookup-only: 'true'
-          path: |
-            lib/starlingmonkey_embedding_weval.wasm
-            lib/starlingmonkey_ics.wevalcache
-            build-release-weval
-
       - name: Build Weval
-        if: steps.starlingmonkey-aot.outputs.cache-hit != 'true'
         run: |
           npm run clean
           npm run build:weval
 
-      - uses: actions/upload-artifact@v4
-        if: steps.starlingmonkey-aot.outputs.cache-hit != 'true'
+      - uses: actions/cache/save@v4
         with:
-          name: starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
-          if-no-files-found: 'error'
-          path: |
-            lib/starlingmonkey_embedding_weval.wasm
-            lib/starlingmonkey_ics.wevalcache
-            build-release-weval
+          key: starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+          path: lib
 
   ########
   # Test #
@@ -243,34 +192,12 @@ jobs:
         id: starlingmonkey-commit
         run: echo "STARLINGMONKEY_HASH=$(git submodule status | head -c9 | tail -c8)" >> "$GITHUB_OUTPUT"
 
-      - name: Restore Embedding Splicer from cache
-        uses: actions/cache/restore@v4
-        id: splicer-build
-        with:
-          key: splicer-node-${{matrix.node-version}}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
-          path: |
-            lib/spidermonkey-embedding-splicer.core2.wasm
-            lib/spidermonkey-embedding-splicer.core.wasm
-            lib/spidermonkey-embedding-splicer.d.ts
-            lib/spidermonkey-embedding-splicer.js
-            target
-
       - name: Restore StarlingMonkey build from cache
         uses: actions/cache/restore@v4
         id: restore-starlingmonkey-jit-build
         with:
-          key: key-starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
-          path: |
-            lib/starlingmonkey_embedding.wasm
-            build-release
-
-      - uses: actions/download-artifact@v4
-        if: steps.restore-starlingmonkey-jit-build.outputs.cache-hit != 'true'
-        with:
-          name: key-starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
-          path: |
-            lib/starlingmonkey_embedding.wasm
-            build-release
+          key: starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+          path: lib
 
       - uses: actions/setup-node@v4
         with:
@@ -311,36 +238,12 @@ jobs:
         id: starlingmonkey-commit
         run: echo "STARLINGMONKEY_HASH=$(git submodule status | head -c9 | tail -c8)" >> "$GITHUB_OUTPUT"
 
-      - name: Restore Embedding Splicer from cache
-        uses: actions/cache/restore@v4
-        id: splicer-build
-        with:
-          key: splicer-node-${{matrix.node-version}}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
-          path: |
-            lib/spidermonkey-embedding-splicer.core2.wasm
-            lib/spidermonkey-embedding-splicer.core.wasm
-            lib/spidermonkey-embedding-splicer.d.ts
-            lib/spidermonkey-embedding-splicer.js
-            target
-
       - name: Restore StarlingMonkey AOT build from cache
         uses: actions/cache/restore@v4
         id: restore-starlingmonkey-aot-build
         with:
           key: starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
-          path: |
-            lib/starlingmonkey_embedding_weval.wasm
-            lib/starlingmonkey_ics.wevalcache
-            build-release-weval
-
-      - uses: actions/download-artifact@v4
-        if: steps.restore-starlingmonkey-aot-build.outputs.cache-hit != 'true'
-        with:
-          name: starlingmonkey-aot-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
-          path: |
-            lib/starlingmonkey_embedding_weval.wasm
-            lib/starlingmonkey_ics.wevalcache
-            build-release-weval
+          path: lib
 
       - uses: actions/setup-node@v4
         with:
