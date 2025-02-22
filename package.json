@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "@bytecodealliance/preview2-shim": "^0.17.1",
-    "mocha": "^10.2.0"
+    "mocha": "^11.1.0"
   },
   "dependencies": {
     "@bytecodealliance/jco": "^1.9.1",
