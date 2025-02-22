@@ -124,7 +124,7 @@ jobs:
         uses: actions/cache@v4
         id: starlingmonkey-jit
         with:
-          key: starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+          key: key-starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           lookup-only: 'true'
           path: |
             lib/starlingmonkey_embedding.wasm
@@ -141,7 +141,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: steps.starlingmonkey-jit.outputs.cache-hit != 'true'
         with:
-          name: starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+          name: key-starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           if-no-files-found: 'error'
           path: |
             lib/starlingmonkey_embedding.wasm
@@ -259,7 +259,7 @@ jobs:
         uses: actions/cache/restore@v4
         id: restore-starlingmonkey-jit-build
         with:
-          key: starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+          key: key-starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: |
             lib/starlingmonkey_embedding.wasm
             build-release
@@ -267,7 +267,7 @@ jobs:
       - uses: actions/download-artifact@v4
         if: steps.restore-starlingmonkey-jit-build.outputs.cache-hit != 'true'
         with:
-          name: starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
+          name: key-starlingmonkey-jit-node-${{matrix.node-version}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: |
             lib/starlingmonkey_embedding.wasm
             build-release
