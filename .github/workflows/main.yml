@@ -42,7 +42,9 @@ jobs:
         id: splicer-build
         with:
           key: splicer-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
-          path: lib
+          path: |
+            lib
+            target
 
       - name: Install Rust Toolchain
         if: steps.splicer-build.outputs.cache-hit != 'true'
@@ -106,7 +108,9 @@ jobs:
         id: splicer-build
         with:
           key: splicer-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
-          path: lib
+          path: |
+            lib
+            target
 
       - uses: actions/setup-node@v4
         if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
