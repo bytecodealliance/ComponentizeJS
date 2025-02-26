@@ -7,13 +7,13 @@ export TEST_BINARY_PATH=$(realpath host)/target/release/wasmtime-test
 # Build the JS component if not present
 echo -e "[info] expecting component WASM at [$COMPONENT_WASM_PATH]...";
 if [ ! -f "$COMPONENT_WASM_PATH" ]; then
-    cd guest && npm install && npm build
+    cd guest && npm install && npm run build && cd ..
 fi
 
 # Build the Rust embedding test binary if not present
-echo -e "[info] expecting test binary at [$COMPONENT_WASM_PATH]...";
+echo -e "[info] expecting test binary at [$TEST_BINARY_PATH]...";
 if [ ! -f "$TEST_BINARY_PATH" ]; then
-    cd host && cargo build --release
+    cd host && cargo build --release && cd ..
 fi
 
 # Run the test binary, capturing the output
