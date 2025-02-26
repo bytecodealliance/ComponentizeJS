@@ -6,8 +6,8 @@ target/
 /crates/wasmtime-test
 /test.js
 /shared
-example/package-lock.json
-example/hello.component.wasm
+examples/hello-world/guest/package-lock.json
+examples/hello-world/guest/hello.component.wasm
 /build-debug
 /build-release
 /build-release-weval
