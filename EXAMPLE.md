@@ -44,9 +44,9 @@ node componentize.mjs
 
 ### Running the Component in Wasmtime
 
-Set up the [Cargo.toml as in the example directory](example/Cargo.toml).
+Set up the [Cargo.toml as in the example directory](examples/hello-world/host/Cargo.toml).
 
-Set up [`src/main.rs`](example/src/main.rs) as in the example directory.
+Set up [`src/main.rs`](examples/hello-world/host/src/main.rs) as in the example directory.
 
 Building and running the binary should print the result:
 
