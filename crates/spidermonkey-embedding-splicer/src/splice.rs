@@ -11,8 +11,6 @@ use wasmparser::Operator;
 
 use crate::*;
 
-const WASI_VERSIONS: [&str; 4] = ["0.2.0", "0.2.1", "0.2.2", "0.2.3"];
-
 //
 // Parses the Spidermonkey binary into section data for reserialization
 // into an output binary, and in the process:
@@ -46,27 +44,13 @@ pub fn splice(
 
     // since StarlingMonkey implements CLI Run and incoming handler,
     // we override them only if the guest content exports those functions
-    for wasi_version in WASI_VERSIONS {
-        let import = format!("wasi:cli/run@{wasi_version}#run");
-        if exports.iter().any(|(name, _)| *name == import) {
-            if let Some(run) = module.exports.get_func_by_name(import) {
-                let expt = module.exports.get_func_by_id(run).unwrap();
-                module.exports.delete(expt);
-                module.delete_func(run); // TODO: Look at the intended behaviour here. Need to pass function ID to delete from functions. Was Previously passing Exports ID
-            }
-        }
-    }
-
-    for wasi_version in WASI_VERSIONS {
-        let import = format!("wasi:http/incoming-handler@{wasi_version}#handle");
-        if exports.iter().any(|(name, _)| *name == import) {
-            if let Some(serve) = module.exports.get_func_by_name(import) {
-                let expt = module.exports.get_func_by_id(serve).unwrap();
-                module.exports.delete(expt);
-                module.delete_func(serve); // TODO: Look at the intended behaviour here. Same as above comment
-            }
-        }
-    }
+    remove_if_exported_by_js(&mut module, &exports, "wasi:cli/run@0.2.", "#run");
+    remove_if_exported_by_js(
+        &mut module,
+        &exports,
+        "wasi:http/incoming-handler@0.2.",
+        "#handle",
+    );
 
     // we reencode the WASI world component data, so strip it out from the
     // custom section
@@ -86,6 +70,34 @@ pub fn splice(
     synthesize_export_functions(&mut module, &exports)?;
 
     Ok(module.encode())
+}
+
+fn remove_if_exported_by_js(
+    module: &mut Module,
+    content_exports: &Vec<(String, CoreFn)>,
+    name_start: &str,
+    name_end: &str,
+) {
+    let content_exports_run = content_exports
+        .iter()
+        .any(|(name, _)| name.starts_with(name_start) && name.ends_with(name_end));
+    if content_exports_run {
+        let exported_run_fn = module
+            .exports
+            .iter()
+            .find(|export| export.name.starts_with(name_start) && export.name.ends_with(name_end))
+            .unwrap();
+        let export_id = module
+            .exports
+            .get_export_id_by_name(String::from(&exported_run_fn.name))
+            .unwrap();
+        let function_id = module
+            .exports
+            .get_func_by_name(String::from(&exported_run_fn.name))
+            .unwrap();
+        module.exports.delete(export_id);
+        module.delete_func(function_id);
+    }
 }
 
 fn get_export_fid(module: &Module, expt_id: &ExportsID) -> FunctionID {
