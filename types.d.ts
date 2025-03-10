@@ -89,3 +89,8 @@ interface ComponentizeOutput {
    */
   imports: [[string, string]][]
 }
+
+/**
+ * ComponentizeJS version string
+ */
+export const version: string
