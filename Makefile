@@ -3,7 +3,7 @@ JCO ?= ./node_modules/.bin/jco
 STARLINGMONKEY_SRC ?= StarlingMonkey
 
 ifndef JCO
-	JCO = $(error No jco in PATH. Run npm install -g @bytecodealliance/jco)
+	JCO = $(error No jco found. Run npm install.)
 endif
 
 # ifndef WASM_OPT
@@ -52,3 +52,4 @@ clean:
 	rm -r obj
 	rm lib/spidermonkey-embedding-splicer.js
 	rm lib/starlingmonkey_embedding.wasm
+	rm lib/starlingmonkey_embedding.debug.wasm

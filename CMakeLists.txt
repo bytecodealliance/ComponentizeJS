@@ -27,7 +27,7 @@ set(OUTPUT_NAME_DEBUG "starlingmonkey_embedding.debug.wasm")
 set(OUTPUT_NAME_WEVAL "starlingmonkey_embedding_weval.wasm")
 
 # Set the appropriate name based on current configuration
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     set(OUTPUT_FILENAME ${OUTPUT_NAME_DEBUG})
 elseif(WEVAL)
     set(OUTPUT_FILENAME ${OUTPUT_NAME_WEVAL})
