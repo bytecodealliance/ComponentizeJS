@@ -12,8 +12,8 @@ use std::{
 };
 use wasmparser::{MemArg, TypeRef};
 use wit_parser::Resolve;
-
-use crate::{parse_wit, Features};
+use crate::parse_wit;
+use crate::wit::Features;
 
 const WASI_VERSIONS: [&str; 4] = ["0.2.0", "0.2.1", "0.2.2", "0.2.3"];
 

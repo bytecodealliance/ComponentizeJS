@@ -1,14 +1,16 @@
 interface ComponentizeOptions {
   /**
+   * The path to the file to componentize.
+   *
+   * This file must be a valid JavaScript module, and can import other modules using relative paths.
+   */
+  sourcePath: string,
+  /**
    * Use a debug build
    * Note that the debug build only includes the names section only for size optimization, and not DWARF
    * debugging sections, due to a lack of support in Node.js for these debugging workflows currently.
    */
   debugBuild?: boolean,
-  /**
-   * Source name for debugging
-   */
-  sourceName?: string,
   /**
    * Path to custom ComponentizeJS engine build to use
    */
@@ -67,13 +69,16 @@ interface ComponentizeOptions {
 }
 
 /**
- * @param source JavaScript module to componentize
+ * @deprecated Use `componentize(opts)` instead
+ *
+ * @param source Source code of JavaScript module to componentize
  * @param opts Componentize options
  */
 export function componentize(source: string, opts: ComponentizeOptions): Promise<ComponentizeOutput>
 /**
- * 
- * @param source JavaScript module to componentize
+ * @deprecated Use `componentize(opts)` instead
+ *
+ * @param source Source code of JavaScript module to componentize
  * @param witWorld Inline WIT string to componentize to
  * @param opts Componentize options
  */

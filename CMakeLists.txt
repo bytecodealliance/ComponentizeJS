@@ -21,6 +21,8 @@ project(ComponentizeJS)
 
 set(RAW_WASM ${CMAKE_CURRENT_BINARY_DIR}/starling-raw.wasm/starling-raw.wasm)
 
+set(EMBEDDING_DEP "starling-raw.wasm")
+
 # Define output filenames based on build configuration
 set(OUTPUT_NAME_RELEASE "starlingmonkey_embedding.wasm")
 set(OUTPUT_NAME_DEBUG "starlingmonkey_embedding.debug.wasm")
@@ -31,6 +33,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInf
     set(OUTPUT_FILENAME ${OUTPUT_NAME_DEBUG})
 elseif(WEVAL)
     set(OUTPUT_FILENAME ${OUTPUT_NAME_WEVAL})
+    set(EMBEDDING_DEP "starling-ics.wevalcache")
 else()
     set(OUTPUT_FILENAME ${OUTPUT_NAME_RELEASE})
 endif()
@@ -38,17 +41,15 @@ endif()
 set(OUTPUT_FILENAME ${CMAKE_CURRENT_SOURCE_DIR}/lib/${OUTPUT_FILENAME})
 
 add_custom_target(starlingmonkey_embedding
-    DEPENDS starling-raw.wasm
+    DEPENDS ${EMBEDDING_DEP}
     COMMAND ${CMAKE_COMMAND} -E copy
             ${CMAKE_CURRENT_BINARY_DIR}/starling-raw.wasm/starling-raw.wasm
             ${OUTPUT_FILENAME}
 )
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     add_custom_command(TARGET starlingmonkey_embedding POST_BUILD
         COMMAND ${WASM_TOOLS_BIN} strip ${OUTPUT_FILENAME} -d ".debug_(info|loc|ranges|abbrev|line|str)" -o ${OUTPUT_FILENAME}
-        COMMENT "Stripping debug info from ${OUTPUT_FILENAME}"
         VERBATIM
     )
 endif()
-message(STATUS "Output file: ${OUTPUT_FILENAME}, wasm tools: ${WASM_TOOLS_BIN}")
