@@ -49,8 +49,8 @@ jobs:
       - name: Install Rust Toolchain
         if: steps.splicer-build.outputs.cache-hit != 'true'
         run: |
-          rustup toolchain install 1.77.1
-          rustup target add wasm32-wasi --toolchain 1.77.1
+          rustup toolchain install 1.80.0
+          rustup target add wasm32-wasip1 --toolchain 1.80.0
           rustup target add wasm32-wasip1
 
       - uses: actions/setup-node@v4
@@ -95,8 +95,8 @@ jobs:
       - name: Install Rust Toolchain
         if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
         run: |
-          rustup toolchain install 1.77.1
-          rustup target add wasm32-wasi --toolchain 1.77.1
+          rustup toolchain install 1.80.0
+          rustup target add wasm32-wasip1 --toolchain 1.80.0
           rustup target add wasm32-wasip1
 
       - name: Install wasm-tools
