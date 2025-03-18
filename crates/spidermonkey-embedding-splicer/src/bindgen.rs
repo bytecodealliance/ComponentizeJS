@@ -1,4 +1,6 @@
-use crate::{uwrite, uwriteln};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::fmt::Write;
+
 use anyhow::Result;
 use heck::*;
 use js_component_bindgen::function_bindgen::{
@@ -7,8 +9,6 @@ use js_component_bindgen::function_bindgen::{
 use js_component_bindgen::intrinsics::{render_intrinsics, Intrinsic};
 use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fmt::Write;
 use wit_bindgen_core::abi::{self, LiftLower};
 use wit_bindgen_core::wit_parser::Resolve;
 use wit_bindgen_core::wit_parser::{
@@ -18,6 +18,8 @@ use wit_bindgen_core::wit_parser::{
 use wit_component::StringEncoding;
 use wit_parser::abi::WasmType;
 use wit_parser::abi::{AbiVariant, WasmSignature};
+
+use crate::{uwrite, uwriteln};
 
 #[derive(Debug)]
 pub enum Resource {
@@ -518,6 +520,9 @@ impl JsBindgen<'_> {
                                     resource_name,
                                 );
                             }
+                            FunctionKind::AsyncFreestanding => todo!(),
+                            FunctionKind::AsyncMethod(_id) => todo!(),
+                            FunctionKind::AsyncStatic(_id) => todo!(),
                         };
                     }
                 }
@@ -607,10 +612,14 @@ impl JsBindgen<'_> {
                         BTreeMap::<_, Vec<_>>::new(),
                         |mut map, (name, func)| {
                             map.entry(match &func.kind {
-                                FunctionKind::Freestanding => None,
+                                FunctionKind::Freestanding | FunctionKind::AsyncFreestanding => {
+                                    None
+                                }
                                 FunctionKind::Method(ty)
                                 | FunctionKind::Static(ty)
-                                | FunctionKind::Constructor(ty) => Some(*ty),
+                                | FunctionKind::Constructor(ty)
+                                | FunctionKind::AsyncMethod(ty)
+                                | FunctionKind::AsyncStatic(ty) => Some(*ty),
                             })
                             .or_default()
                             .push((name.as_str(), func));
@@ -728,6 +737,9 @@ impl JsBindgen<'_> {
                     Resource::Constructor(self.resolve.types[*ty].name.clone().unwrap()),
                 )
             }
+            FunctionKind::AsyncFreestanding => todo!(),
+            FunctionKind::AsyncMethod(_id) => todo!(),
+            FunctionKind::AsyncStatic(_id) => todo!(),
         };
 
         // imports are canonicalized as exports because
@@ -783,8 +795,8 @@ impl JsBindgen<'_> {
         for (_, ty) in func.params.iter() {
             self.iter_resources(ty, &mut resource_map);
         }
-        for ty in func.results.iter_types() {
-            self.iter_resources(ty, &mut resource_map);
+        if let Some(ty) = func.result {
+            self.iter_resources(&ty, &mut resource_map);
         }
         resource_map
     }
@@ -893,23 +905,27 @@ impl JsBindgen<'_> {
             }
         }
 
+        let err = if get_thrown_type(self.resolve, func.result)
+            .is_some_and(|(_, err_ty)| err_ty.is_some())
+        {
+            match abi {
+                AbiVariant::GuestExport => ErrHandling::ThrowResultErr,
+                AbiVariant::GuestImport => ErrHandling::ResultCatchHandler,
+                AbiVariant::GuestImportAsync => todo!(),
+                AbiVariant::GuestExportAsync => todo!(),
+                AbiVariant::GuestExportAsyncStackful => todo!(),
+            }
+        } else {
+            ErrHandling::None
+        };
+
         let mut f = FunctionBindgen {
             is_async: false,
             tracing_prefix: None,
             intrinsics: &mut self.all_intrinsics,
             valid_lifting_optimization: true,
             sizes: &self.sizes,
-            err: if func.results.throws(self.resolve).is_some() {
-                match abi {
-                    AbiVariant::GuestExport => ErrHandling::ThrowResultErr,
-                    AbiVariant::GuestImport => ErrHandling::ResultCatchHandler,
-                    AbiVariant::GuestImportAsync => todo!(),
-                    AbiVariant::GuestExportAsync => todo!(),
-                    AbiVariant::GuestExportAsyncStackful => todo!(),
-                }
-            } else {
-                ErrHandling::None
-            },
+            err,
             block_storage: Vec::new(),
             blocks: Vec::new(),
             callee,
@@ -973,6 +989,9 @@ impl JsBindgen<'_> {
                 Resource::Constructor(self.resolve.types[*ty].name.clone().unwrap()),
                 format!("new {callee}"),
             ),
+            FunctionKind::AsyncFreestanding => todo!(),
+            FunctionKind::AsyncMethod(_id) => todo!(),
+            FunctionKind::AsyncStatic(_id) => todo!(),
         };
 
         let binding_name = format!(
@@ -1017,8 +1036,8 @@ impl JsBindgen<'_> {
         CoreFn {
             retsize: if sig.retptr {
                 let mut retsize: u32 = 0;
-                for ret_ty in func.results.iter_types() {
-                    retsize += self.sizes.size(ret_ty).size_wasm32() as u32;
+                if let Some(ret_ty) = func.result {
+                    retsize += self.sizes.size(&ret_ty).size_wasm32() as u32;
                 }
                 retsize
             } else {
@@ -1325,5 +1344,22 @@ fn binding_name(func_name: &str, iface_name: &Option<String>) -> String {
     match iface_name {
         Some(iface_name) => format!("{iface_name}${func_name}"),
         None => format!("{func_name}"),
+    }
+}
+
+/// Utility function for deducing whether a type can throw
+pub fn get_thrown_type<'a>(
+    resolve: &'a Resolve,
+    return_type: Option<Type>,
+) -> Option<(Option<&'a Type>, Option<&'a Type>)> {
+    match return_type {
+        None => None,
+        Some(ty) => match ty {
+            Type::Id(id) => match &resolve.types[id].kind {
+                TypeDefKind::Result(r) => Some((r.ok.as_ref(), r.err.as_ref())),
+                _ => None,
+            },
+            _ => None,
+        },
     }
 }
