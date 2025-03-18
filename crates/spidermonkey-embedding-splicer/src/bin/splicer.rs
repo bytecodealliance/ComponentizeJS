@@ -3,8 +3,8 @@ use clap::{Parser, Subcommand};
 use std::fs;
 use std::path::PathBuf;
 
-use spidermonkey_embedding_splicer::{splice, stub_wasi};
 use spidermonkey_embedding_splicer::wit::Features;
+use spidermonkey_embedding_splicer::{splice, stub_wasi};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -129,14 +129,8 @@ fn main() -> Result<()> {
 
             let wit_path_str = wit_path.as_ref().map(|p| p.to_string_lossy().to_string());
 
-            let result = splice::splice_bindings(
-                engine,
-                world_name,
-                wit_path_str,
-                None,
-                debug,
-            )
-            .map_err(|e| anyhow::anyhow!(e))?;
+            let result = splice::splice_bindings(engine, world_name, wit_path_str, None, debug)
+                .map_err(|e| anyhow::anyhow!(e))?;
             fs::write(&out_dir.join("component.wasm"), result.wasm).with_context(|| {
                 format!(
                     "Failed to write output file: {}",

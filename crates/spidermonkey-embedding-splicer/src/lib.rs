@@ -1,12 +1,12 @@
-use std::path::Path;
 use anyhow::{bail, Context, Result};
+use std::path::Path;
 
 pub mod bindgen;
 pub mod splice;
 pub mod stub_wasi;
 
-use wit_parser::{PackageId, Resolve};
 use crate::wit::{CoreFn, CoreTy};
+use wit_parser::{PackageId, Resolve};
 
 pub mod wit {
     wit_bindgen::generate!({
@@ -85,4 +85,3 @@ fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
     };
     Ok((resolve, id))
 }
-

@@ -1,6 +1,6 @@
-use spidermonkey_embedding_splicer::{splice, wit};
-use spidermonkey_embedding_splicer::wit::{export, Features, Guest, SpliceResult};
 use spidermonkey_embedding_splicer::stub_wasi::stub_wasi;
+use spidermonkey_embedding_splicer::wit::{export, Features, Guest, SpliceResult};
+use spidermonkey_embedding_splicer::{splice, wit};
 
 struct SpidermonkeyEmbeddingSplicerComponent;
 

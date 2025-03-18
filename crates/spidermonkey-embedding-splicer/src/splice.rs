@@ -1,6 +1,7 @@
+use crate::bindgen::BindingItem;
+use crate::wit::{CoreFn, CoreTy, SpliceResult};
+use crate::{bindgen, map_core_fn, parse_wit, splice};
 use anyhow::Result;
-use wasm_encoder::{Encode, Section};
-use std::path::PathBuf;
 use orca_wasm::ir::function::{FunctionBuilder, FunctionModifier};
 use orca_wasm::ir::id::{ExportsID, FunctionID, LocalID};
 use orca_wasm::ir::module::Module;
@@ -8,15 +9,14 @@ use orca_wasm::ir::types::{BlockType, ElementItems, InstrumentationMode};
 use orca_wasm::module_builder::AddLocal;
 use orca_wasm::opcode::{Inject, InjectAt};
 use orca_wasm::{DataType, Opcode};
+use std::path::PathBuf;
+use wasm_encoder::{Encode, Section};
 use wasmparser::ExternalKind;
 use wasmparser::MemArg;
 use wasmparser::Operator;
 use wit_component::metadata::{decode, Bindgen};
 use wit_component::StringEncoding;
 use wit_parser::Resolve;
-use crate::{bindgen, map_core_fn, parse_wit, splice};
-use crate::bindgen::BindingItem;
-use crate::wit::{CoreFn, CoreTy, SpliceResult};
 
 // Returns
 // pub struct SpliceResult {
@@ -53,14 +53,14 @@ pub fn splice_bindings(
 
     // merge the engine world with the target world, retaining the engine producers
     let (engine_world, producers) = if let Ok((
-                                                  _,
-                                                  Bindgen {
-                                                      resolve: mut engine_resolve,
-                                                      world: engine_world,
-                                                      metadata: _,
-                                                      producers,
-                                                  },
-                                              )) = decode(&engine)
+        _,
+        Bindgen {
+            resolve: mut engine_resolve,
+            world: engine_world,
+            metadata: _,
+            producers,
+        },
+    )) = decode(&engine)
     {
         // we disable the engine run and incoming handler as we recreate these exports
         // when needed, so remove these from the world before initiating the merge
@@ -104,23 +104,16 @@ pub fn splice_bindings(
         unreachable!();
     };
 
-    let componentized = bindgen::componentize_bindgen(
-        &resolve,
-        world,
-    )
-        .map_err(|err| err.to_string())?;
+    let componentized =
+        bindgen::componentize_bindgen(&resolve, world).map_err(|err| err.to_string())?;
 
     resolve
         .merge_worlds(engine_world, world)
         .expect("unable to merge with engine world");
 
-    let encoded = wit_component::metadata::encode(
-        &resolve,
-        world,
-        StringEncoding::UTF8,
-        producers.as_ref(),
-    )
-        .map_err(|e| e.to_string())?;
+    let encoded =
+        wit_component::metadata::encode(&resolve, world, StringEncoding::UTF8, producers.as_ref())
+            .map_err(|e| e.to_string())?;
 
     let section = wasm_encoder::CustomSection {
         name: "component-type".into(),
@@ -254,9 +247,6 @@ pub fn splice_bindings(
         ));
     }
 
-    // println!("{:?}", &componentized.imports);
-    // println!("{:?}", &componentized.resource_imports);
-    // println!("{:?}", &exports);
     let mut wasm =
         splice::splice(engine, imports, exports, debug).map_err(|e| format!("{:?}", e))?;
 
@@ -271,11 +261,11 @@ pub fn splice_bindings(
             .iter()
             .map(
                 |(
-                     _,
-                     BindingItem {
-                         binding_name, func, ..
-                     },
-                 )| { (binding_name.to_string(), map_core_fn(&func)) },
+                    _,
+                    BindingItem {
+                        binding_name, func, ..
+                    },
+                )| { (binding_name.to_string(), map_core_fn(&func)) },
             )
             .collect(),
         imports: componentized
@@ -283,15 +273,15 @@ pub fn splice_bindings(
             .iter()
             .map(
                 |(
-                     specifier,
-                     BindingItem {
-                         name,
-                         iface,
-                         func,
-                         resource,
-                         ..
-                     },
-                 )| {
+                    specifier,
+                    BindingItem {
+                        name,
+                        iface,
+                        func,
+                        resource,
+                        ..
+                    },
+                )| {
                     (
                         if *iface {
                             specifier.to_string()

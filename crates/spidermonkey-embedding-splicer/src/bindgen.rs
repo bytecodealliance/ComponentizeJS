@@ -129,10 +129,7 @@ pub struct Componentization {
     pub resource_imports: Vec<(String, String, u32)>,
 }
 
-pub fn componentize_bindgen(
-    resolve: &Resolve,
-    wid: WorldId,
-) -> Result<Componentization> {
+pub fn componentize_bindgen(resolve: &Resolve, wid: WorldId) -> Result<Componentization> {
     let mut bindgen = JsBindgen {
         src: Source::default(),
         esm_bindgen: EsmBindgen::default(),
@@ -222,9 +219,7 @@ pub fn componentize_bindgen(
         let joined_bindings = specifier_list.join(",\n\t");
         import_wrappers.push((
             specifier.to_string(),
-            format!(
-                "defineBuiltinModule('{specifier}', {{\n\t{joined_bindings}\n}});"
-            ),
+            format!("defineBuiltinModule('{specifier}', {{\n\t{joined_bindings}\n}});"),
         ));
     }
 
@@ -374,13 +369,13 @@ pub fn componentize_bindgen(
     output.push_str(&js_intrinsics);
     output.push_str(&bindgen.src);
 
-    import_wrappers.iter().for_each(|(_, src)| output.push_str(&format!("\n\n{src}")));
+    import_wrappers
+        .iter()
+        .for_each(|(_, src)| output.push_str(&format!("\n\n{src}")));
 
-    bindgen.esm_bindgen.render_export_imports(
-        &mut output,
-        "$source_mod",
-        &mut bindgen.local_names,
-    );
+    bindgen
+        .esm_bindgen
+        .render_export_imports(&mut output, "$source_mod", &mut bindgen.local_names);
 
     Ok(Componentization {
         js_bindings: output.to_string(),
@@ -1206,10 +1201,12 @@ impl EsmBindgen {
         }
 
         let mut bind_exports = Source::default();
-        bind_exports.push_str("let __sourceName;
+        bind_exports.push_str(
+            "let __sourceName;
                                    function bindExports(sourceName) {
                                    __sourceName = sourceName;
-                                   let __iface;");
+                                   let __iface;",
+        );
         for (export_name, binding) in &self.exports {
             match binding {
                 Binding::Interface(bindings) => {
@@ -1275,9 +1272,12 @@ impl EsmBindgen {
                     }
                 }
                 Binding::Resource(local_name) => {
-                    uwriteln!(output, "
+                    uwriteln!(
+                        output,
+                        "
                         let {local_name};
-                    ");
+                    "
+                    );
                     uwriteln!(bind_exports, "
                         {local_name} = {imports_object}.{export_name};
                         if (typeof {local_name} !== 'function')
@@ -1285,9 +1285,12 @@ impl EsmBindgen {
                     ");
                 }
                 Binding::Local(local_name) => {
-                    uwriteln!(output, "
+                    uwriteln!(
+                        output,
+                        "
                         let {local_name};
-                    ");
+                    "
+                    );
                     uwriteln!(bind_exports, "
                         {local_name} = {imports_object}.{export_name};
                         if (typeof {local_name} !== 'function')
