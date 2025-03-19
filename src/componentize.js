@@ -17,7 +17,6 @@ import {
 } from '../lib/spidermonkey-embedding-splicer.js';
 import { fileURLToPath } from 'node:url';
 import { stdout, platform } from 'node:process';
-import { assert } from '../StarlingMonkey/tests/assert.js';
 export const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8')
 );
@@ -73,7 +72,11 @@ export async function componentize(opts,
       opts = _deprecatedOpts || {};
       opts.witWorld = _deprecatedWitWorldOrOpts;
     } else {
-      assert(typeof _deprecatedWitWorldOrOpts === 'object');
+      if (typeof _deprecatedWitWorldOrOpts !== 'object') {
+        throw new Error(
+          `componentize: second argument must be an object or a string, but is ${typeof _deprecatedWitWorldOrOpts}`
+        );
+      }
       opts = _deprecatedWitWorldOrOpts;
     }
   }
