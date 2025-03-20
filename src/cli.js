@@ -46,18 +46,7 @@ function asyncAction (cmd) {
   return function () {
     const args = [...arguments];
     (async () => {
-      try {
-        await cmd.apply(null, args);
-      }
-      catch (e) {
-        process.stdout.write(`(jco ${cmd.name}) `);
-        if (typeof e === 'string') {
-          console.error(c`{red.bold Error}: ${e}\n`);
-        } else {
-          console.error(e);
-        }
-        process.exit(1);
-      }
+      await cmd.apply(null, args);
     })();
   };
 }
