@@ -7,7 +7,7 @@ import {
 } from '@bytecodealliance/jco';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { resolve, join, basename, dirname } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { rmSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -16,7 +16,7 @@ import {
   stubWasi,
 } from '../lib/spidermonkey-embedding-splicer.js';
 import { fileURLToPath } from 'node:url';
-import { stdout, platform } from 'node:process';
+import { cwd, stdout, platform } from 'node:process';
 export const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8')
 );
@@ -206,11 +206,27 @@ export async function componentize(opts,
     console.log(env);
   }
 
-  let initializerPath = maybeWindowsPath(join(sourceDir, 'initializer.js'));
+  let initializerPath = join(sourceDir, 'initializer.js');
   sourcePath = maybeWindowsPath(sourcePath);
+  let workspacePrefix = dirname(sourcePath);
+
+  // If the source path is within the current working directory, strip the
+  // cwd as a prefix from the source path, and remap the paths seen by the
+  // component to be relative to the current working directory.
+  // This only works in wizer, not in weval, because the latter doesn't
+  // support --mapdir.
+  if (!opts.enableAot && workspacePrefix.startsWith(cwd())) {
+    workspacePrefix = cwd();
+    sourcePath = sourcePath.slice(workspacePrefix.length + 1);
+  }
   let args = `--initializer-script-path ${initializerPath} ${sourcePath}`;
   runtimeArgs = runtimeArgs ? `${runtimeArgs} ${args}` : args;
-  let preopens = [`--dir ${maybeWindowsPath(sourceDir)}`, `--dir ${maybeWindowsPath(dirname(sourcePath))}`];
+  let preopens = [`--dir ${sourceDir}`];
+  if (opts.enableAot) {
+    preopens.push(`--dir ${workspacePrefix}`);
+  } else {
+    preopens.push(`--mapdir /::${workspacePrefix}`);
+  }
 
   let wizerProcess;
 
