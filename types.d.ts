@@ -69,12 +69,20 @@ interface ComponentizeOptions {
 }
 
 /**
+ * Componentize a JavaScript module to a WebAssembly component
+ *
+ * @param opts Componentize options
+ */
+export function componentize(opts: ComponentizeOptions): Promise<ComponentizeOutput>
+
+/**
  * @deprecated Use `componentize(opts)` instead
  *
  * @param source Source code of JavaScript module to componentize
  * @param opts Componentize options
  */
 export function componentize(source: string, opts: ComponentizeOptions): Promise<ComponentizeOutput>
+
 /**
  * @deprecated Use `componentize(opts)` instead
  *
