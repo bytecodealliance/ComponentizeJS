@@ -1,5 +1,5 @@
-use crate::{uwrite, uwriteln, Features};
-use anyhow::{bail, Result};
+use crate::{uwrite, uwriteln};
+use anyhow::Result;
 use heck::*;
 use js_component_bindgen::function_bindgen::{
     ErrHandling, FunctionBindgen, ResourceData, ResourceMap, ResourceTable,
@@ -13,7 +13,7 @@ use wit_bindgen_core::abi::{self, LiftLower};
 use wit_bindgen_core::wit_parser::Resolve;
 use wit_bindgen_core::wit_parser::{
     Function, FunctionKind, Handle, InterfaceId, SizeAlign, Type, TypeDefKind, TypeId, TypeOwner,
-    WorldId, WorldItem, WorldKey,
+    WorldId, WorldItem,
 };
 use wit_component::StringEncoding;
 use wit_parser::abi::WasmType;
@@ -88,8 +88,6 @@ struct JsBindgen<'a> {
     esm_bindgen: EsmBindgen,
     local_names: LocalNames,
 
-    local_package_name: String,
-
     resolve: &'a Resolve,
     world: WorldId,
     sizes: SizeAlign,
@@ -128,19 +126,10 @@ pub struct Componentization {
     pub js_bindings: String,
     pub exports: Vec<(String, BindingItem)>,
     pub imports: Vec<(String, BindingItem)>,
-    pub import_wrappers: Vec<(String, String)>,
     pub resource_imports: Vec<(String, String, u32)>,
 }
 
-pub fn componentize_bindgen(
-    resolve: &Resolve,
-    wid: WorldId,
-    name: &str,
-    guest_imports: &Vec<String>,
-    guest_exports: &Vec<String>,
-    features: Vec<Features>,
-) -> Result<Componentization> {
-    let local_package_name = resolve.id_of_name(resolve.worlds[wid].package.unwrap(), "");
+pub fn componentize_bindgen(resolve: &Resolve, wid: WorldId) -> Result<Componentization> {
     let mut bindgen = JsBindgen {
         src: Source::default(),
         esm_bindgen: EsmBindgen::default(),
@@ -151,7 +140,6 @@ pub fn componentize_bindgen(
         sizes: SizeAlign::default(),
         memory: "$memory".to_string(),
         realloc: "$realloc".to_string(),
-        local_package_name,
         exports: Vec::new(),
         imports: Vec::new(),
         resource_directions: HashMap::new(),
@@ -164,9 +152,9 @@ pub fn componentize_bindgen(
         .local_names
         .exclude_globals(Intrinsic::get_global_names());
 
-    bindgen.imports_bindgen(&guest_imports);
+    bindgen.imports_bindgen();
 
-    bindgen.exports_bindgen(&guest_exports, features)?;
+    bindgen.exports_bindgen()?;
     bindgen.esm_bindgen.populate_export_aliases();
 
     // consolidate import specifiers and generate wrappers
@@ -206,9 +194,9 @@ pub fn componentize_bindgen(
                 let export_name = resource.to_upper_camel_case();
                 let binding_name = binding_name(&export_name, &item.iface_name);
                 if item.iface {
-                    specifier_list.push(format!("import_{binding_name} as {export_name}"));
+                    specifier_list.push(format!("{export_name}: import_{binding_name}"));
                 } else {
-                    specifier_list.push(format!("import_{binding_name} as default"));
+                    specifier_list.push(format!("default: import_{binding_name}"));
                 }
             } else {
                 for BindingItem {
@@ -221,20 +209,17 @@ pub fn componentize_bindgen(
                     let export_name = name.to_lower_camel_case();
                     let binding_name = binding_name(&export_name, iface_name);
                     if *iface {
-                        specifier_list.push(format!("import_{binding_name} as {export_name}"));
+                        specifier_list.push(format!("{export_name}: import_{binding_name}"));
                     } else {
-                        specifier_list.push(format!("import_{binding_name} as default"));
+                        specifier_list.push(format!("default: import_{binding_name}"));
                     }
                 }
             }
         }
-        let joined_bindings = specifier_list.join(", ");
+        let joined_bindings = specifier_list.join(",\n\t");
         import_wrappers.push((
             specifier.to_string(),
-            format!(
-                "export {{ {joined_bindings} }} from './{}.bindings.js';",
-                &name[0..name.len() - 3]
-            ),
+            format!("defineBuiltinModule('{specifier}', {{\n\t{joined_bindings}\n}});"),
         ));
     }
 
@@ -356,13 +341,12 @@ pub fn componentize_bindgen(
 
     uwrite!(
         output,
-        "
-            import * as $source_mod from '{name}';
+        "let {{ TextEncoder, TextDecoder }} = contentGlobal;
 
             let repCnt = 1;
             let repTable = new Map();
 
-            Symbol.dispose = Symbol.for('dispose');
+            contentGlobal.Symbol.dispose = Symbol.dispose = Symbol.for('dispose');
 
             let [$memory, $realloc{}] = $bindings;
             delete globalThis.$bindings;
@@ -381,22 +365,22 @@ pub fn componentize_bindgen(
             .concat(),
     );
 
-    bindgen.esm_bindgen.render_export_imports(
-        &mut output,
-        "$source_mod",
-        &mut bindgen.local_names,
-        name,
-    );
-
     let js_intrinsics = render_intrinsics(&mut bindgen.all_intrinsics, false, true);
     output.push_str(&js_intrinsics);
     output.push_str(&bindgen.src);
+
+    import_wrappers
+        .iter()
+        .for_each(|(_, src)| output.push_str(&format!("\n\n{src}")));
+
+    bindgen
+        .esm_bindgen
+        .render_export_imports(&mut output, "$source_mod", &mut bindgen.local_names);
 
     Ok(Componentization {
         js_bindings: output.to_string(),
         exports: bindgen.exports,
         imports: bindgen.imports,
-        import_wrappers,
         resource_imports,
     })
 }
@@ -409,56 +393,58 @@ impl JsBindgen<'_> {
 
     fn exports_bindgen(
         &mut self,
-        guest_exports: &Vec<String>,
-        features: Vec<Features>,
+        // guest_exports: &Option<Vec<String>>,
+        // features: Vec<Features>,
     ) -> Result<()> {
         for (key, export) in &self.resolve.worlds[self.world].exports {
             let name = self.resolve.name_world_key(key);
-
+            if name.starts_with("wasi:http/incoming-handler@0.2.") {
+                continue;
+            }
             // Do not generate exports when the guest export is not implemented.
             // We check both the full interface name - "ns:pkg@v/my-interface" and the
             // aliased interface name "myInterface". All other names are always
             // camel-case in the check.
-            match key {
-                WorldKey::Interface(iface) => {
-                    if !guest_exports.contains(&name) {
-                        let iface = &self.resolve.interfaces[*iface];
-                        if let Some(iface_name) = iface.name.as_ref() {
-                            let camel_case_name = iface_name.to_lower_camel_case();
-                            if !guest_exports.contains(&camel_case_name) {
-                                // For wasi:http/incoming-handler, we treat it
-                                // as a special case as the engine already
-                                // provides the export using fetchEvent and that
-                                // can be used when an explicit export is not
-                                // defined by the guest content.
-                                if iface_name == "incoming-handler"
-                                    || name.starts_with("wasi:http/incoming-handler@0.2.")
-                                {
-                                    if !features.contains(&Features::Http) {
-                                        bail!(
-                                            "JS export definition for '{}' not found. Cannot use fetchEvent because the http feature is not enabled.",
-                                            camel_case_name
-                                        )
-                                    }
-                                    continue;
-                                }
-                                bail!("Expected a JS export definition for '{}'", camel_case_name);
-                            }
-                            // TODO: move populate_export_aliases to a preprocessing
-                            // step that doesn't require esm_bindgen, so that we can
-                            // do alias deduping here as well.
-                        } else {
-                            continue;
-                        }
-                    }
-                }
-                WorldKey::Name(export_name) => {
-                    let camel_case_name = export_name.to_lower_camel_case();
-                    if !guest_exports.contains(&camel_case_name) {
-                        bail!("Expected a JS export definition for '{}'", camel_case_name);
-                    }
-                }
-            }
+            // match key {
+            //     WorldKey::Interface(iface) => {
+            //         if !guest_exports.contains(&name) {
+            //             let iface = &self.resolve.interfaces[*iface];
+            //             if let Some(iface_name) = iface.name.as_ref() {
+            //                 let camel_case_name = iface_name.to_lower_camel_case();
+            //                 if !guest_exports.contains(&camel_case_name) {
+            //                     // For wasi:http/incoming-handler, we treat it
+            //                     // as a special case as the engine already
+            //                     // provides the export using fetchEvent and that
+            //                     // can be used when an explicit export is not
+            //                     // defined by the guest content.
+            //                     if iface_name == "incoming-handler"
+            //                         || name.starts_with("wasi:http/incoming-handler@0.2.")
+            //                     {
+            //                         if !features.contains(&Features::Http) {
+            //                             bail!(
+            //                                 "JS export definition for '{}' not found. Cannot use fetchEvent because the http feature is not enabled.",
+            //                                 camel_case_name
+            //                             )
+            //                         }
+            //                         continue;
+            //                     }
+            //                     bail!("Expected a JS export definition for '{}'", camel_case_name);
+            //                 }
+            //                 // TODO: move populate_export_aliases to a preprocessing
+            //                 // step that doesn't require esm_bindgen, so that we can
+            //                 // do alias deduping here as well.
+            //             } else {
+            //                 continue;
+            //             }
+            //         }
+            //     }
+            //     WorldKey::Name(export_name) => {
+            //         let camel_case_name = export_name.to_lower_camel_case();
+            //         if !guest_exports.contains(&camel_case_name) {
+            //             bail!("Expected a JS export definition for '{}'", camel_case_name);
+            //         }
+            //     }
+            // }
 
             match export {
                 WorldItem::Function(func) => {
@@ -562,7 +548,7 @@ impl JsBindgen<'_> {
             &iface_name,
         );
 
-        uwriteln!(self.src, "\nexport class import_{name} {{");
+        uwriteln!(self.src, "\nclass import_{name} {{");
 
         // TODO: Imports tree-shaking for resources is disabled since it is not functioning correctly.
         // To make this work properly, we need to trace recursively through the type graph
@@ -598,14 +584,12 @@ impl JsBindgen<'_> {
         );
     }
 
-    fn imports_bindgen(&mut self, guest_imports: &Vec<String>) {
+    fn imports_bindgen(&mut self) {
         for (key, impt) in &self.resolve.worlds[self.world].imports {
             let import_name = self.resolve.name_world_key(key);
             match &impt {
                 WorldItem::Function(f) => {
-                    if !guest_imports.contains(&import_name)
-                        && !import_name.starts_with(&self.local_package_name)
-                    {
+                    if !matches!(f.kind, FunctionKind::Freestanding) {
                         continue;
                     }
                     self.import_bindgen(import_name, f, false, None);
@@ -642,9 +626,7 @@ impl JsBindgen<'_> {
                     for (resource, functions) in by_resource {
                         if let Some(ty) = resource {
                             self.resource_bindgen(ty, &import_name, &iface_name, functions);
-                        } else if guest_imports.contains(&import_name)
-                            || import_name.starts_with(&self.local_package_name)
-                        {
+                        } else {
                             for (_, func) in functions {
                                 self.import_bindgen(
                                     import_name.clone(),
@@ -718,7 +700,7 @@ impl JsBindgen<'_> {
             FunctionKind::Freestanding => {
                 let binding_name = binding_name(&fn_camel_name, &iface_name);
 
-                uwrite!(self.src, "\nexport function import_{binding_name}");
+                uwrite!(self.src, "\nfunction import_{binding_name}");
 
                 (binding_name, Resource::None)
             }
@@ -1002,7 +984,7 @@ impl JsBindgen<'_> {
         );
 
         // all exports are supported as async functions
-        uwrite!(self.src, "\nexport async function {binding_name}");
+        uwrite!(self.src, "\nasync function {binding_name}");
 
         // exports are canonicalized as imports because
         // the function bindgen as currently written still makes this assumption
@@ -1177,7 +1159,6 @@ impl EsmBindgen {
         output: &mut Source,
         imports_object: &str,
         _local_names: &mut LocalNames,
-        source_name: &str,
     ) {
         // TODO: bring back these validations of imports
         // including using the flattened bindings
@@ -1186,9 +1167,8 @@ impl EsmBindgen {
             uwriteln!(output, "
                 class BindingsError extends Error {{
                     constructor (path, type, helpContext, help) {{
-                        super(`\"{source_name}\" source does not export a \"${{path}}\" ${{type}} as expected by the world.${{
-                            help ? `\\n\\n  Try defining it${{helpContext}}:\\n\\n${{'    ' + help.split('\\n').map(ln => `  ${{ln}}`).join('\\n')}}\n` : ''
-                        }}`);
+                        super(`\"${{__sourceName}}\" does not export a \"${{path}}\" ${{type}} as expected by the world.${{
+                            help ? `\\n  Try defining it${{helpContext}}:\\n${{help.split('\\n').map(ln => `  ${{ln}}`).join('\\n')}}` : ''}}`);
                     }}
                 }}
                 function getInterfaceExport (mod, exportNameOrAlias, exportId) {{
@@ -1219,15 +1199,43 @@ impl EsmBindgen {
                 }}
                 ");
         }
+
+        let mut bind_exports = Source::default();
+        bind_exports.push_str(
+            "let __sourceName;
+                                   function bindExports(sourceName) {
+                                   __sourceName = sourceName;
+                                   let __iface;",
+        );
         for (export_name, binding) in &self.exports {
             match binding {
                 Binding::Interface(bindings) => {
-                    uwrite!(output, "const ");
-                    uwrite!(output, "{{");
+                    if let Some(alias) = self.export_aliases.get(export_name) {
+                        // aliased namespace id
+                        uwriteln!(
+                            bind_exports,
+                            "
+                        __iface = getInterfaceExport({imports_object}, '{alias}', '{export_name}');",
+                        );
+                    } else if export_name.contains(':') {
+                        // ID case without alias (different error messaging)
+                        uwriteln!(
+                            bind_exports,
+                            "
+                        __iface = getInterfaceExport({imports_object}, null, '{export_name}');",
+                        );
+                    } else {
+                        // kebab name interface
+                        uwriteln!(
+                            bind_exports,
+                            "
+                        __iface = getInterfaceExport({imports_object}, '{export_name}', null);",
+                        );
+                    }
+                    uwrite!(output, "let ");
                     let mut first = true;
                     for (external_name, import) in bindings {
                         if first {
-                            output.push_str(" ");
                             first = false;
                         } else {
                             output.push_str(", ");
@@ -1238,34 +1246,10 @@ impl EsmBindgen {
                                 local_name
                             }
                         };
-                        if external_name == local_name {
-                            uwrite!(output, "{external_name}");
-                        } else {
-                            uwrite!(output, "{external_name}: {local_name}");
-                        }
+                        uwrite!(output, "{local_name}");
+                        uwriteln!(bind_exports, "{local_name} = __iface.{external_name};");
                     }
-                    if !first {
-                        output.push_str(" ");
-                    }
-                    if let Some(alias) = self.export_aliases.get(export_name) {
-                        // aliased namespace id
-                        uwriteln!(
-                            output,
-                            "}} = getInterfaceExport({imports_object}, '{alias}', '{export_name}');",
-                        );
-                    } else if export_name.contains(':') {
-                        // ID case without alias (different error messaging)
-                        uwriteln!(
-                            output,
-                            "}} = getInterfaceExport({imports_object}, null, '{export_name}');",
-                        );
-                    } else {
-                        // kebab name interface
-                        uwriteln!(
-                            output,
-                            "}} = getInterfaceExport({imports_object}, '{export_name}', null);",
-                        );
-                    }
+                    output.push_str(";\n");
                     // After defining all the local bindings, verify them throwing errors as necessary
                     for (external_name, import) in bindings {
                         let local_name = match import {
@@ -1281,28 +1265,42 @@ impl EsmBindgen {
                             "verifyInterfaceFn"
                         };
                         if let Some(alias) = self.export_aliases.get(export_name) {
-                            uwriteln!(output, "{verify_name}({local_name}, '{export_name}', '{external_name}', '{alias}');");
+                            uwriteln!(bind_exports, "{verify_name}({local_name}, '{export_name}', '{external_name}', '{alias}');");
                         } else {
-                            uwriteln!(output, "{verify_name}({local_name}, '{export_name}', '{external_name}', null);");
+                            uwriteln!(bind_exports, "{verify_name}({local_name}, '{export_name}', '{external_name}', null);");
                         };
                     }
                 }
                 Binding::Resource(local_name) => {
-                    uwriteln!(output, "
-                        const {local_name} = {imports_object}.{export_name};
+                    uwriteln!(
+                        output,
+                        "
+                        let {local_name};
+                    "
+                    );
+                    uwriteln!(bind_exports, "
+                        {local_name} = {imports_object}.{export_name};
                         if (typeof {local_name} !== 'function')
                             throw new BindingsError('{export_name}', 'function', '', `export function {export_name} () {{}};\n`);
                     ");
                 }
                 Binding::Local(local_name) => {
-                    uwriteln!(output, "
-                        const {local_name} = {imports_object}.{export_name};
+                    uwriteln!(
+                        output,
+                        "
+                        let {local_name};
+                    "
+                    );
+                    uwriteln!(bind_exports, "
+                        {local_name} = {imports_object}.{export_name};
                         if (typeof {local_name} !== 'function')
                             throw new BindingsError('{export_name}', 'function', '', `export function {export_name} () {{}};\n`);
                     ");
                 }
             }
         }
+        bind_exports.push_str("}\n");
+        output.push_str(&bind_exports);
     }
 }
 

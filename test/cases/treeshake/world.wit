@@ -1,9 +1,0 @@
-package local:smoke;
-
-world the-world {
-  import unused: func();
-  import imports: interface {
-    y: func();
-  }
-  export hello: func();
-}

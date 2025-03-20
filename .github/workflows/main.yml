@@ -49,14 +49,14 @@ jobs:
       - name: Install Rust Toolchain
         if: steps.splicer-build.outputs.cache-hit != 'true'
         run: |
-          rustup toolchain install 1.77.1
-          rustup target add wasm32-wasi --toolchain 1.77.1
+          rustup toolchain install 1.80.0
+          rustup target add wasm32-wasip1 --toolchain 1.80.0
           rustup target add wasm32-wasip1
 
       - uses: actions/setup-node@v4
         if: steps.splicer-build.outputs.cache-hit != 'true'
         with:
-          node-version: '22'
+          node-version: '23.10.0'
 
       - name: Install NPM packages
         if: steps.splicer-build.outputs.cache-hit != 'true'
@@ -95,8 +95,8 @@ jobs:
       - name: Install Rust Toolchain
         if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
         run: |
-          rustup toolchain install 1.77.1
-          rustup target add wasm32-wasi --toolchain 1.77.1
+          rustup toolchain install 1.80.0
+          rustup target add wasm32-wasip1 --toolchain 1.80.0
           rustup target add wasm32-wasip1
 
       - name: Install wasm-tools
@@ -115,7 +115,7 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
         with:
-          node-version: '22'
+          node-version: '23.10.0'
 
       - name: Install NPM packages
         if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
@@ -139,7 +139,7 @@ jobs:
       fail-fast: false
       matrix:
         node-version:
-          - '22.14.0'
+          - '23.10.0'
           # - latest reenable when https://github.com/nodejs/node/issues/57172 is fixed
         build-type:
           - 'release'
@@ -189,7 +189,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '23.10.0'
 
       - name: Install NPM packages
         run: npm install

@@ -7,7 +7,7 @@ import {
 } from '@bytecodealliance/jco';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { resolve, join, dirname } from 'node:path';
+import { resolve, join, basename, dirname } from 'node:path';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { rmSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -16,15 +16,11 @@ import {
   stubWasi,
 } from '../lib/spidermonkey-embedding-splicer.js';
 import { fileURLToPath } from 'node:url';
-import { stdout, stderr, exit, platform } from 'node:process';
-import { init as lexerInit, parse } from 'es-module-lexer';
+import { stdout, platform } from 'node:process';
 export const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8')
 );
 const isWindows = platform === 'win32';
-const DEBUG_BINDINGS = false;
-const DEBUG_CALLS = false;
-const DEBUG_BINARY = false;
 
 function maybeWindowsPath(path) {
   if (!path) return path;
@@ -32,21 +28,83 @@ function maybeWindowsPath(path) {
   return '//?/' + resolve(path).replace(/\\/g, '/');
 }
 
-export async function componentize(jsSource, witWorld, opts) {
-  if (typeof witWorld === 'object') {
-    opts = witWorld;
-    witWorld = opts?.witWorld;
+/**
+ * Clean up the given input string by removing the given patterns if
+ * found as line prefixes.
+ */
+function stripLinesPrefixes(input, prefixPatterns) {
+  return input.split('\n')
+    .map(line => prefixPatterns.reduce((line, n) => line.replace(n, ''), line))
+    .join('\n').trim();
+}
+
+const WizerErrorCause = `Error: the \`componentize.wizer\` function trapped
+
+Caused by:`;
+
+const WizerExitCode = "Exited with i32 exit status";
+
+function parseWizerStderr(stderr) {
+  let output = `${stderr}`;
+  let causeStart = output.indexOf(WizerErrorCause);
+  let exitCodeStart = output.indexOf(WizerExitCode);
+  if (causeStart === -1 || exitCodeStart === -1) {
+    return output;
   }
-  opts = opts || {};
+
+  let causeEnd = output.indexOf('\n', exitCodeStart + 1);
+  return `${output.substring(0, causeStart)}${output.substring(causeEnd)}`.trim();
+}
+
+export async function componentize(opts,
+                                   _deprecatedWitWorldOrOpts = undefined,
+                                   _deprecatedOpts = undefined) {
+  let useOriginalSourceFile = true;
+  let jsSource;
+
+  // Handle the two old signatures
+  // (jsSource, witWorld, opts?)
+  // (jsSource, opts)
+  if (typeof opts === 'string') {
+    jsSource = opts;
+    useOriginalSourceFile = false;
+    if (typeof _deprecatedWitWorldOrOpts === 'string') {
+      opts = _deprecatedOpts || {};
+      opts.witWorld = _deprecatedWitWorldOrOpts;
+    } else {
+      if (typeof _deprecatedWitWorldOrOpts !== 'object') {
+        throw new Error(
+          `componentize: second argument must be an object or a string, but is ${typeof _deprecatedWitWorldOrOpts}`
+        );
+      }
+      opts = _deprecatedWitWorldOrOpts;
+    }
+  }
+
+  const tmpDir = join(
+    tmpdir(),
+    createHash('sha256')
+      .update(Math.random().toString())
+      .digest('hex')
+      .slice(0, 12)
+  );
+  await mkdir(tmpDir);
+  const sourceDir = join(tmpDir, 'sources');
+  await mkdir(sourceDir);
+
   let {
     sourceName = 'source.js',
+    sourcePath = join(sourceDir, sourceName),
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
+    witWorld,
     worldName,
     disableFeatures = [],
     enableFeatures = [],
     debugBuild = false,
     runtimeArgs,
+    debugBindings = false,
+    enableWizerLogging = false,
     aotCache = fileURLToPath(
       new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url)
     ),
@@ -65,24 +123,40 @@ export async function componentize(jsSource, witWorld, opts) {
       )
     );
 
-  await lexerInit;
-  let jsImports = [];
-  let jsExports = [];
-  try {
-    [jsImports, jsExports] = parse(jsSource);
-  } catch {
-    // ignore parser errors - will show up as engine parse errors shortly
+  let { wasm, jsBindings, exports, imports } = spliceBindings(
+    await readFile(engine),
+    witWorld,
+    maybeWindowsPath(witPath),
+    worldName,
+    false
+  );
+
+  const input = join(tmpDir, 'in.wasm');
+  const output = join(tmpDir, 'out.wasm');
+
+  await writeFile(input, Buffer.from(wasm));
+  await writeFile(join(sourceDir, "initializer.js"), jsBindings);
+
+  if (debugBindings) {
+    console.log('--- JS Bindings ---');
+    console.log(
+      jsBindings
+        .split('\n')
+        .map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`)
+        .join('\n')
+    );
+    console.log('--- JS Imports ---');
+    console.log(imports);
+    console.log('--- JS Exports ---');
+    console.log(exports);
   }
 
-  let guestImports = [];
-  jsImports.map(({ t, n }) => {
-    if (typeof n === 'string' && (t === 1 || t === 2)) guestImports.push(n);
-  });
-
-  let guestExports = [];
-  jsExports.map((k) => {
-    if (k.n) guestExports.push(k.n);
-  });
+  if (!useOriginalSourceFile) {
+    if (debugBindings) {
+      console.log(`> Writing JS source to ${tmpDir}/sources`);
+    }
+    await writeFile(sourcePath, jsSource);
+  }
 
   // we never disable a feature that is already in the target world usage
   const features = [];
@@ -99,97 +173,6 @@ export async function componentize(jsSource, witWorld, opts) {
     features.push('http');
   }
 
-  let { wasm, jsBindings, importWrappers, exports, imports } = spliceBindings(
-    sourceName,
-    await readFile(engine),
-    witWorld,
-    maybeWindowsPath(witPath),
-    worldName,
-    guestImports,
-    guestExports,
-    features,
-    false
-  );
-
-  if (DEBUG_BINDINGS) {
-    console.log('--- JS Source ---');
-    console.log(jsSource);
-    console.log('--- JS Bindings ---');
-    console.log(
-      jsBindings
-        .split('\n')
-        .map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`)
-        .join('\n')
-    );
-    console.log('--- JS Imports ---');
-    console.log(imports);
-    console.log(importWrappers);
-    console.log('--- JS Exports ---');
-    console.log(exports);
-  }
-
-  const tmpDir = join(
-    tmpdir(),
-    createHash('sha256')
-      .update(Math.random().toString())
-      .digest('hex')
-      .slice(0, 12)
-  );
-  await mkdir(tmpDir);
-
-  const input = join(tmpDir, 'in.wasm');
-  const output = join(tmpDir, 'out.wasm');
-
-  await writeFile(input, Buffer.from(wasm));
-
-  // rewrite the JS source import specifiers to reference import wrappers
-  let source = '',
-    curIdx = 0;
-  const importSpecifiers = new Set([...importWrappers.map(([impt]) => impt)]);
-  for (const jsImpt of jsImports) {
-    if (jsImpt.t !== 1 && jsImpt.t !== 2) continue;
-    if (!jsImpt.n) continue;
-    if (!importSpecifiers.has(jsImpt.n)) {
-      throw new Error(
-        `Import '${
-          jsImpt.n
-        }' is not defined by the WIT world. Available imports are: ${[
-          ...importSpecifiers,
-        ]
-          .map((impt) => `'${impt}'`)
-          .join(
-            ', '
-          )}.\nMake sure to use a bundler for JS dependencies such as esbuild or RollupJS.`
-      );
-    }
-    const specifier = jsSource.slice(jsImpt.s, jsImpt.e);
-    source += jsSource.slice(curIdx, jsImpt.s);
-    source += `./${specifier.replace(':', '__').replace('/', '$')}.js`;
-    curIdx = jsImpt.e;
-  }
-  source += jsSource.slice(curIdx);
-
-  // write the source files into the source dir
-  const sourceDir = join(tmpDir, 'sources');
-
-  if (DEBUG_BINDINGS) {
-    console.log(`> Writing sources to ${tmpDir}/sources`);
-  }
-
-  await mkdir(sourceDir);
-  await Promise.all(
-    [
-      [sourceName, source],
-      [sourceName.slice(0, -3) + '.bindings.js', jsBindings],
-      ...importWrappers.map(([sourceName, source]) => [
-        `./${sourceName.replace(':', '__').replace('/', '$')}.js`,
-        source,
-      ]),
-    ].map(async ([sourceName, source]) =>
-      writeFile(join(sourceDir, sourceName), source)
-    )
-  );
-
   let hostenv = {};
 
   if (opts.env) {
@@ -198,9 +181,8 @@ export async function componentize(jsSource, witWorld, opts) {
 
   const env = {
     ...hostenv,
-    DEBUG: DEBUG_CALLS ? '1' : '',
+    DEBUG: enableWizerLogging ? '1' : '',
     SOURCE_NAME: sourceName,
-    IMPORT_WRAPPER_CNT: Object.keys(importWrappers).length.toString(),
     EXPORT_CNT: exports.length.toString(),
     FEATURE_CLOCKS: features.includes('clocks') ? '1' : '',
   };
@@ -219,13 +201,18 @@ export async function componentize(jsSource, witWorld, opts) {
   }
   env['IMPORT_CNT'] = imports.length;
 
-  if (DEBUG_BINDINGS) {
+  if (debugBindings) {
     console.log('--- Wizer Env ---');
     console.log(env);
   }
 
-  let sourcePath = maybeWindowsPath(join(sourceDir, sourceName.slice(0, -3) + '.bindings.js'));
-  runtimeArgs = runtimeArgs ? `${runtimeArgs} ${sourcePath}` : sourcePath;
+  let initializerPath = maybeWindowsPath(join(sourceDir, 'initializer.js'));
+  sourcePath = maybeWindowsPath(sourcePath);
+  let args = `--initializer-script-path ${initializerPath} ${sourcePath}`;
+  runtimeArgs = runtimeArgs ? `${runtimeArgs} ${args}` : args;
+  let preopens = [`--dir ${maybeWindowsPath(sourceDir)}`, `--dir ${maybeWindowsPath(dirname(sourcePath))}`];
+
+  let wizerProcess;
 
   if (opts.enableAot) {
     // Determine the weval bin path, possibly using a pre-downloaded version
@@ -236,80 +223,63 @@ export async function componentize(jsSource, witWorld, opts) {
       wevalBin = await getWeval();
     }
 
-    try {
-      let wevalProcess = spawnSync(
-        wevalBin,
-        [
-          'weval',
-          `--cache-ro ${aotCache}`,
-          `--dir ${maybeWindowsPath(sourceDir)}`,
-          '-w',
-          '--init-func',
-          'componentize.wizer',
-          `-i ${input}`,
-          `-o ${output}`,
-        ],
-        {
-          stdio: [null, stdout, stderr],
-          env,
-          input: runtimeArgs,
-          shell: true,
-          encoding: 'utf-8',
-        }
-      );
-      if (wevalProcess.status !== 0)
-        throw new Error('Wevaling failed to complete');
-    } catch (error) {
-      let err =
-        `Failed to initialize the compiled Wasm binary with Weval:\n` +
-        error.message;
-      if (DEBUG_BINDINGS) {
-        err += `\nBinary and sources available for debugging at ${tmpDir}\n`;
-      } else {
-        rmSync(tmpDir, { recursive: true });
+    wizerProcess = spawnSync(
+      wevalBin,
+      [
+        'weval',
+        `--cache-ro ${aotCache}`,
+        ...preopens,
+        '-w',
+        '--init-func',
+        'componentize.wizer',
+        `-i ${input}`,
+        `-o ${output}`,
+      ],
+      {
+        stdio: [null, stdout, "pipe"],
+        env,
+        input: runtimeArgs,
+        shell: true,
+        encoding: 'utf-8',
       }
-      throw new Error(err);
-    }
+    );
   } else {
-    try {
-      let wizerProcess = spawnSync(
-        wizer,
-        [
-          '--allow-wasi',
-          '--init-func',
-          'componentize.wizer',
-          `--dir=${maybeWindowsPath(sourceDir)}`,
-          `--wasm-bulk-memory=true`,
-          '--inherit-env=true',
-          `-o=${output}`,
-          input,
-        ],
-        {
-          stdio: [null, stdout, stderr],
-          env,
-          input: runtimeArgs,
-          shell: true,
-          encoding: 'utf-8',
-        }
-      );
-      if (wizerProcess.status !== 0)
-        throw new Error('Wizering failed to complete');
-    } catch (error) {
-      let err =
-        `Failed to initialize the compiled Wasm binary with Wizer:\n` +
-        error.message;
-      if (DEBUG_BINDINGS) {
-        err += `\nBinary and sources available for debugging at ${tmpDir}\n`;
-      } else {
-        rmSync(tmpDir, { recursive: true });
+    wizerProcess = spawnSync(
+      wizer,
+      [
+        '--allow-wasi',
+        '--init-func',
+        'componentize.wizer',
+        ...preopens,
+        `--wasm-bulk-memory=true`,
+        '--inherit-env=true',
+        `-o=${output}`,
+        input,
+      ],
+      {
+        stdio: [null, stdout, "pipe"],
+        env,
+        input: runtimeArgs,
+        shell: true,
+        encoding: 'utf-8',
       }
-      throw new Error(err);
+    );
+  }
+
+  if (wizerProcess.status !== 0) {
+    let wizerErr = parseWizerStderr(wizerProcess.stderr);
+    let err = `Failed to initialize component:\n${wizerErr}`;
+    if (debugBindings) {
+      err += `\n\nBinary and sources available for debugging at ${tmpDir}\n`;
+    } else {
+      rmSync(tmpDir, { recursive: true });
     }
+    throw new Error(err);
   }
 
   const bin = await readFile(output);
 
-  const tmpdirRemovePromise = DEBUG_BINDINGS
+  const tmpdirRemovePromise = debugBindings
     ? Promise.resolve()
     : rm(tmpDir, { recursive: true });
 
@@ -370,14 +340,9 @@ export async function componentize(jsSource, witWorld, opts) {
     };
   }
 
-  // convert CABI import conventiosn to ESM import conventions
-  imports = imports.map(([specifier, impt]) =>
-    specifier === '$root' ? [impt, 'default'] : [specifier, impt]
-  );
-
   const INIT_OK = 0;
-  const INIT_FN_LIST = 11;
-  const INIT_TYPE_PARSE = 17;
+  const INIT_FN_LIST = 1;
+  const INIT_TYPE_PARSE = 2;
 
   const status = check_init();
   let err = null;
@@ -391,19 +356,19 @@ export async function componentize(jsSource, witWorld, opts) {
       err = `Unable to parse the core ABI export types`;
       break;
     default:
-      err = `Unknown error - ${status}`;
+      err = `Unknown error during initialization: ${status}`;
   }
 
   if (err) {
-    console.error(err);
+    let msg = err;
     const stderr = getStderr();
     if (stderr) {
-      console.error(stderr);
+      msg += `\n${stripLinesPrefixes(stderr, [new RegExp(`${initializerPath}[:\\d]* ?`)], tmpDir)}`;
     }
-    exit(1);
+    throw new Error(msg);
   }
 
-  // after wizering, stub out the wasi imports depending on what features are enabled
+  // after wizening, stub out the wasi imports depending on what features are enabled
   const finalBin = stubWasi(
     bin,
     features,
@@ -412,7 +377,7 @@ export async function componentize(jsSource, witWorld, opts) {
     worldName
   );
 
-  if (DEBUG_BINARY) {
+  if (debugBindings) {
     await writeFile('binary.wasm', finalBin);
   }
 
@@ -428,6 +393,11 @@ export async function componentize(jsSource, witWorld, opts) {
       language: [['JavaScript', '']],
       'processed-by': [['ComponentizeJS', version]],
     })
+  );
+
+  // convert CABI import conventions to ESM import conventions
+  imports = imports.map(([specifier, impt]) =>
+    specifier === '$root' ? [impt, 'default'] : [specifier, impt]
   );
 
   return {

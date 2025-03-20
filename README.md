@@ -136,13 +136,27 @@ This asynchrony is only supported for exported functions - imported functions ca
 
 ### CLI
 
-ComponentizeJS can be used as a CLI from `jco`:
+ComponentizeJS can be used as a CLI directly, or via the `jco componentize` command:
 
+#### Direct use
+```
+npm install -g @bytecodealliance/componentize-js
+```
+
+Example:
+
+```sh
+componentize-js --wit wit -o component.wasm source.js
+```
+
+See `jco componentize --help` for more details.
+
+#### Use via `jco componentize`
 ```
 npm install -g @bytecodealliance/jco @bytecodealliance/componentize-js
 ```
 
-For example:
+Example:
 
 ```sh
 jco componentize source.js --wit wit -o component.wasm
@@ -169,17 +183,17 @@ Note that features explicitly imported by the target world cannot be disabled - 
 
 ## Using StarlingMonkey's `fetch-event`
 
-The StarlingMonkey engine provides the ability to use `fetchEvent` to handle calls to `wasi:http/incoming-handler@0.2.0#handle`. When targeting worlds that export `wasi:http/incoming-handler@0.2.0` the fetch event will automatically be attached. Alternatively, to override the fetch event with a custom handler, export an explict `incomingHandler` or `'wasi:http/incoming-handler@0.2.0'` object. Using the `fetchEvent` requires enabling the `http` feature.
+The StarlingMonkey engine provides the ability to use `fetchEvent` to handle calls to `wasi:http/incoming-handler@0.2.0#handle`. When targeting worlds that export `wasi:http/incoming-handler@0.2.0` the fetch event will automatically be attached. Alternatively, to override the fetch event with a custom handler, export an explicit `incomingHandler` or `'wasi:http/incoming-handler@0.2.0'` object. Using the `fetchEvent` requires enabling the `http` feature.
 
 ## API
 
 ```ts
-export function componentize(jsSource: string, opts: {
+export function componentize(opts: {
+  sourcePath: string,
   witPath: string,
   worldName: string,
   debug?: bool,
   debugBuild?: bool,
-  sourceName?: string,
   engine?: string,
   preview2Adapter?: string,
   disableFeatures?: ('stdio' | 'random' | 'clocks' | 'http')[],
@@ -188,9 +202,6 @@ export function componentize(jsSource: string, opts: {
   imports: string[]
 }
 ```
-
-`http` provides support for the host APIs used by the `fetch` method and is disabled by default,
-while this API is still being developed. Contributions very welcome to improve `fetch` support.
 
 Converts a JS source into a component binary.
 

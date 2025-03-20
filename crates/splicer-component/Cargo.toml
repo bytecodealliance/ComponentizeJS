@@ -1,0 +1,11 @@
+[package]
+name = "splicer-component"
+description = "WebAssembly Component embedding of the splicer"
+edition.workspace = true
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+spidermonkey-embedding-splicer = { path = "../spidermonkey-embedding-splicer" }

@@ -137,8 +137,7 @@ cabi_realloc(void *ptr, size_t orig_size, size_t org_align, size_t new_size) {
   // track all allocations during a function "call" for freeing
   Runtime.free_list.push_back(ret);
   if (!ret) {
-    LOG("(cabi_realloc) Unable to realloc");
-    abort();
+    Runtime.engine->abort("(cabi_realloc) Unable to realloc");
   }
   LOG("(cabi_realloc) [%d %zu %zu] %d\n", (uint32_t)ptr, orig_size, new_size,
       (uint32_t)ret);
@@ -156,9 +155,7 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
     }
   }
   if (Runtime.cur_fn_idx != -1) {
-    LOG("(call) unexpected call state, post_call was not called after last "
-        "call");
-    abort();
+    Runtime.engine->abort("(call) unexpected call state, post_call was not called after last call");
   }
   Runtime.cur_fn_idx = fn_idx;
   ComponentizeRuntime::CoreFn *fn = &Runtime.fns[fn_idx];
@@ -192,8 +189,7 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
 
   JS::RootedVector<JS::Value> args(Runtime.cx);
   if (!args.resize(fn->args.size() + (fn->retptr ? 1 : 0))) {
-    LOG("(call) unable to allocate memory for array resize");
-    abort();
+    Runtime.engine->abort("(call) unable to allocate memory for array resize");
   }
 
   LOG("(call) setting args");
@@ -249,8 +245,7 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
   if (!promise) {
     // caught Result<> errors won't bubble here, so these are just critical
     // errors (same for promise rejections)
-    LOG("(call) unable to obtain call promise");
-    abort();
+    Runtime.engine->abort("(call) unable to obtain call promise");
   }
 
   RootedObject empty_receiver(Runtime.cx, JS_NewPlainObject(Runtime.cx));
@@ -261,8 +256,7 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
       Runtime.cx,
       create_internal_method<call_catch_handler>(Runtime.cx, empty_receiver));
   if (!call_then_handler_obj || !call_catch_handler_obj) {
-    LOG("(call) unable to obtain call promise");
-    abort();
+    Runtime.engine->abort("(call) unable to obtain call promise");
   }
 
   LOG("(call) adding promise reactions");
@@ -275,8 +269,7 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
 
   LOG("(call) driving event loop to promise completion");
   if (!Runtime.engine->run_event_loop()) {
-    LOG("(call) event loop error");
-    abort();
+    Runtime.engine->abort("(call) event loop error");
   }
 
   LOG("(call) retrieving promise result");
@@ -364,15 +357,31 @@ componentize_initialize() {
   __wizer_initialize();
   char env_name[100];
   LOG("(wizer) retrieve and generate the export bindings");
-  RootedObject ns(Runtime.cx, &Runtime.engine->script_value().toObject());
+  RootedValue nsVal(Runtime.cx, Runtime.engine->script_value());
+  RootedObject ns(Runtime.cx, &nsVal.toObject());
+  RootedObject initializer_global(Runtime.cx, Runtime.engine->init_script_global());
+  if (!JS_SetProperty(Runtime.cx, initializer_global, "$source_mod", nsVal)) {
+    Runtime.init_err = ComponentizeRuntime::InitError::FnList;
+    return;
+  }
+  RootedString source_name(Runtime.cx, JS_NewStringCopyZ(Runtime.cx, Runtime.source_name.c_str()));
+  MOZ_RELEASE_ASSERT(source_name);
+  RootedValue source_name_val(Runtime.cx, StringValue(source_name));
+  HandleValueArray args(source_name_val);
+  RootedValue rval(Runtime.cx);
+  if (!JS_CallFunctionName(Runtime.cx, initializer_global, "bindExports", args, &rval)) {
+    Runtime.init_err = ComponentizeRuntime::InitError::FnList;
+    return;
+  }
 
   uint32_t export_cnt = atoi(getenv("EXPORT_CNT"));
   for (size_t i = 0; i < export_cnt; i++) {
     ComponentizeRuntime::CoreFn *fn = &Runtime.fns.emplace_back();
 
     sprintf(&env_name[0], "EXPORT%zu_NAME", i);
+    LOG("(wizer) export binding for %s", getenv(env_name));
     RootedValue function_binding(Runtime.cx);
-    if (!JS_GetProperty(Runtime.cx, ns, getenv(env_name), &function_binding)) {
+    if (!JS_GetProperty(Runtime.cx, initializer_global, getenv(env_name), &function_binding)) {
       Runtime.init_err = ComponentizeRuntime::InitError::FnList;
       return;
     }
@@ -558,7 +567,7 @@ bool install(api::Engine *engine) {
   }
 
   LOG("(wizer) setting the binding global");
-  if (!JS_DefineProperty(engine->cx(), engine->global(), "$bindings",
+  if (!JS_DefineProperty(engine->cx(), engine->init_script_global(), "$bindings",
                          import_bindings, 0)) {
     return false;
   }
