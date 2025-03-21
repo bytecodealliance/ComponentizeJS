@@ -215,9 +215,15 @@ export async function componentize(opts,
   // component to be relative to the current working directory.
   // This only works in wizer, not in weval, because the latter doesn't
   // support --mapdir.
-  if (!opts.enableAot && workspacePrefix.startsWith(cwd())) {
-    workspacePrefix = cwd();
-    sourcePath = sourcePath.slice(workspacePrefix.length + 1);
+  if (!opts.enableAot) {
+    if (!useOriginalSourceFile) {
+      workspacePrefix = sourceDir;
+      sourcePath = sourceName;
+    }
+    if (workspacePrefix.startsWith(cwd())) {
+      workspacePrefix = cwd();
+      sourcePath = sourcePath.slice(workspacePrefix.length + 1);
+    }
   }
   let args = `--initializer-script-path ${initializerPath} ${sourcePath}`;
   runtimeArgs = runtimeArgs ? `${runtimeArgs} ${args}` : args;
