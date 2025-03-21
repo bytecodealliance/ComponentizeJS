@@ -1,3 +1,15 @@
+import { TextDecoder } from 'node:util';
+import { Buffer } from 'node:buffer';
+import { fileURLToPath } from 'node:url';
+import { cwd, stdout, platform } from 'node:process';
+import { freemem } from 'node:os';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { resolve, join, dirname } from 'node:path';
+import { readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
+import { rmSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+
 import wizer from '@bytecodealliance/wizer';
 import getWeval from '@bytecodealliance/weval';
 import {
@@ -5,60 +17,66 @@ import {
   metadataAdd,
   preview1AdapterReactorPath,
 } from '@bytecodealliance/jco';
-import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { resolve, join, dirname } from 'node:path';
-import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
-import { rmSync, existsSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+
 import {
   spliceBindings,
   stubWasi,
 } from '../lib/spidermonkey-embedding-splicer.js';
-import { fileURLToPath } from 'node:url';
-import { cwd, stdout, platform } from 'node:process';
+
 export const { version } = JSON.parse(
-  await readFile(new URL('../package.json', import.meta.url), 'utf8')
+  await readFile(new URL('../package.json', import.meta.url), 'utf8'),
 );
-const isWindows = platform === 'win32';
 
-function maybeWindowsPath(path) {
-  if (!path) return path;
-  if (!isWindows) return resolve(path);
-  return '//?/' + resolve(path).replace(/\\/g, '/');
-}
+/** Whether the current platform is windows */
+const IS_WINDOWS = platform === 'win32';
 
-/**
- * Clean up the given input string by removing the given patterns if
- * found as line prefixes.
- */
-function stripLinesPrefixes(input, prefixPatterns) {
-  return input.split('\n')
-    .map(line => prefixPatterns.reduce((line, n) => line.replace(n, ''), line))
-    .join('\n').trim();
-}
-
-const WizerErrorCause = `Error: the \`componentize.wizer\` function trapped
+/** Prefix into wizer error output that indicates a error/trap */
+const WIZER_ERROR_CAUSE_PREFIX = `Error: the \`componentize.wizer\` function trapped
 
 Caused by:`;
 
-const WizerExitCode = "Exited with i32 exit status";
+/** Prefix into wizer error output that indicates exit status */
+const WIZER_EXIT_CODE_PREFIX = 'Exited with i32 exit status';
 
-function parseWizerStderr(stderr) {
-  let output = `${stderr}`;
-  let causeStart = output.indexOf(WizerErrorCause);
-  let exitCodeStart = output.indexOf(WizerExitCode);
-  if (causeStart === -1 || exitCodeStart === -1) {
-    return output;
-  }
+/** Response code from check_init() that denotes success */
+const CHECK_INIT_RETURN_OK = 0;
 
-  let causeEnd = output.indexOf('\n', exitCodeStart + 1);
-  return `${output.substring(0, causeStart)}${output.substring(causeEnd)}`.trim();
-}
+/** Response code from check_init() that denotes being unable to extract exports list */
+const CHECK_INIT_RETURN_FN_LIST = 1;
 
-export async function componentize(opts,
-                                   _deprecatedWitWorldOrOpts = undefined,
-                                   _deprecatedOpts = undefined) {
+/** Response code from check_init() that denotes being unable to parse core ABI export types */
+const CHECK_INIT_RETURN_TYPE_PARSE = 2;
+
+/** Default path to the AOT weval cache */
+const DEFAULT_AOT_CACHE = fileURLToPath(
+  new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url),
+);
+
+/** Default settings for debug options */
+const DEFAULT_DEBUG_SETTINGS = {
+  bindings: false,
+  bindingsDir: null,
+
+  binary: false,
+  binaryPath: null,
+
+  wizerLogging: false,
+};
+
+/**
+ * Create a WebAssembly component from the given JS source code
+ *
+ * @param {string} jsSource - Javascript source code
+ * @param {string} [witWorld] - WIT world that should be targeted
+ * @param {object} [opts] - Options for creating the component
+ * @param {object} [opts.debugBuild] - Whether to use a debug build of StarlingMonkey
+ * @param {object} [opts.debug] - Options for debugging
+ */
+export async function componentize(
+  opts,
+  _deprecatedWitWorldOrOpts = undefined,
+  _deprecatedOpts = undefined,
+) {
   let useOriginalSourceFile = true;
   let jsSource;
 
@@ -74,91 +92,92 @@ export async function componentize(opts,
     } else {
       if (typeof _deprecatedWitWorldOrOpts !== 'object') {
         throw new Error(
-          `componentize: second argument must be an object or a string, but is ${typeof _deprecatedWitWorldOrOpts}`
+          `componentize: second argument must be an object or a string, but is ${typeof _deprecatedWitWorldOrOpts}`,
         );
       }
       opts = _deprecatedWitWorldOrOpts;
     }
   }
 
-  const tmpDir = join(
-    tmpdir(),
-    createHash('sha256')
-      .update(Math.random().toString())
-      .digest('hex')
-      .slice(0, 12)
-  );
-  await mkdir(tmpDir);
-  const sourceDir = join(tmpDir, 'sources');
-  await mkdir(sourceDir);
+  // Prepare a working diretory for use during componentization
+  const { sourcesDir, baseDir: workDir } = await prepWorkDir();
 
   let {
     sourceName = 'source.js',
-    sourcePath = join(sourceDir, sourceName),
+    sourcePath = join(sourcesDir, sourceName),
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
     witWorld,
     worldName,
     disableFeatures = [],
     enableFeatures = [],
-    debugBuild = false,
+    debug = { ...DEFAULT_DEBUG_SETTINGS },
     runtimeArgs,
-    debugBindings = false,
-    enableWizerLogging = false,
-    aotCache = fileURLToPath(
-      new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url)
-    ),
+    aotCache = DEFAULT_AOT_CACHE,
   } = opts;
 
-  const engine =
-    opts.engine ||
-    fileURLToPath(
-      new URL(
-        opts.enableAot
-          ? `../lib/starlingmonkey_embedding_weval.wasm`
-          : `../lib/starlingmonkey_embedding${
-              debugBuild ? '.debug' : ''
-            }.wasm`,
-        import.meta.url
-      )
-    );
+  // Determine the path to the StarlingMonkey binary
+  const engine = getEnginePath(opts);
 
   let { wasm, jsBindings, exports, imports } = spliceBindings(
     await readFile(engine),
     witWorld,
     maybeWindowsPath(witPath),
     worldName,
-    false
+    false,
   );
 
-  const input = join(tmpDir, 'in.wasm');
-  const output = join(tmpDir, 'out.wasm');
+  const inputWasmPath = join(workDir, 'in.wasm');
+  const outputWasmPath = join(workDir, 'out.wasm');
 
-  await writeFile(input, Buffer.from(wasm));
-  await writeFile(join(sourceDir, "initializer.js"), jsBindings);
+  await writeFile(inputWasmPath, Buffer.from(wasm));
+  await writeFile(join(sourcesDir, 'initializer.js'), jsBindings);
 
-  if (debugBindings) {
-    console.log('--- JS Bindings ---');
-    console.log(
-      jsBindings
-        .split('\n')
-        .map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`)
-        .join('\n')
-    );
-    console.log('--- JS Imports ---');
-    console.log(imports);
-    console.log('--- JS Exports ---');
-    console.log(exports);
+  if (debug?.bindings) {
+    if (debug?.bindingsDir) {
+      console.error('--- JS Bindings ---');
+      console.error(
+        jsBindings
+          .split('\n')
+          .map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`)
+          .join('\n'),
+      );
+      console.error('--- JS Imports ---');
+      console.error(imports);
+      console.error('--- JS Exports ---');
+      console.error(exports);
+    } else {
+      console.error(`outputting debug files to [${debug?.bindingsDir}]...\n`);
+      // Ensure the debug bindings dir exists, and is a directory
+      if (!(await stat(debug?.bindingsDir).then((s) => s.isDirectory()))) {
+        throw new Error(
+          `Missing/invalid debug bindings directory [${debug?.bindingsDir}]`,
+        );
+      }
+      // Write debug to bindings debug directory
+      await Promise.all([
+        writeFile(join(debug?.bindingsDir, 'source.debug.js'), jsSource),
+        writeFile(join(debug?.bindingsDir, 'bindings.debug.js'), jsBindings),
+        writeFile(
+          join(debug?.bindingsDir, 'imports.debug.json'),
+          JSON.stringify(imports, null, 2),
+        ),
+        writeFile(
+          join(debug?.bindingsDir, 'exports.debug.json'),
+          JSON.stringify(exports, null, 2),
+        ),
+      ]);
+    }
   }
 
   if (!useOriginalSourceFile) {
-    if (debugBindings) {
-      console.log(`> Writing JS source to ${tmpDir}/sources`);
+    if (debug?.bindings) {
+      console.error(`> Writing JS source to ${workDir}/sources`);
     }
     await writeFile(sourcePath, jsSource);
   }
 
-  // we never disable a feature that is already in the target world usage
+  // We never disable a feature that is already in the target world usage
   const features = [];
   if (!disableFeatures.includes('stdio')) {
     features.push('stdio');
@@ -181,7 +200,7 @@ export async function componentize(opts,
 
   const env = {
     ...hostenv,
-    DEBUG: enableWizerLogging ? '1' : '',
+    DEBUG: debug?.enableWizerLogging ? '1' : '',
     SOURCE_NAME: sourceName,
     EXPORT_CNT: exports.length.toString(),
     FEATURE_CLOCKS: features.includes('clocks') ? '1' : '',
@@ -201,12 +220,12 @@ export async function componentize(opts,
   }
   env['IMPORT_CNT'] = imports.length;
 
-  if (debugBindings) {
+  if (debug?.bindings) {
     console.log('--- Wizer Env ---');
     console.log(env);
   }
 
-  let initializerPath = join(sourceDir, 'initializer.js');
+  let initializerPath = join(sourcesDir, 'initializer.js');
   sourcePath = maybeWindowsPath(sourcePath);
   let workspacePrefix = dirname(sourcePath);
 
@@ -221,7 +240,7 @@ export async function componentize(opts,
   }
   let args = `--initializer-script-path ${initializerPath} ${sourcePath}`;
   runtimeArgs = runtimeArgs ? `${runtimeArgs} ${args}` : args;
-  let preopens = [`--dir ${sourceDir}`];
+  let preopens = [`--dir ${sourcesDir}`];
   if (opts.enableAot) {
     preopens.push(`--dir ${workspacePrefix}`);
   } else {
@@ -248,16 +267,16 @@ export async function componentize(opts,
         '-w',
         '--init-func',
         'componentize.wizer',
-        `-i ${input}`,
-        `-o ${output}`,
+        `-i ${inputWasmPath}`,
+        `-o ${outputWasmPath}`,
       ],
       {
-        stdio: [null, stdout, "pipe"],
+        stdio: [null, stdout, 'pipe'],
         env,
         input: runtimeArgs,
         shell: true,
         encoding: 'utf-8',
-      }
+      },
     );
   } else {
     wizerProcess = spawnSync(
@@ -269,106 +288,274 @@ export async function componentize(opts,
         ...preopens,
         `--wasm-bulk-memory=true`,
         '--inherit-env=true',
-        `-o=${output}`,
-        input,
+        `-o=${outputWasmPath}`,
+        inputWasmPath,
       ],
       {
-        stdio: [null, stdout, "pipe"],
+        stdio: [null, stdout, 'pipe'],
         env,
         input: runtimeArgs,
         shell: true,
         encoding: 'utf-8',
-      }
+      },
     );
   }
 
+  // If the wizer (or weval) process failed, parse the output and display to the user
   if (wizerProcess.status !== 0) {
     let wizerErr = parseWizerStderr(wizerProcess.stderr);
     let err = `Failed to initialize component:\n${wizerErr}`;
-    if (debugBindings) {
-      err += `\n\nBinary and sources available for debugging at ${tmpDir}\n`;
+    if (debug?.bindings) {
+      err += `\n\nBinary and sources available for debugging at ${workDir}\n`;
     } else {
-      rmSync(tmpDir, { recursive: true });
+      rmSync(workDir, { recursive: true });
     }
     throw new Error(err);
   }
 
-  const bin = await readFile(output);
+  // Read the generated WASM back into memory
+  const bin = await readFile(outputWasmPath);
 
-  const tmpdirRemovePromise = debugBindings
-    ? Promise.resolve()
-    : rm(tmpDir, { recursive: true });
-
-  // Check for initialization errors
-  // By actually executing the binary in a mini sandbox to get back
-  // the initialization state
+  // Check for initialization errors, by actually executing the binary in
+  // a mini sandbox to get back the initialization state
   const {
     exports: { check_init },
     getStderr,
   } = await initWasm(bin);
 
-  await tmpdirRemovePromise;
-
-  async function initWasm(bin) {
-    const eep = (name) => () => {
-      throw new Error(
-        `Internal error: unexpected call to "${name}" during Wasm verification`
-      );
-    };
-
-    let stderr = '';
-    const wasmModule = await WebAssembly.compile(bin);
-
-    const mockImports = {
-      // "wasi-logging2": {
-      //   log: eep("log"),
-      // },
-      wasi_snapshot_preview1: {
-        fd_write: function (fd, iovs, iovs_len, nwritten) {
-          if (fd !== 2) return 0;
-          const mem = new DataView(exports.memory.buffer);
-          let written = 0;
-          for (let i = 0; i < iovs_len; i++) {
-            const bufPtr = mem.getUint32(iovs + i * 8, true);
-            const bufLen = mem.getUint32(iovs + 4 + i * 8, true);
-            stderr += new TextDecoder().decode(
-              new Uint8Array(exports.memory.buffer, bufPtr, bufLen)
-            );
-            written += bufLen;
-          }
-          mem.setUint32(nwritten, written, true);
-          return 1;
-        },
-      },
-    };
-
-    for (const { module, name } of WebAssembly.Module.imports(wasmModule)) {
-      mockImports[module] = mockImports[module] || {};
-      if (!mockImports[module][name]) mockImports[module][name] = eep(name);
-    }
-
-    const { exports } = await WebAssembly.instantiate(wasmModule, mockImports);
-    return {
-      exports,
-      getStderr() {
-        return stderr;
-      },
-    };
+  // If not in debug mode, clean up
+  if (!debug?.bindings) {
+    await rm(workDir, { recursive: true });
   }
 
-  const INIT_OK = 0;
-  const INIT_FN_LIST = 1;
-  const INIT_TYPE_PARSE = 2;
+  /// Process output of check init, throwing if necessary
+  handleCheckInitOutput(check_init(), initializerPath, workDir, getStderr);
 
-  const status = check_init();
+  // After wizening, stub out the wasi imports depending on what features are enabled
+  const finalBin = stubWasi(
+    bin,
+    features,
+    witWorld,
+    maybeWindowsPath(witPath),
+    worldName,
+  );
+
+  if (debug?.bindings) {
+    await writeFile('binary.wasm', finalBin);
+  }
+
+  // Add component metadata
+  const component = await metadataAdd(
+    await componentNew(
+      finalBin,
+      Object.entries({
+        wasi_snapshot_preview1: await readFile(preview2Adapter),
+      }),
+      false,
+    ),
+    Object.entries({
+      language: [['JavaScript', '']],
+      'processed-by': [['ComponentizeJS', version]],
+    }),
+  );
+
+  // Convert CABI import conventions to ESM import conventions
+  imports = imports.map(([specifier, impt]) =>
+    specifier === '$root' ? [impt, 'default'] : [specifier, impt],
+  );
+
+  // Build debug object to return
+  let debugOutput;
+  if (debug?.bindings) {
+    debugOutput.bindings = debug.bindings;
+    debugOutput.workDir = workDir;
+  }
+  if (debug?.binary) {
+    debugOutput.binary = debug.binary;
+    debugOutput.binaryPath = debug.binaryPath;
+  }
+
+  return {
+    component,
+    imports,
+    debug: debugOutput,
+  };
+}
+
+/**
+ * Calculate the min stack size depending on free memory
+ *
+ * @param {number} freeMemoryBytes - Amount of free memory in the system, in bytes  (if not provided, os.freemem() is used)
+ * @returns {number} The minimum stack size that should be used as a default.
+ */
+function defaultMinStackSize(freeMemoryBytes) {
+  freeMemoryBytes = freeMemoryBytes ?? freemem();
+  return Math.max(8 * 1024 * 1024, Math.floor(freeMemoryBytes * 0.1));
+}
+
+/** Determine the correct path for the engine */
+function getEnginePath(opts) {
+  if (opts.engine) {
+    return opts.engine;
+  }
+  const debugSuffix = opts?.debugBuild ? '.debug' : '';
+  let engineBinaryRelPath = `../lib/starlingmonkey_embedding${debugSuffix}.wasm`;
+  if (opts.enableAot) {
+    engineBinaryRelPath = '../lib/starlingmonkey_embedding_weval.wasm';
+  }
+  return fileURLToPath(new URL(engineBinaryRelPath, import.meta.url));
+}
+
+/**
+ * Parse output of post-processing step (whether Wizer or Weval)
+ *
+ * @param {Stream} stderr
+ * @returns {string} String that can be printed to describe error output
+ */
+function parseWizerStderr(stderr) {
+  let output = `${stderr}`;
+  let causeStart = output.indexOf(WIZER_ERROR_CAUSE_PREFIX);
+  let exitCodeStart = output.indexOf(WIZER_EXIT_CODE_PREFIX);
+  if (causeStart === -1 || exitCodeStart === -1) {
+    return output;
+  }
+
+  let causeEnd = output.indexOf('\n', exitCodeStart + 1);
+  return `${output.substring(0, causeStart)}${output.substring(causeEnd)}`.trim();
+}
+
+/**
+ * Check whether a value is numeric (including BigInt)
+ *
+ * @param {any} n
+ * @returns {boolean} whether the value is numeric
+ */
+function isNumeric(n) {
+  switch (typeof n) {
+    case 'bigint':
+    case 'number':
+      return true;
+    case 'object':
+      return n.constructor == BigInt || n.constructor == Number;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Convert a given path to one that also works on windows
+ *
+ * @param {string} path - A path that may or may not be windows-compatible
+ * @returns {string} The Windows-compatible (if necessary) path
+ */
+function maybeWindowsPath(path) {
+  if (!path) return path;
+  if (!IS_WINDOWS) return resolve(path);
+  return '//?/' + resolve(path).replace(/\\/g, '/');
+}
+
+/**
+ * Clean up the given input string by removing the given patterns if
+ * found as line prefixes.
+ *
+ * @param {string} input
+ * @param {string[]} prefixPatterns - line prefix patterns to remove
+ */
+function stripLinesPrefixes(input, prefixPatterns) {
+  return input
+    .split('\n')
+    .map((line) =>
+      prefixPatterns.reduce((line, n) => line.replace(n, ''), line),
+    )
+    .join('\n')
+    .trim();
+}
+
+/** Prepare a work directory for use with componentization */
+async function prepWorkDir() {
+  const baseDir = join(
+    tmpdir(),
+    createHash('sha256')
+      .update(Math.random().toString())
+      .digest('hex')
+      .slice(0, 12),
+  );
+  await mkdir(baseDir);
+  const sourcesDir = join(baseDir, 'sources');
+  await mkdir(sourcesDir);
+  return { baseDir, sourcesDir };
+}
+
+/**
+ * Initialize a WebAssembly binary, given the
+ *
+ * @param {Buffer} bin - WebAssembly binary bytes
+ * @throws If a binary is invalid
+ */
+async function initWasm(bin) {
+  const eep = (name) => () => {
+    throw new Error(
+      `Internal error: unexpected call to "${name}" during Wasm verification`,
+    );
+  };
+
+  let stderr = '';
+  const wasmModule = await WebAssembly.compile(bin);
+
+  const mockImports = {
+    // "wasi-logging2": {
+    //   log: eep("log"),
+    // },
+    wasi_snapshot_preview1: {
+      fd_write: function (fd, iovs, iovs_len, nwritten) {
+        if (fd !== 2) return 0;
+        const mem = new DataView(exports.memory.buffer);
+        let written = 0;
+        for (let i = 0; i < iovs_len; i++) {
+          const bufPtr = mem.getUint32(iovs + i * 8, true);
+          const bufLen = mem.getUint32(iovs + 4 + i * 8, true);
+          stderr += new TextDecoder().decode(
+            new Uint8Array(exports.memory.buffer, bufPtr, bufLen),
+          );
+          written += bufLen;
+        }
+        mem.setUint32(nwritten, written, true);
+        return 1;
+      },
+    },
+  };
+
+  for (const { module, name } of WebAssembly.Module.imports(wasmModule)) {
+    mockImports[module] = mockImports[module] || {};
+    if (!mockImports[module][name]) mockImports[module][name] = eep(name);
+  }
+
+  const { exports } = await WebAssembly.instantiate(wasmModule, mockImports);
+  return {
+    exports,
+    getStderr() {
+      return stderr;
+    },
+  };
+}
+
+/**
+ * Handle the output of `check_init()`
+ *
+ * @param {number} status - output of check_init
+ * @param {string} initializerPath
+ * @param {string} workDir
+ * @param {() => string} getStderr - A function that resolves to the stderr output of check init
+ */
+function handleCheckInitOutput(status, initializerPath, workDir, getStderr) {
   let err = null;
   switch (status) {
-    case INIT_OK:
+    case CHECK_INIT_RETURN_OK:
       break;
-    case INIT_FN_LIST:
+    case CHECK_INIT_RETURN_FN_LIST:
       err = `Unable to extract expected exports list`;
       break;
-    case INIT_TYPE_PARSE:
+    case CHECK_INIT_RETURN_TYPE_PARSE:
       err = `Unable to parse the core ABI export types`;
       break;
     default:
@@ -379,45 +566,8 @@ export async function componentize(opts,
     let msg = err;
     const stderr = getStderr();
     if (stderr) {
-      msg += `\n${stripLinesPrefixes(stderr, [new RegExp(`${initializerPath}[:\\d]* ?`)], tmpDir)}`;
+      msg += `\n${stripLinesPrefixes(stderr, [new RegExp(`${initializerPath}[:\\d]* ?`)], workDir)}`;
     }
     throw new Error(msg);
   }
-
-  // after wizening, stub out the wasi imports depending on what features are enabled
-  const finalBin = stubWasi(
-    bin,
-    features,
-    witWorld,
-    maybeWindowsPath(witPath),
-    worldName
-  );
-
-  if (debugBindings) {
-    await writeFile('binary.wasm', finalBin);
-  }
-
-  const component = await metadataAdd(
-    await componentNew(
-      finalBin,
-      Object.entries({
-        wasi_snapshot_preview1: await readFile(preview2Adapter),
-      }),
-      false
-    ),
-    Object.entries({
-      language: [['JavaScript', '']],
-      'processed-by': [['ComponentizeJS', version]],
-    })
-  );
-
-  // convert CABI import conventions to ESM import conventions
-  imports = imports.map(([specifier, impt]) =>
-    specifier === '$root' ? [impt, 'default'] : [specifier, impt]
-  );
-
-  return {
-    component,
-    imports,
-  };
 }
