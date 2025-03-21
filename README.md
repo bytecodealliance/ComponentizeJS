@@ -111,6 +111,12 @@ The component iself can be executed in any component runtime, see the [example](
 
 To enable AOT compilation, set the `enableAot: true` option to run [Weval][weval] ahead-of-time compilation.
 
+AOT compilation can also be configured with the following options:
+
+| Option                 | Type                                | Example         | Description                                                              |
+|------------------------|-------------------------------------|-----------------|--------------------------------------------------------------------------|
+| `aotMinStackSizeBytes` | `nubmer | Number | bigint | BigInt` | `2_007_846_092` | The minimum stack size (via `RUST_MIN_STACK` to set when running `weval` |
+
 [weval]: https://github.com/bytecodealliance/weval
 
 ### Custom `weval` binary

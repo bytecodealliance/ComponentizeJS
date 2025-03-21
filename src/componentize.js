@@ -1,3 +1,4 @@
+import { freemem } from "node:os";
 import wizer from '@bytecodealliance/wizer';
 import getWeval from '@bytecodealliance/weval';
 import {
@@ -18,7 +19,7 @@ import {
 import { fileURLToPath } from 'node:url';
 import { cwd, stdout, platform } from 'node:process';
 export const { version } = JSON.parse(
-  await readFile(new URL('../package.json', import.meta.url), 'utf8')
+  await readFile(new URL('../package.json', import.meta.url), 'utf8'),
 );
 const isWindows = platform === 'win32';
 
@@ -54,6 +55,24 @@ function parseWizerStderr(stderr) {
 
   let causeEnd = output.indexOf('\n', exitCodeStart + 1);
   return `${output.substring(0, causeStart)}${output.substring(causeEnd)}`.trim();
+}
+
+/**
+ * Check whether a value is numeric (including BigInt)
+ *
+ * @param {any} n
+ * @returns {boolean} whether the value is numeric
+ */
+function isNumeric(n) {
+  switch (typeof n) {
+    case 'bigint':
+    case 'number':
+      return true;
+    case 'object':
+      return n.constructor == BigInt || n.constructor == Number;
+    default:
+      return false;
+  }
 }
 
 export async function componentize(opts,
@@ -106,7 +125,7 @@ export async function componentize(opts,
     debugBindings = false,
     enableWizerLogging = false,
     aotCache = fileURLToPath(
-      new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url)
+      new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url),
     ),
   } = opts;
 
@@ -116,11 +135,9 @@ export async function componentize(opts,
       new URL(
         opts.enableAot
           ? `../lib/starlingmonkey_embedding_weval.wasm`
-          : `../lib/starlingmonkey_embedding${
-              debugBuild ? '.debug' : ''
-            }.wasm`,
-        import.meta.url
-      )
+          : `../lib/starlingmonkey_embedding${debugBuild ? '.debug' : ''}.wasm`,
+        import.meta.url,
+      ),
     );
 
   let { wasm, jsBindings, exports, imports } = spliceBindings(
@@ -245,6 +262,18 @@ export async function componentize(opts,
       wevalBin = await getWeval();
     }
 
+    // Set the min stack size, if one was provided
+    if (opts.aotMinStackSizeBytes) {
+      if (!isNumeric(opts.aotMinStackSizeBytes)) {
+        throw new TypeError(
+          `aotMinStackSizeBytes must be a numeric value, received [${opts.aotMinStackSizeBytes}] (type ${typeof opts.aotMinStackSizeBytes})`,
+        );
+      }
+      env.RUST_MIN_STACK = opts.aotMinStackSizeBytes;
+    } else {
+      env.RUST_MIN_STACK = defaultMinStackSize();
+    }
+
     wizerProcess = spawnSync(
       wevalBin,
       [
@@ -318,7 +347,7 @@ export async function componentize(opts,
   async function initWasm(bin) {
     const eep = (name) => () => {
       throw new Error(
-        `Internal error: unexpected call to "${name}" during Wasm verification`
+        `Internal error: unexpected call to "${name}" during Wasm verification`,
       );
     };
 
@@ -338,7 +367,7 @@ export async function componentize(opts,
             const bufPtr = mem.getUint32(iovs + i * 8, true);
             const bufLen = mem.getUint32(iovs + 4 + i * 8, true);
             stderr += new TextDecoder().decode(
-              new Uint8Array(exports.memory.buffer, bufPtr, bufLen)
+              new Uint8Array(exports.memory.buffer, bufPtr, bufLen),
             );
             written += bufLen;
           }
@@ -396,7 +425,7 @@ export async function componentize(opts,
     features,
     witWorld,
     maybeWindowsPath(witPath),
-    worldName
+    worldName,
   );
 
   if (debugBindings) {
@@ -409,12 +438,12 @@ export async function componentize(opts,
       Object.entries({
         wasi_snapshot_preview1: await readFile(preview2Adapter),
       }),
-      false
+      false,
     ),
     Object.entries({
       language: [['JavaScript', '']],
       'processed-by': [['ComponentizeJS', version]],
-    })
+    }),
   );
 
   // convert CABI import conventions to ESM import conventions
@@ -426,4 +455,15 @@ export async function componentize(opts,
     component,
     imports,
   };
+}
+
+/**
+ * Calculate the min stack size depending on free memory
+ *
+ * @param {number} freeMemoryBytes - Amount of free memory in the system, in bytes  (if not provided, os.freemem() is used)
+ * @returns {number} The minimum stack size that should be used as a default.
+ */
+function defaultMinStackSize(freeMemoryBytes) {
+  freeMemoryBytes = freeMemoryBytes ?? freemem();
+  return Math.max(8 * 1024 * 1024, Math.floor(freeMemoryBytes * 0.1));
 }
