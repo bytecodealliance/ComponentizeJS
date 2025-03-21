@@ -1,8 +1,23 @@
+import { URL, fileURLToPath } from 'node:url';
+import { createServer } from 'node:net';
+
 import { strictEqual, ok } from 'node:assert';
 
-export const source = `
+const FETCH_URL = 'http://localhost';
+
+export const state = async () => {
+  const { getRandomPort } = await import(
+    fileURLToPath(new URL('../util.js', import.meta.url))
+  );
+  const port = await getRandomPort();
+  return { port };
+};
+
+export const source = (testState) => {
+  let port = testState?.port ? ':' + testState.port : '';
+  return `
   export async function run () {
-    const res = await fetch('https://httpbin.org/anything');
+    const res = await fetch('${FETCH_URL}${port}');
     const source = await res.json();
     console.log(source.url);
   }
@@ -10,11 +25,29 @@ export const source = `
     return true;
   }
 `;
+};
 
 export const enableFeatures = ['http'];
 
-export async function test(run) {
+export async function test(run, testState) {
+  // Get the randomly generated port
+  const port = testState.port;
+  if (!port) {
+    throw new Error('missing port on test state');
+  }
+
+  // Run a local server on some port
+  const server = createServer(async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.write(
+      JSON.stringify({
+        status: 'ok',
+      }),
+    );
+    res.end();
+  }).listen(port);
+
   const { stdout, stderr } = await run();
   strictEqual(stderr, '');
-  strictEqual(stdout.trim(), 'https://httpbin.org/anything');
+  strictEqual(stdout.trim(), FETCH_URL);
 }
