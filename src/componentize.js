@@ -225,7 +225,7 @@ export async function componentize(opts,
       sourcePath = sourcePath.slice(workspacePrefix.length + 1);
     }
   }
-  let args = `--initializer-script-path ${initializerPath} ${sourcePath}`;
+  let args = `--initializer-script-path ${initializerPath} --strip-path-prefix ${workspacePrefix}/ ${sourcePath}`;
   runtimeArgs = runtimeArgs ? `${runtimeArgs} ${args}` : args;
   let preopens = [`--dir ${sourceDir}`];
   if (opts.enableAot) {
