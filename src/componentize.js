@@ -63,15 +63,6 @@ const DEFAULT_DEBUG_SETTINGS = {
   wizerLogging: false,
 };
 
-/**
- * Create a WebAssembly component from the given JS source code
- *
- * @param {string} jsSource - Javascript source code
- * @param {string} [witWorld] - WIT world that should be targeted
- * @param {object} [opts] - Options for creating the component
- * @param {object} [opts.debugBuild] - Whether to use a debug build of StarlingMonkey
- * @param {object} [opts.debug] - Options for debugging
- */
 export async function componentize(
   opts,
   _deprecatedWitWorldOrOpts = undefined,
