@@ -11,25 +11,15 @@ version = "0.1.0"
 anyhow = { version = "1.0.95", default-features = false }
 heck = { version = "0.5", default-features = false }
 #js-component-bindgen = { version = "1.10.0", default-features = false }
-#orca-wasm = { version = "0.9.0", default-features = false }
+orca-wasm = { version = "0.10.0", default-features = false }
 rand = { version = "0.8", default-features = false }
-#wasm-encoder = { version = "0.225.0", default-features = false }
-#wasmparser = { version = "0.224.0", features = ["features"] }
-#wit-bindgen = { version = "0.39.0", features = [ "macros" ] }
-#wit-bindgen-core = { version = "0.39.0", default-features = false }
-#wit-component = { version = "0.225.0", features = ["dummy-module"] }
-#wit-parser = { version = "0.225.0", default-features = false }
-
-# TODO: remove once js-component-bindgen with newer upstream versions is released
-js-component-bindgen = { path = "../jco/crates/js-component-bindgen", default-features = false }
-
-# TODO: remove once orca PR has merged
-# see: https://github.com/thesuhas/orca/pull/241
-orca-wasm = { path = "../orca" }
-
 wasm-encoder = { version = "0.227.1", default-features = false }
 wasmparser = { version = "0.227.1", features = ["features"] }
 wit-bindgen = { version = "0.41.0", features = [ "macros" ] }
 wit-bindgen-core = { version = "0.41.0", default-features = false }
 wit-component = { version = "0.227.1", features = ["dummy-module"] }
 wit-parser = { version = "0.227.1", default-features = false }
+
+# TODO: remove once js-component-bindgen with newer upstream versions is released
+js-component-bindgen = { path = "../jco/crates/js-component-bindgen", default-features = false }
+
