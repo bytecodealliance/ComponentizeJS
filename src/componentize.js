@@ -1,4 +1,15 @@
-import { freemem } from 'node:os';
+import { freemem } from "node:os";
+import { TextDecoder } from 'node:util';
+import { Buffer } from 'node:buffer';
+import { fileURLToPath } from 'node:url';
+import { cwd, stdout, platform } from 'node:process';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { resolve, join, dirname } from 'node:path';
+import { readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
+import { rmSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+
 import wizer from '@bytecodealliance/wizer';
 import getWeval from '@bytecodealliance/weval';
 import {
@@ -6,18 +17,12 @@ import {
   metadataAdd,
   preview1AdapterReactorPath,
 } from '@bytecodealliance/jco';
-import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { resolve, join, dirname } from 'node:path';
-import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
-import { rmSync, existsSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+
 import {
   spliceBindings,
   stubWasi,
 } from '../lib/spidermonkey-embedding-splicer.js';
-import { fileURLToPath } from 'node:url';
-import { cwd, stdout, platform } from 'node:process';
+
 export const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8'),
 );
