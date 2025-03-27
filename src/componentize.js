@@ -57,56 +57,6 @@ function maybeWindowsPath(path) {
   return '//?/' + resolve(path).replace(/\\/g, '/');
 }
 
-/**
- * Clean up the given input string by removing the given patterns if
- * found as line prefixes.
- */
-function stripLinesPrefixes(input, prefixPatterns) {
-  return input
-    .split('\n')
-    .map((line) =>
-      prefixPatterns.reduce((line, n) => line.replace(n, ''), line),
-    )
-    .join('\n')
-    .trim();
-}
-
-const WizerErrorCause = `Error: the \`componentize.wizer\` function trapped
-
-Caused by:`;
-
-const WizerExitCode = 'Exited with i32 exit status';
-
-function parseWizerStderr(stderr) {
-  let output = `${stderr}`;
-  let causeStart = output.indexOf(WizerErrorCause);
-  let exitCodeStart = output.indexOf(WizerExitCode);
-  if (causeStart === -1 || exitCodeStart === -1) {
-    return output;
-  }
-
-  let causeEnd = output.indexOf('\n', exitCodeStart + 1);
-  return `${output.substring(0, causeStart)}${output.substring(causeEnd)}`.trim();
-}
-
-/**
- * Check whether a value is numeric (including BigInt)
- *
- * @param {any} n
- * @returns {boolean} whether the value is numeric
- */
-function isNumeric(n) {
-  switch (typeof n) {
-    case 'bigint':
-    case 'number':
-      return true;
-    case 'object':
-      return n.constructor == BigInt || n.constructor == Number;
-    default:
-      return false;
-  }
-}
-
 export async function componentize(
   opts,
   _deprecatedWitWorldOrOpts = undefined,
@@ -497,3 +447,54 @@ function defaultMinStackSize(freeMemoryBytes) {
   freeMemoryBytes = freeMemoryBytes ?? freemem();
   return Math.max(8 * 1024 * 1024, Math.floor(freeMemoryBytes * 0.1));
 }
+
+/**
+ * Clean up the given input string by removing the given patterns if
+ * found as line prefixes.
+ */
+function stripLinesPrefixes(input, prefixPatterns) {
+  return input
+    .split('\n')
+    .map((line) =>
+      prefixPatterns.reduce((line, n) => line.replace(n, ''), line),
+    )
+    .join('\n')
+    .trim();
+}
+
+/**
+ * Parse output of post-processing step (whether Wizer or Weval)
+ *
+ * @param {Stream} stderr
+ * @returns {string} String that can be printed to describe error output
+ */
+function parseWizerStderr(stderr) {
+  let output = `${stderr}`;
+  let causeStart = output.indexOf(WIZER_ERROR_CAUSE_PREFIX);
+  let exitCodeStart = output.indexOf(WIZER_EXIT_CODE_PREFIX);
+  if (causeStart === -1 || exitCodeStart === -1) {
+    return output;
+  }
+
+  let causeEnd = output.indexOf('\n', exitCodeStart + 1);
+  return `${output.substring(0, causeStart)}${output.substring(causeEnd)}`.trim();
+}
+
+/**
+ * Check whether a value is numeric (including BigInt)
+ *
+ * @param {any} n
+ * @returns {boolean} whether the value is numeric
+ */
+function isNumeric(n) {
+  switch (typeof n) {
+    case 'bigint':
+    case 'number':
+      return true;
+    case 'object':
+      return n.constructor == BigInt || n.constructor == Number;
+    default:
+      return false;
+  }
+}
+
