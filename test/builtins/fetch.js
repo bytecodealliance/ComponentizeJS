@@ -15,9 +15,11 @@ export const state = async () => {
 
 export const source = (testState) => {
   let port = testState?.port ? ':' + testState.port : '';
+  const url = FETCH_URL + port;
+  console.error('[test] fetch.js visiting URL', url);
   return `
   export async function run () {
-    const res = await fetch('${FETCH_URL}${port}');
+    const res = await fetch('${url}');
     const source = await res.json();
     console.log(source.url);
   }
