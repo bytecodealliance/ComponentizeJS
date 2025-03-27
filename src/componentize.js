@@ -51,6 +51,17 @@ const DEFAULT_AOT_CACHE = fileURLToPath(
   new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url),
 );
 
+/** Default settings for debug options */
+const DEFAULT_DEBUG_SETTINGS = {
+  bindings: false,
+  bindingsDir: null,
+
+  binary: false,
+  binaryPath: null,
+
+  wizerLogging: false,
+};
+
 function maybeWindowsPath(path) {
   if (!path) return path;
   if (!IS_WINDOWS) return resolve(path);
@@ -96,12 +107,20 @@ export async function componentize(
     worldName,
     disableFeatures = [],
     enableFeatures = [],
+
+    debug = { ...DEFAULT_DEBUG_SETTINGS },
     debugBuild = false,
-    runtimeArgs,
     debugBindings = false,
     enableWizerLogging = false,
+
+    runtimeArgs,
+
     aotCache = DEFAULT_AOT_CACHE,
   } = opts;
+
+  debugBindings = debugBindings || debug?.bindings;
+  debugBuild = debugBuild || debug?.build;
+  enableWizerLogging = enableWizerLogging || debug?.enableWizerLogging;
 
   // Determine the path to the StarlingMonkey binary
   const engine = getEnginePath(opts);
@@ -121,27 +140,52 @@ export async function componentize(
   await writeFile(join(sourcesDir, 'initializer.js'), jsBindings);
 
   if (debugBindings) {
-    console.log('--- JS Bindings ---');
-    console.log(
-      jsBindings
-        .split('\n')
-        .map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`)
-        .join('\n'),
-    );
-    console.log('--- JS Imports ---');
-    console.log(imports);
-    console.log('--- JS Exports ---');
-    console.log(exports);
+    // If a bindings output directory was specified, output generated bindings to files
+    if (debug?.bindingsDir) {
+      console.error(`outputting debug files to [${debug?.bindingsDir}]...\n`);
+      // Ensure the debug bindings dir exists, and is a directory
+      if (!(await stat(debug?.bindingsDir).then((s) => s.isDirectory()))) {
+        throw new Error(
+          `Missing/invalid debug bindings directory [${debug?.bindingsDir}]`,
+        );
+      }
+      // Write debug to bindings debug directory
+      await Promise.all([
+        writeFile(join(debug?.bindingsDir, 'source.debug.js'), jsSource),
+        writeFile(join(debug?.bindingsDir, 'bindings.debug.js'), jsBindings),
+        writeFile(
+          join(debug?.bindingsDir, 'imports.debug.json'),
+          JSON.stringify(imports, null, 2),
+        ),
+        writeFile(
+          join(debug?.bindingsDir, 'exports.debug.json'),
+          JSON.stringify(exports, null, 2),
+        ),
+      ]);
+    } else {
+      // If a bindings output directory was not specified, output to stdout
+      console.error('--- JS Bindings ---');
+      console.error(
+        jsBindings
+          .split('\n')
+          .map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`)
+          .join('\n'),
+      );
+      console.error('--- JS Imports ---');
+      console.error(imports);
+      console.error('--- JS Exports ---');
+      console.error(exports);
+    }
   }
 
   if (!useOriginalSourceFile) {
     if (debugBindings) {
-      console.log(`> Writing JS source to ${tmpDir}/sources`);
+      console.error(`> Writing JS source to ${tmpDir}/sources`);
     }
     await writeFile(sourcePath, jsSource);
   }
 
-  // we never disable a feature that is already in the target world usage
+  // We never disable a feature that is already in the target world usage
   const features = [];
   if (!disableFeatures.includes('stdio')) {
     features.push('stdio');
@@ -185,8 +229,8 @@ export async function componentize(
   env['IMPORT_CNT'] = imports.length;
 
   if (debugBindings) {
-    console.log('--- Wizer Env ---');
-    console.log(env);
+    console.error('--- Wizer Env ---');
+    console.error(env);
   }
 
   let initializerPath = join(sourcesDir, 'initializer.js');
@@ -208,8 +252,10 @@ export async function componentize(
       sourcePath = sourcePath.slice(workspacePrefix.length + 1);
     }
   }
+
   let args = `--initializer-script-path ${initializerPath} --strip-path-prefix ${workspacePrefix}/ ${sourcePath}`;
   runtimeArgs = runtimeArgs ? `${runtimeArgs} ${args}` : args;
+
   let preopens = [`--dir ${sourcesDir}`];
   if (opts.enableAot) {
     preopens.push(`--dir ${workspacePrefix}`);
@@ -217,8 +263,7 @@ export async function componentize(
     preopens.push(`--mapdir /::${workspacePrefix}`);
   }
 
-  let wizerProcess;
-
+  let postProcess;
   if (opts.enableAot) {
     // Determine the weval bin path, possibly using a pre-downloaded version
     let wevalBin;
@@ -240,7 +285,7 @@ export async function componentize(
       env.RUST_MIN_STACK = defaultMinStackSize();
     }
 
-    wizerProcess = spawnSync(
+    postProcess = spawnSync(
       wevalBin,
       [
         'weval',
@@ -261,7 +306,7 @@ export async function componentize(
       },
     );
   } else {
-    wizerProcess = spawnSync(
+    postProcess = spawnSync(
       wizer,
       [
         '--allow-wasi',
@@ -283,11 +328,12 @@ export async function componentize(
     );
   }
 
-  if (wizerProcess.status !== 0) {
-    let wizerErr = parseWizerStderr(wizerProcess.stderr);
+  // If the wizer (or weval) process failed, parse the output and display to the user
+  if (postProcess.status !== 0) {
+    let wizerErr = parseWizerStderr(postProcess.stderr);
     let err = `Failed to initialize component:\n${wizerErr}`;
     if (debugBindings) {
-      err += `\n\nBinary and sources available for debugging at ${tmpDir}\n`;
+      err += `\n\nBinary and sources available for debugging at ${workDir}\n`;
     } else {
       await rm(workDir, { recursive: true });
     }
@@ -312,7 +358,7 @@ export async function componentize(
   /// Process output of check init, throwing if necessary
   handleCheckInitOutput(check_init(), initializerPath, workDir, getStderr);
 
-  // after wizening, stub out the wasi imports depending on what features are enabled
+  // After wizening, stub out the wasi imports depending on what features are enabled
   const finalBin = stubWasi(
     bin,
     features,
@@ -339,14 +385,26 @@ export async function componentize(
     }),
   );
 
-  // convert CABI import conventions to ESM import conventions
+  // Convert CABI import conventions to ESM import conventions
   imports = imports.map(([specifier, impt]) =>
     specifier === '$root' ? [impt, 'default'] : [specifier, impt],
   );
 
+  // Build debug object to return
+  let debugOutput;
+  if (debugBindings) {
+    debugOutput.bindings = debug.bindings;
+    debugOutput.workDir = workDir;
+  }
+  if (debug?.binary) {
+    debugOutput.binary = debug.binary;
+    debugOutput.binaryPath = debug.binaryPath;
+  }
+
   return {
     component,
     imports,
+    debug: debugOutput,
   };
 }
 
