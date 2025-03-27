@@ -328,76 +328,8 @@ export async function componentize(
 
   await tmpdirRemovePromise;
 
-  async function initWasm(bin) {
-    const eep = (name) => () => {
-      throw new Error(
-        `Internal error: unexpected call to "${name}" during Wasm verification`,
-      );
-    };
-
-    let stderr = '';
-    const wasmModule = await WebAssembly.compile(bin);
-
-    const mockImports = {
-      // "wasi-logging2": {
-      //   log: eep("log"),
-      // },
-      wasi_snapshot_preview1: {
-        fd_write: function (fd, iovs, iovs_len, nwritten) {
-          if (fd !== 2) return 0;
-          const mem = new DataView(exports.memory.buffer);
-          let written = 0;
-          for (let i = 0; i < iovs_len; i++) {
-            const bufPtr = mem.getUint32(iovs + i * 8, true);
-            const bufLen = mem.getUint32(iovs + 4 + i * 8, true);
-            stderr += new TextDecoder().decode(
-              new Uint8Array(exports.memory.buffer, bufPtr, bufLen),
-            );
-            written += bufLen;
-          }
-          mem.setUint32(nwritten, written, true);
-          return 1;
-        },
-      },
-    };
-
-    for (const { module, name } of WebAssembly.Module.imports(wasmModule)) {
-      mockImports[module] = mockImports[module] || {};
-      if (!mockImports[module][name]) mockImports[module][name] = eep(name);
-    }
-
-    const { exports } = await WebAssembly.instantiate(wasmModule, mockImports);
-    return {
-      exports,
-      getStderr() {
-        return stderr;
-      },
-    };
-  }
-
-  const status = check_init();
-  let err = null;
-  switch (status) {
-    case CHECK_INIT_RETURN_OK:
-      break;
-    case CHECK_INIT_RETURN_FN_LIST:
-      err = `Unable to extract expected exports list`;
-      break;
-    case CHECK_INIT_RETURN_TYPE_PARSE:
-      err = `Unable to parse the core ABI export types`;
-      break;
-    default:
-      err = `Unknown error during initialization: ${status}`;
-  }
-
-  if (err) {
-    let msg = err;
-    const stderr = getStderr();
-    if (stderr) {
-      msg += `\n${stripLinesPrefixes(stderr, [new RegExp(`${initializerPath}[:\\d]* ?`)], tmpDir)}`;
-    }
-    throw new Error(msg);
-  }
+  /// Process output of check init, throwing if necessary
+  handleCheckInitOutput(check_init(), initializerPath, workDir, getStderr);
 
   // after wizening, stub out the wasi imports depending on what features are enabled
   const finalBin = stubWasi(
@@ -498,3 +430,130 @@ function isNumeric(n) {
   }
 }
 
+/**
+ * Initialize a WebAssembly binary, given the
+ *
+ * @param {Buffer} bin - WebAssembly binary bytes
+ * @throws If a binary is invalid
+ */
+async function initWasm(bin) {
+  const eep = (name) => () => {
+    throw new Error(
+      `Internal error: unexpected call to "${name}" during Wasm verification`,
+    );
+  };
+
+  let stderr = '';
+  const wasmModule = await WebAssembly.compile(bin);
+
+  const mockImports = {
+    // "wasi-logging2": {
+    //   log: eep("log"),
+    // },
+    wasi_snapshot_preview1: {
+      fd_write: function (fd, iovs, iovs_len, nwritten) {
+        if (fd !== 2) return 0;
+        const mem = new DataView(exports.memory.buffer);
+        let written = 0;
+        for (let i = 0; i < iovs_len; i++) {
+          const bufPtr = mem.getUint32(iovs + i * 8, true);
+          const bufLen = mem.getUint32(iovs + 4 + i * 8, true);
+          stderr += new TextDecoder().decode(
+            new Uint8Array(exports.memory.buffer, bufPtr, bufLen),
+          );
+          written += bufLen;
+        }
+        mem.setUint32(nwritten, written, true);
+        return 1;
+      },
+    },
+  };
+
+  for (const { module, name } of WebAssembly.Module.imports(wasmModule)) {
+    mockImports[module] = mockImports[module] || {};
+    if (!mockImports[module][name]) mockImports[module][name] = eep(name);
+  }
+
+  const { exports } = await WebAssembly.instantiate(wasmModule, mockImports);
+  return {
+    exports,
+    getStderr() {
+      return stderr;
+    },
+  };
+}
+
+/**
+ * Handle the output of `check_init()`
+ *
+ * @param {number} status - output of check_init
+ * @param {string} initializerPath
+ * @param {string} workDir
+ * @param {() => string} getStderr - A function that resolves to the stderr output of check init
+ */
+function handleCheckInitOutput(
+  status,
+  initializerPath,
+  workDir,
+  getStderr,
+) {
+  let err = null;
+  switch (status) {
+    case CHECK_INIT_RETURN_OK:
+      break;
+    case CHECK_INIT_RETURN_FN_LIST:
+      err = `Unable to extract expected exports list`;
+      break;
+    case CHECK_INIT_RETURN_TYPE_PARSE:
+      err = `Unable to parse the core ABI export types`;
+      break;
+    default:
+      err = `Unknown error during initialization: ${status}`;
+  }
+
+  if (err) {
+    let msg = err;
+    const stderr = getStderr();
+    if (stderr) {
+      msg += `\n${stripLinesPrefixes(stderr, [new RegExp(`${initializerPath}[:\\d]* ?`)], workDir)}`;
+    }
+    throw new Error(msg);
+  }
+
+  // after wizening, stub out the wasi imports depending on what features are enabled
+  const finalBin = stubWasi(
+    bin,
+    features,
+    witWorld,
+    maybeWindowsPath(witPath),
+    worldName,
+  );
+
+  if (debugBindings) {
+    await writeFile('binary.wasm', finalBin);
+  }
+
+  const component = await metadataAdd(
+    await componentNew(
+      finalBin,
+      Object.entries({
+        wasi_snapshot_preview1: await readFile(preview2Adapter),
+      }),
+      false,
+    ),
+    Object.entries({
+      language: [['JavaScript', '']],
+      'processed-by': [['ComponentizeJS', version]],
+    }),
+  );
+
+  // convert CABI import conventions to ESM import conventions
+  imports = imports.map(([specifier, impt]) =>
+    specifier === '$root' ? [impt, 'default'] : [specifier, impt],
+  );
+
+  return {
+    component,
+    imports,
+  };
+}
