@@ -1,4 +1,4 @@
-import { freemem } from "node:os";
+import { freemem } from 'node:os';
 import { TextDecoder } from 'node:util';
 import { Buffer } from 'node:buffer';
 import { fileURLToPath } from 'node:url';
@@ -26,11 +26,34 @@ import {
 export const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8'),
 );
-const isWindows = platform === 'win32';
+
+/** Whether the current platform is windows */
+const IS_WINDOWS = platform === 'win32';
+
+/** Prefix into wizer error output that indicates a error/trap */
+const WIZER_ERROR_CAUSE_PREFIX = `Error: the \`componentize.wizer\` function trapped
+Caused by:`;
+
+/** Prefix into wizer error output that indicates exit status */
+const WIZER_EXIT_CODE_PREFIX = 'Exited with i32 exit status';
+
+/** Response code from check_init() that denotes success */
+const CHECK_INIT_RETURN_OK = 0;
+
+/** Response code from check_init() that denotes being unable to extract exports list */
+const CHECK_INIT_RETURN_FN_LIST = 1;
+
+/** Response code from check_init() that denotes being unable to parse core ABI export types */
+const CHECK_INIT_RETURN_TYPE_PARSE = 2;
+
+/** Default path to the AOT weval cache */
+const DEFAULT_AOT_CACHE = fileURLToPath(
+  new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url),
+);
 
 function maybeWindowsPath(path) {
   if (!path) return path;
-  if (!isWindows) return resolve(path);
+  if (!IS_WINDOWS) return resolve(path);
   return '//?/' + resolve(path).replace(/\\/g, '/');
 }
 
@@ -402,19 +425,15 @@ export async function componentize(
     };
   }
 
-  const INIT_OK = 0;
-  const INIT_FN_LIST = 1;
-  const INIT_TYPE_PARSE = 2;
-
   const status = check_init();
   let err = null;
   switch (status) {
-    case INIT_OK:
+    case CHECK_INIT_RETURN_OK:
       break;
-    case INIT_FN_LIST:
+    case CHECK_INIT_RETURN_FN_LIST:
       err = `Unable to extract expected exports list`;
       break;
-    case INIT_TYPE_PARSE:
+    case CHECK_INIT_RETURN_TYPE_PARSE:
       err = `Unable to parse the core ABI export types`;
       break;
     default:
