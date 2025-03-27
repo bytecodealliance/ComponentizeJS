@@ -84,16 +84,8 @@ export async function componentize(
     }
   }
 
-  const tmpDir = join(
-    tmpdir(),
-    createHash('sha256')
-      .update(Math.random().toString())
-      .digest('hex')
-      .slice(0, 12),
-  );
-  await mkdir(tmpDir);
-  const sourceDir = join(tmpDir, 'sources');
-  await mkdir(sourceDir);
+  // Prepare a working diretory for use during componentization
+  const { sourcesDir, baseDir: workDir } = await prepWorkDir();
 
   let {
     sourceName = 'source.js',
@@ -113,16 +105,8 @@ export async function componentize(
     ),
   } = opts;
 
-  const engine =
-    opts.engine ||
-    fileURLToPath(
-      new URL(
-        opts.enableAot
-          ? `../lib/starlingmonkey_embedding_weval.wasm`
-          : `../lib/starlingmonkey_embedding${debugBuild ? '.debug' : ''}.wasm`,
-        import.meta.url,
-      ),
-    );
+  // Determine the path to the StarlingMonkey binary
+  const engine = getEnginePath(opts);
 
   let { wasm, jsBindings, exports, imports } = spliceBindings(
     await readFile(engine),
@@ -132,11 +116,11 @@ export async function componentize(
     false,
   );
 
-  const input = join(tmpDir, 'in.wasm');
-  const output = join(tmpDir, 'out.wasm');
+  const inputWasmPath = join(workDir, 'in.wasm');
+  const outputWasmPath = join(workDir, 'out.wasm');
 
-  await writeFile(input, Buffer.from(wasm));
-  await writeFile(join(sourceDir, 'initializer.js'), jsBindings);
+  await writeFile(inputWasmPath, Buffer.from(wasm));
+  await writeFile(join(sourcesDir, 'initializer.js'), jsBindings);
 
   if (debugBindings) {
     console.log('--- JS Bindings ---');
@@ -312,11 +296,7 @@ export async function componentize(
     throw new Error(err);
   }
 
-  const bin = await readFile(output);
-
-  const tmpdirRemovePromise = debugBindings
-    ? Promise.resolve()
-    : rm(tmpDir, { recursive: true });
+  const bin = await readFile(outputWasmPath);
 
   // Check for initialization errors
   // By actually executing the binary in a mini sandbox to get back
@@ -326,7 +306,10 @@ export async function componentize(
     getStderr,
   } = await initWasm(bin);
 
-  await tmpdirRemovePromise;
+  // If not in debug mode, clean up
+  if (!debugBindings) {
+    await rm(workDir, { recursive: true });
+  }
 
   /// Process output of check init, throwing if necessary
   handleCheckInitOutput(check_init(), initializerPath, workDir, getStderr);
@@ -428,6 +411,34 @@ function isNumeric(n) {
     default:
       return false;
   }
+}
+
+/** Determine the correct path for the engine */
+function getEnginePath(opts) {
+  if (opts.engine) {
+    return opts.engine;
+  }
+  const debugSuffix = opts?.debugBuild ? '.debug' : '';
+  let engineBinaryRelPath = `../lib/starlingmonkey_embedding${debugSuffix}.wasm`;
+  if (opts.enableAot) {
+    engineBinaryRelPath = '../lib/starlingmonkey_embedding_weval.wasm';
+  }
+  return fileURLToPath(new URL(engineBinaryRelPath, import.meta.url));
+}
+
+/** Prepare a work directory for use with componentization */
+async function prepWorkDir() {
+  const baseDir = join(
+    tmpdir(),
+    createHash('sha256')
+      .update(Math.random().toString())
+      .digest('hex')
+      .slice(0, 12),
+  );
+  await mkdir(baseDir);
+  const sourcesDir = join(baseDir, 'sources');
+  await mkdir(sourcesDir);
+  return { baseDir, sourcesDir };
 }
 
 /**
