@@ -49,6 +49,18 @@ export async function test(run, testState) {
     res.end();
   }).listen(port);
 
+  // Wait until the server is ready
+  let ready = false;
+  const url = FETCH_URL + (port ? ':' + port : '');
+  while (!ready) {
+    try {
+      const res = await fetch(url);
+      ready = true;
+    } catch (err) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+
   const { stdout, stderr } = await run();
   strictEqual(stderr, '');
   strictEqual(stdout.trim(), FETCH_URL);
