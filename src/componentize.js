@@ -1,4 +1,4 @@
-import { freemem } from "node:os";
+import { freemem } from 'node:os';
 import wizer from '@bytecodealliance/wizer';
 import getWeval from '@bytecodealliance/weval';
 import {
@@ -34,16 +34,20 @@ function maybeWindowsPath(path) {
  * found as line prefixes.
  */
 function stripLinesPrefixes(input, prefixPatterns) {
-  return input.split('\n')
-    .map(line => prefixPatterns.reduce((line, n) => line.replace(n, ''), line))
-    .join('\n').trim();
+  return input
+    .split('\n')
+    .map((line) =>
+      prefixPatterns.reduce((line, n) => line.replace(n, ''), line),
+    )
+    .join('\n')
+    .trim();
 }
 
 const WizerErrorCause = `Error: the \`componentize.wizer\` function trapped
 
 Caused by:`;
 
-const WizerExitCode = "Exited with i32 exit status";
+const WizerExitCode = 'Exited with i32 exit status';
 
 function parseWizerStderr(stderr) {
   let output = `${stderr}`;
@@ -75,9 +79,11 @@ function isNumeric(n) {
   }
 }
 
-export async function componentize(opts,
-                                   _deprecatedWitWorldOrOpts = undefined,
-                                   _deprecatedOpts = undefined) {
+export async function componentize(
+  opts,
+  _deprecatedWitWorldOrOpts = undefined,
+  _deprecatedOpts = undefined,
+) {
   let useOriginalSourceFile = true;
   let jsSource;
 
@@ -93,7 +99,7 @@ export async function componentize(opts,
     } else {
       if (typeof _deprecatedWitWorldOrOpts !== 'object') {
         throw new Error(
-          `componentize: second argument must be an object or a string, but is ${typeof _deprecatedWitWorldOrOpts}`
+          `componentize: second argument must be an object or a string, but is ${typeof _deprecatedWitWorldOrOpts}`,
         );
       }
       opts = _deprecatedWitWorldOrOpts;
@@ -105,7 +111,7 @@ export async function componentize(opts,
     createHash('sha256')
       .update(Math.random().toString())
       .digest('hex')
-      .slice(0, 12)
+      .slice(0, 12),
   );
   await mkdir(tmpDir);
   const sourceDir = join(tmpDir, 'sources');
@@ -145,14 +151,14 @@ export async function componentize(opts,
     witWorld,
     maybeWindowsPath(witPath),
     worldName,
-    false
+    false,
   );
 
   const input = join(tmpDir, 'in.wasm');
   const output = join(tmpDir, 'out.wasm');
 
   await writeFile(input, Buffer.from(wasm));
-  await writeFile(join(sourceDir, "initializer.js"), jsBindings);
+  await writeFile(join(sourceDir, 'initializer.js'), jsBindings);
 
   if (debugBindings) {
     console.log('--- JS Bindings ---');
@@ -160,7 +166,7 @@ export async function componentize(opts,
       jsBindings
         .split('\n')
         .map((ln, idx) => `${(idx + 1).toString().padStart(4, ' ')} | ${ln}`)
-        .join('\n')
+        .join('\n'),
     );
     console.log('--- JS Imports ---');
     console.log(imports);
@@ -287,12 +293,12 @@ export async function componentize(opts,
         `-o ${output}`,
       ],
       {
-        stdio: [null, stdout, "pipe"],
+        stdio: [null, stdout, 'pipe'],
         env,
         input: runtimeArgs,
         shell: true,
         encoding: 'utf-8',
-      }
+      },
     );
   } else {
     wizerProcess = spawnSync(
@@ -308,12 +314,12 @@ export async function componentize(opts,
         input,
       ],
       {
-        stdio: [null, stdout, "pipe"],
+        stdio: [null, stdout, 'pipe'],
         env,
         input: runtimeArgs,
         shell: true,
         encoding: 'utf-8',
-      }
+      },
     );
   }
 
@@ -448,7 +454,7 @@ export async function componentize(opts,
 
   // convert CABI import conventions to ESM import conventions
   imports = imports.map(([specifier, impt]) =>
-    specifier === '$root' ? [impt, 'default'] : [specifier, impt]
+    specifier === '$root' ? [impt, 'default'] : [specifier, impt],
   );
 
   return {
