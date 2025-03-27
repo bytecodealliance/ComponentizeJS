@@ -39,6 +39,7 @@ export async function test(run, testState) {
   }
 
   // Run a local server on some port
+  console.error('[test] starting local server...');
   const server = createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.write(
@@ -50,6 +51,7 @@ export async function test(run, testState) {
   }).listen(port);
 
   // Wait until the server is ready
+  console.error('[test] waiting for server to start...');
   let ready = false;
   const url = FETCH_URL + (port ? ':' + port : '');
   while (!ready) {
@@ -61,6 +63,7 @@ export async function test(run, testState) {
     }
   }
 
+  console.error('[test] server started, running...');
   const { stdout, stderr } = await run();
   strictEqual(stderr, '');
   strictEqual(stdout.trim(), FETCH_URL);
