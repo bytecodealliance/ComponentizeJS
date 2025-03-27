@@ -89,7 +89,7 @@ export async function componentize(
 
   let {
     sourceName = 'source.js',
-    sourcePath = join(sourceDir, sourceName),
+    sourcePath = join(sourcesDir, sourceName),
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
     witWorld,
@@ -100,9 +100,7 @@ export async function componentize(
     runtimeArgs,
     debugBindings = false,
     enableWizerLogging = false,
-    aotCache = fileURLToPath(
-      new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url),
-    ),
+    aotCache = DEFAULT_AOT_CACHE,
   } = opts;
 
   // Determine the path to the StarlingMonkey binary
@@ -191,7 +189,7 @@ export async function componentize(
     console.log(env);
   }
 
-  let initializerPath = join(sourceDir, 'initializer.js');
+  let initializerPath = join(sourcesDir, 'initializer.js');
   sourcePath = maybeWindowsPath(sourcePath);
   let workspacePrefix = dirname(sourcePath);
 
@@ -202,7 +200,7 @@ export async function componentize(
   // support --mapdir.
   if (!opts.enableAot) {
     if (!useOriginalSourceFile) {
-      workspacePrefix = sourceDir;
+      workspacePrefix = sourcesDir;
       sourcePath = sourceName;
     }
     if (workspacePrefix.startsWith(cwd())) {
@@ -212,7 +210,7 @@ export async function componentize(
   }
   let args = `--initializer-script-path ${initializerPath} --strip-path-prefix ${workspacePrefix}/ ${sourcePath}`;
   runtimeArgs = runtimeArgs ? `${runtimeArgs} ${args}` : args;
-  let preopens = [`--dir ${sourceDir}`];
+  let preopens = [`--dir ${sourcesDir}`];
   if (opts.enableAot) {
     preopens.push(`--dir ${workspacePrefix}`);
   } else {
@@ -251,8 +249,8 @@ export async function componentize(
         '-w',
         '--init-func',
         'componentize.wizer',
-        `-i ${input}`,
-        `-o ${output}`,
+        `-i ${inputWasmPath}`,
+        `-o ${outputWasmPath}`,
       ],
       {
         stdio: [null, stdout, 'pipe'],
@@ -272,8 +270,8 @@ export async function componentize(
         ...preopens,
         `--wasm-bulk-memory=true`,
         '--inherit-env=true',
-        `-o=${output}`,
-        input,
+        `-o=${outputWasmPath}`,
+        inputWasmPath,
       ],
       {
         stdio: [null, stdout, 'pipe'],
@@ -291,16 +289,16 @@ export async function componentize(
     if (debugBindings) {
       err += `\n\nBinary and sources available for debugging at ${tmpDir}\n`;
     } else {
-      rmSync(tmpDir, { recursive: true });
+      await rm(workDir, { recursive: true });
     }
     throw new Error(err);
   }
 
+  // Read the generated WASM back into memory
   const bin = await readFile(outputWasmPath);
 
-  // Check for initialization errors
-  // By actually executing the binary in a mini sandbox to get back
-  // the initialization state
+  // Check for initialization errors, by actually executing the binary in
+  // a mini sandbox to get back the initialization state
   const {
     exports: { check_init },
     getStderr,
