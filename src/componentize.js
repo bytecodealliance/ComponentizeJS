@@ -356,7 +356,12 @@ export async function componentize(
   }
 
   /// Process output of check init, throwing if necessary
-  handleCheckInitOutput(check_init(), initializerPath, workDir, getStderr);
+  await handleCheckInitOutput(
+    check_init(),
+    initializerPath,
+    workDir,
+    getStderr,
+  );
 
   // After wizening, stub out the wasi imports depending on what features are enabled
   const finalBin = stubWasi(
@@ -558,7 +563,7 @@ async function initWasm(bin) {
  * @param {string} workDir
  * @param {() => string} getStderr - A function that resolves to the stderr output of check init
  */
-function handleCheckInitOutput(
+async function handleCheckInitOutput(
   status,
   initializerPath,
   workDir,
@@ -586,41 +591,4 @@ function handleCheckInitOutput(
     }
     throw new Error(msg);
   }
-
-  // after wizening, stub out the wasi imports depending on what features are enabled
-  const finalBin = stubWasi(
-    bin,
-    features,
-    witWorld,
-    maybeWindowsPath(witPath),
-    worldName,
-  );
-
-  if (debugBindings) {
-    await writeFile('binary.wasm', finalBin);
-  }
-
-  const component = await metadataAdd(
-    await componentNew(
-      finalBin,
-      Object.entries({
-        wasi_snapshot_preview1: await readFile(preview2Adapter),
-      }),
-      false,
-    ),
-    Object.entries({
-      language: [['JavaScript', '']],
-      'processed-by': [['ComponentizeJS', version]],
-    }),
-  );
-
-  // convert CABI import conventions to ESM import conventions
-  imports = imports.map(([specifier, impt]) =>
-    specifier === '$root' ? [impt, 'default'] : [specifier, impt],
-  );
-
-  return {
-    component,
-    imports,
-  };
 }
