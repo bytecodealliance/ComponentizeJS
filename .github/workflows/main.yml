@@ -132,7 +132,7 @@ jobs:
   ########
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs:
       - build
     strategy:
@@ -141,6 +141,9 @@ jobs:
         node-version:
           - '23.10.0'
           # - latest reenable when https://github.com/nodejs/node/issues/57172 is fixed
+        os:
+          - ubuntu-latest
+          - windows-latest
         build-type:
           - 'release'
           - 'debug'
