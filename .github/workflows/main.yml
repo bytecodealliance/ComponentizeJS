@@ -159,6 +159,7 @@ jobs:
         uses: actions/cache/restore@v4
         id: restore-starlingmonkey-jit-build
         with:
+          enableCrossOsArchive: true
           key: starlingmonkey-${{matrix.build-type}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: lib
 
