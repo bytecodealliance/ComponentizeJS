@@ -132,7 +132,7 @@ jobs:
   ########
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs:
       - build
     strategy:
@@ -141,6 +141,10 @@ jobs:
         node-version:
           - '23.10.0'
           # - latest reenable when https://github.com/nodejs/node/issues/57172 is fixed
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
         build-type:
           - 'release'
           - 'debug'
@@ -156,6 +160,7 @@ jobs:
         uses: actions/cache/restore@v4
         id: restore-starlingmonkey-jit-build
         with:
+          enableCrossOsArchive: true
           key: starlingmonkey-${{matrix.build-type}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: lib
 

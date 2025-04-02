@@ -25,8 +25,17 @@ const isWindows = platform === 'win32';
 
 function maybeWindowsPath(path) {
   if (!path) return path;
-  if (!isWindows) return resolve(path);
-  return '//?/' + resolve(path).replace(/\\/g, '/');
+  const resolvedPath = resolve(path);
+  if (!isWindows) return resolvedPath;
+
+  // Strip any existing UNC prefix check both the format we add as well as what
+  //  the windows API returns when using path.resolve
+  let cleanPath = resolvedPath;
+  while (cleanPath.startsWith('\\\\?\\') || cleanPath.startsWith('//?/')) {
+    cleanPath = cleanPath.substring(4);
+  }
+
+  return '//?/' + cleanPath.replace(/\\/g, '/');
 }
 
 /**
@@ -108,7 +117,7 @@ export async function componentize(opts,
       .slice(0, 12)
   );
   await mkdir(tmpDir);
-  const sourceDir = join(tmpDir, 'sources');
+  const sourceDir = maybeWindowsPath(join(tmpDir, 'sources'));
   await mkdir(sourceDir);
 
   let {
@@ -223,7 +232,7 @@ export async function componentize(opts,
     console.log(env);
   }
 
-  let initializerPath = join(sourceDir, 'initializer.js');
+  let initializerPath = maybeWindowsPath(join(sourceDir, 'initializer.js'));
   sourcePath = maybeWindowsPath(sourcePath);
   let workspacePrefix = dirname(sourcePath);
 
