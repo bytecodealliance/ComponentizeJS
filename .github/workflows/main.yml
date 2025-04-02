@@ -144,6 +144,7 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
+          - macos-latest
         build-type:
           - 'release'
           - 'debug'
