@@ -11,6 +11,6 @@ edition = "2021"
 anyhow = "1.0.81"
 async-std = { version = "1.13.0", features = ["attributes"] }
 cap-std = "3.3.0"
-wasmtime = { version = "25.0.1", features = ["component-model"] }
-wasmtime-wasi =  "25.0.1"
-wasmtime-wasi-http =  "25.0.1"
+wasmtime = { version = "31.0.0", features = ["component-model"] }
+wasmtime-wasi =  "31.0.0"
+wasmtime-wasi-http =  "31.0.0"
