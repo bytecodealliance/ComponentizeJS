@@ -85,8 +85,8 @@ function isNumeric(n) {
 }
 
 export async function componentize(opts,
-                                   _deprecatedWitWorldOrOpts = undefined,
-                                   _deprecatedOpts = undefined) {
+  _deprecatedWitWorldOrOpts = undefined,
+  _deprecatedOpts = undefined) {
   let useOriginalSourceFile = true;
   let jsSource;
 
@@ -246,8 +246,9 @@ export async function componentize(opts,
       workspacePrefix = sourceDir;
       sourcePath = sourceName;
     }
-    if (workspacePrefix.startsWith(cwd())) {
-      workspacePrefix = cwd();
+    let currentDir = maybeWindowsPath(cwd());
+    if (workspacePrefix.startsWith(currentDir)) {
+      workspacePrefix = currentDir;
       sourcePath = sourcePath.slice(workspacePrefix.length + 1);
     }
   }
