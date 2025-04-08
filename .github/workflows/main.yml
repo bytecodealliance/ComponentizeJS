@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+
 defaults:
   run:
     shell: bash
@@ -14,6 +15,7 @@ defaults:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 
 jobs:
   lint:
@@ -33,7 +35,12 @@ jobs:
   #########
 
   build-splicer:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -164,6 +171,15 @@ jobs:
           key: starlingmonkey-${{matrix.build-type}}-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: lib
 
+      - name: Restore Embedding Splicer from cache
+        uses: actions/cache/restore@v4
+        id: splicer-build
+        with:
+          key: splicer-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
+          path: |
+            lib
+            target
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{matrix.node-version}}
@@ -192,6 +208,15 @@ jobs:
           key: starlingmonkey-release-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
           path: lib
 
+      - name: Restore Embedding Splicer from cache
+        uses: actions/cache/restore@v4
+        id: splicer-build
+        with:
+          key: splicer-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
+          path: |
+            lib
+            target
+
       - uses: actions/setup-node@v4
         with:
           node-version: '23.10.0'
@@ -203,8 +228,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: 'examples/hello-world/host/target/release/wasmtime-test*'
-          key: example-hello-world-cargo-${{ hashFiles('examples/hello-world/host/src/main.rs', 
-                                                       'examples/hello-world/host/Cargo.lock', 
+          key: example-hello-world-cargo-${{ hashFiles('examples/hello-world/host/src/main.rs',
+                                                       'examples/hello-world/host/Cargo.lock',
                                                        'examples/hello-world/guest/hello.wit') }}
 
       - name: Test Example

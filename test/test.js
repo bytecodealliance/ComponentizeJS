@@ -138,40 +138,47 @@ suite('Bindings', () => {
     test(name, async () => {
       const source = await readFile(
         new URL(`./cases/${name}/source.js`, import.meta.url),
-        'utf8'
+        'utf8',
       );
 
+      const test = await import(`./cases/${name}/test.js`);
+
+      // Determine the relevant WIT world to use
       let witWorld,
         witPath,
         worldName,
         isWasiTarget = false;
-      try {
-        witWorld = await readFile(
-          new URL(`./cases/${name}/world.wit`, import.meta.url),
-          'utf8'
-        );
-      } catch (e) {
-        if (e?.code == 'ENOENT') {
-          try {
-            isWasiTarget = true;
-            witPath = fileURLToPath(
-              new URL(`./cases/${name}/wit`, import.meta.url)
-            );
-            await readdir(witPath);
-          } catch (e) {
-            if (e?.code === 'ENOENT') {
-              witPath = fileURLToPath(new URL('./wit', import.meta.url));
-              worldName = 'test2';
-            } else {
-              throw e;
+      if (test.worldName) {
+        witPath = fileURLToPath(new URL('./wit', import.meta.url));
+        worldName = test.worldName;
+        isWasiTarget = true;
+      } else {
+        try {
+          witWorld = await readFile(
+            new URL(`./cases/${name}/world.wit`, import.meta.url),
+            'utf8',
+          );
+        } catch (e) {
+          if (e?.code == 'ENOENT') {
+            try {
+              isWasiTarget = true;
+              witPath = fileURLToPath(
+                new URL(`./cases/${name}/wit`, import.meta.url),
+              );
+              await readdir(witPath);
+            } catch (e) {
+              if (e?.code === 'ENOENT') {
+                witPath = fileURLToPath(new URL('./wit', import.meta.url));
+                worldName = 'test2';
+              } else {
+                throw e;
+              }
             }
+          } else {
+            throw e;
           }
-        } else {
-          throw e;
         }
       }
-
-      const test = await import(`./cases/${name}/test.js`);
 
       const enableFeatures = test.enableFeatures || ['http'];
       const disableFeatures =
@@ -229,14 +236,14 @@ suite('Bindings', () => {
 
         await writeFile(
           new URL(`./output/${name}.component.wasm`, import.meta.url),
-          component
+          component,
         );
 
         for (const file of Object.keys(files)) {
           let source = files[file];
           await writeFile(
             new URL(`./output/${name}/${file}`, import.meta.url),
-            source
+            source,
           );
         }
 

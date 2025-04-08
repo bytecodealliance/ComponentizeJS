@@ -1,5 +1,5 @@
 # WASM_OPT ?= $(shell rm node_modules/.bin/wasm-opt ; which wasm-opt)
-JCO ?= ./node_modules/.bin/jco
+JCO ?= npx jco
 STARLINGMONKEY_SRC ?= StarlingMonkey
 
 ifndef JCO
