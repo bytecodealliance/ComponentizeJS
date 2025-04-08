@@ -70,13 +70,17 @@ fn map_core_fn(cfn: &bindgen::CoreFn) -> CoreFn {
     }
 }
 
-fn parse_wit(path: &Path) -> Result<(Resolve, PackageId)> {
+fn parse_wit(path: impl AsRef<Path>) -> Result<(Resolve, PackageId)> {
     let mut resolve = Resolve::default();
+    let path = path.as_ref();
     let id = if path.is_dir() {
-        resolve.push_dir(&path)?.0
+        resolve
+            .push_dir(&path)
+            .with_context(|| format!("resolving WIT in {}", path.display()))?
+            .0
     } else {
         let contents =
-            std::fs::read(&path).with_context(|| format!("failed to read file {path:?}"))?;
+            std::fs::read(&path).with_context(|| format!("reading file {}", path.display()))?;
         let text = match std::str::from_utf8(&contents) {
             Ok(s) => s,
             Err(_) => bail!("input file is not valid utf-8"),
