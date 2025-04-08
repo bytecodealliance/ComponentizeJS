@@ -85,7 +85,7 @@ jobs:
       - name: Get StarlingMonkey Commit
         id: starlingmonkey-commit
         run: echo "STARLINGMONKEY_HASH=$(git submodule status | head -c9 | tail -c8)" >> "$GITHUB_OUTPUT"
-      
+
       - uses: actions/cache@v4
         id: starlingmonkey-build
         with:
@@ -202,8 +202,10 @@ jobs:
       - name: Cache Example build
         uses: actions/cache@v4
         with:
-          path: examples/target
-          key: example-jit-cargo-${{ hashFiles('examples/src/main.rs', 'examples/Cargo.lock', 'examples/hello.wit') }}
+          path: 'examples/hello-world/host/target/release/wasmtime-test*'
+          key: example-hello-world-cargo-${{ hashFiles('examples/hello-world/host/src/main.rs', 
+                                                       'examples/hello-world/host/Cargo.lock', 
+                                                       'examples/hello-world/guest/hello.wit') }}
 
       - name: Test Example
         run: |

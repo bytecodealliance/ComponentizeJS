@@ -5,7 +5,7 @@ use wasmtime::{
     component::{Component, Linker},
     Config, Engine, Store, WasmBacktraceDetails,
 };
-use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
+use wasmtime_wasi::{IoView, ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 use wasmtime_wasi_http::{WasiHttpCtx, WasiHttpView};
 
 mod bindings {
@@ -52,18 +52,15 @@ async fn main() -> Result<()> {
         wasi: WasiCtx,
         http: WasiHttpCtx,
     }
+    impl IoView for CommandExtendedCtx {
+        fn table(&mut self) -> &mut ResourceTable { &mut self.table }
+    }
     impl WasiView for CommandExtendedCtx {
-        fn table(&mut self) -> &mut ResourceTable {
-            &mut self.table
-        }
         fn ctx(&mut self) -> &mut WasiCtx {
             &mut self.wasi
         }
     }
     impl WasiHttpView for CommandExtendedCtx {
-        fn table(&mut self) -> &mut ResourceTable {
-            &mut self.table
-        }
         fn ctx(&mut self) -> &mut WasiHttpCtx {
             &mut self.http
         }
