@@ -109,9 +109,9 @@ suite('Builtins', () => {
                 reject(
                   new Error(
                     'test timed out with output:\n' +
-                      stdout +
-                      '\n\nstderr:\n' +
-                      stderr
+                    stdout +
+                    '\n\nstderr:\n' +
+                    stderr
                   )
                 );
               }, 10_000);
@@ -254,7 +254,7 @@ suite('Bindings', () => {
 });
 
 suite('WASI', () => {
-  test('basic app', async () => {
+  test('basic app (old API)', async () => {
     const { component } = await componentize(
       `
       import { now } from 'wasi:clocks/wall-clock@0.2.3';
@@ -270,6 +270,42 @@ suite('WASI', () => {
       export const getResult = () => result;
     `,
       {
+        witPath: fileURLToPath(new URL('./wit', import.meta.url)),
+        worldName: 'test1',
+        enableAot,
+        debugBuild,
+      }
+    );
+
+    await writeFile(
+      new URL(`./output/wasi.component.wasm`, import.meta.url),
+      component
+    );
+
+    const { files } = await transpile(component, { tracing: DEBUG_TRACING });
+
+    await mkdir(new URL(`./output/wasi/interfaces`, import.meta.url), {
+      recursive: true,
+    });
+
+    for (const file of Object.keys(files)) {
+      await writeFile(
+        new URL(`./output/wasi/${file}`, import.meta.url),
+        files[file]
+      );
+    }
+
+    var instance = await import(`./output/wasi/component.js`);
+    instance.run.run();
+    const result = instance.getResult();
+    strictEqual(result.slice(0, 10), `NOW: ${String(Date.now()).slice(0, 5)}`);
+    strictEqual(result.split(',').length, 3);
+  });
+
+  test('basic app (OriginalSourceFile API)', async () => {
+    const { component } = await componentize(
+      {
+        sourcePath: "./test/api/index.js",
         witPath: fileURLToPath(new URL('./wit', import.meta.url)),
         worldName: 'test1',
         enableAot,
