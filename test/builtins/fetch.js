@@ -3,11 +3,13 @@ import { createServer } from 'node:http';
 
 import { strictEqual, ok } from 'node:assert';
 
+import { maybeWindowsPath } from '../../src/platform.js';
+
 const FETCH_URL = 'http://localhost';
 
 export const state = async () => {
   const { getRandomPort } = await import(
-    fileURLToPath(new URL('../util.js', import.meta.url))
+    maybeWindowsPath(fileURLToPath(new URL('../util.js', import.meta.url)))
   );
   const port = await getRandomPort();
   return { port };
