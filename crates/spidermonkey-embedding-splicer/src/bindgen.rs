@@ -398,9 +398,6 @@ impl JsBindgen<'_> {
     ) -> Result<()> {
         for (key, export) in &self.resolve.worlds[self.world].exports {
             let name = self.resolve.name_world_key(key);
-            if name.starts_with("wasi:http/incoming-handler@0.2.") {
-                continue;
-            }
             // Do not generate exports when the guest export is not implemented.
             // We check both the full interface name - "ns:pkg@v/my-interface" and the
             // aliased interface name "myInterface". All other names are always
