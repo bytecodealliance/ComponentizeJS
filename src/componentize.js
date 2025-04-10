@@ -8,7 +8,7 @@ import {
 } from '@bytecodealliance/jco';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { resolve, join, dirname } from 'node:path';
+import { join, dirname } from 'node:path';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { rmSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -17,26 +17,13 @@ import {
   stubWasi,
 } from '../lib/spidermonkey-embedding-splicer.js';
 import { fileURLToPath } from 'node:url';
-import { cwd, stdout, platform } from 'node:process';
+import { cwd, stdout } from 'node:process';
+
+import { maybeWindowsPath } from './platform.js';
+
 export const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8'),
 );
-const isWindows = platform === 'win32';
-
-function maybeWindowsPath(path) {
-  if (!path) return path;
-  const resolvedPath = resolve(path);
-  if (!isWindows) return resolvedPath;
-
-  // Strip any existing UNC prefix check both the format we add as well as what
-  //  the windows API returns when using path.resolve
-  let cleanPath = resolvedPath;
-  while (cleanPath.startsWith('\\\\?\\') || cleanPath.startsWith('//?/')) {
-    cleanPath = cleanPath.substring(4);
-  }
-
-  return '//?/' + cleanPath.replace(/\\/g, '/');
-}
 
 /**
  * Clean up the given input string by removing the given patterns if
