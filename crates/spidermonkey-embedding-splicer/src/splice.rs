@@ -33,15 +33,19 @@ pub fn splice_bindings(
     wit_source: Option<String>,
     debug: bool,
 ) -> Result<SpliceResult, String> {
-    let (mut resolve, id) = if let Some(wit_source) = wit_source {
-        let mut resolve = Resolve::default();
-        let path = PathBuf::from("component.wit");
-        let id = resolve
-            .push_str(&path, &wit_source)
-            .map_err(|e| e.to_string())?;
-        (resolve, id)
-    } else {
-        parse_wit(&PathBuf::from(wit_path.unwrap())).map_err(|e| format!("{:?}", e))?
+    let (mut resolve, id) = match (wit_source, wit_path) {
+        (Some(wit_source), _) => {
+            let mut resolve = Resolve::default();
+            let path = PathBuf::from("component.wit");
+            let id = resolve
+                .push_str(&path, &wit_source)
+                .map_err(|e| e.to_string())?;
+            (resolve, id)
+        }
+        (_, Some(wit_path)) => parse_wit(&wit_path).map_err(|e| format!("{:?}", e))?,
+        (None, None) => {
+            return Err("neither wit source nor path have been specified".into());
+        }
     };
 
     let world = resolve
