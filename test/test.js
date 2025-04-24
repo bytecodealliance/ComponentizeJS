@@ -11,8 +11,6 @@ const LOG_DEBUGGING = false;
 const enableAot = process.env.WEVAL_TEST == '1';
 const debugBuild = process.env.DEBUG_TEST == '1';
 
-const noOp = async () => {};
-
 function maybeLogging(disableFeatures) {
   if (!LOG_DEBUGGING) return disableFeatures;
   if (disableFeatures && disableFeatures.includes('stdio')) {
@@ -26,24 +24,12 @@ suite('Builtins', () => {
   for (const filename of builtinsCases) {
     const name = filename.slice(0, -3);
     test(name, async () => {
-      const testModule = await import(`./builtins/${filename}`);
       const {
-        state,
+        source,
         test: runTest,
         disableFeatures,
         enableFeatures,
-      } = testModule;
-
-      // If an args object was provided, generate the arguments to feed to both
-      // source generation (if necessary) and the test run itself
-      let stateFn = state ?? noOp;
-      const stateObj = await stateFn();
-
-      // If the source is a function then invoke it to generate the source string, possibly with arguments
-      let source = testModule.source;
-      if (typeof source === 'function') {
-        source = source(stateObj);
-      }
+      } = await import(`./builtins/${filename}`);
 
       const { component } = await componentize(
         source,
@@ -60,7 +46,7 @@ suite('Builtins', () => {
           enableFeatures,
           disableFeatures: maybeLogging(disableFeatures),
           enableAot,
-        },
+        }
       );
 
       const { files } = await transpile(component, {
@@ -75,13 +61,13 @@ suite('Builtins', () => {
 
       await writeFile(
         new URL(`./output/${name}.component.wasm`, import.meta.url),
-        component,
+        component
       );
 
       for (const file of Object.keys(files)) {
         await writeFile(
           new URL(`./output/${name}/${file}`, import.meta.url),
-          files[file],
+          files[file]
         );
       }
 
@@ -90,12 +76,11 @@ suite('Builtins', () => {
         `
         import { run } from './${name}.js';
         run();
-      `,
+      `
       );
 
       try {
-        // Build a run function to pass to the test
-        const runFn = async function run() {
+        await runTest(async function run() {
           let stdout = '',
             stderr = '',
             timeout;
@@ -105,10 +90,10 @@ suite('Builtins', () => {
                 process.argv[0],
                 [
                   fileURLToPath(
-                    new URL(`./output/${name}/run.js`, import.meta.url),
+                    new URL(`./output/${name}/run.js`, import.meta.url)
                   ),
                 ],
-                { stdio: 'pipe' },
+                { stdio: 'pipe' }
               );
               cp.stdout.on('data', (chunk) => {
                 stdout += chunk;
@@ -118,16 +103,16 @@ suite('Builtins', () => {
               });
               cp.on('error', reject);
               cp.on('exit', (code) =>
-                code === 0 ? resolve() : reject(new Error(stderr || stdout)),
+                code === 0 ? resolve() : reject(new Error(stderr || stdout))
               );
               timeout = setTimeout(() => {
                 reject(
                   new Error(
                     'test timed out with output:\n' +
-                      stdout +
-                      '\n\nstderr:\n' +
-                      stderr,
-                  ),
+                    stdout +
+                    '\n\nstderr:\n' +
+                    stderr
+                  )
                 );
               }, 10_000);
             });
@@ -138,10 +123,7 @@ suite('Builtins', () => {
           }
 
           return { stdout, stderr };
-        };
-
-        // Run the actual test
-        await runTest(runFn, stateObj);
+        });
       } catch (err) {
         if (err.stderr) console.error(err.stderr);
         throw err.err || err;
@@ -156,7 +138,7 @@ suite('Bindings', () => {
     test(name, async () => {
       const source = await readFile(
         new URL(`./cases/${name}/source.js`, import.meta.url),
-        'utf8',
+        'utf8'
       );
 
       let witWorld,
@@ -166,14 +148,14 @@ suite('Bindings', () => {
       try {
         witWorld = await readFile(
           new URL(`./cases/${name}/world.wit`, import.meta.url),
-          'utf8',
+          'utf8'
         );
       } catch (e) {
         if (e?.code == 'ENOENT') {
           try {
             isWasiTarget = true;
             witPath = fileURLToPath(
-              new URL(`./cases/${name}/wit`, import.meta.url),
+              new URL(`./cases/${name}/wit`, import.meta.url)
             );
             await readdir(witPath);
           } catch (e) {
@@ -247,14 +229,14 @@ suite('Bindings', () => {
 
         await writeFile(
           new URL(`./output/${name}.component.wasm`, import.meta.url),
-          component,
+          component
         );
 
         for (const file of Object.keys(files)) {
           let source = files[file];
           await writeFile(
             new URL(`./output/${name}/${file}`, import.meta.url),
-            source,
+            source
           );
         }
 
@@ -292,12 +274,12 @@ suite('WASI', () => {
         worldName: 'test1',
         enableAot,
         debugBuild,
-      },
+      }
     );
 
     await writeFile(
       new URL(`./output/wasi.component.wasm`, import.meta.url),
-      component,
+      component
     );
 
     const { files } = await transpile(component, { tracing: DEBUG_TRACING });
@@ -309,7 +291,7 @@ suite('WASI', () => {
     for (const file of Object.keys(files)) {
       await writeFile(
         new URL(`./output/wasi/${file}`, import.meta.url),
-        files[file],
+        files[file]
       );
     }
 
@@ -321,17 +303,19 @@ suite('WASI', () => {
   });
 
   test('basic app (OriginalSourceFile API)', async () => {
-    const { component } = await componentize({
-      sourcePath: './test/api/index.js',
-      witPath: fileURLToPath(new URL('./wit', import.meta.url)),
-      worldName: 'test1',
-      enableAot,
-      debugBuild,
-    });
+    const { component } = await componentize(
+      {
+        sourcePath: "./test/api/index.js",
+        witPath: fileURLToPath(new URL('./wit', import.meta.url)),
+        worldName: 'test1',
+        enableAot,
+        debugBuild,
+      }
+    );
 
     await writeFile(
       new URL(`./output/wasi.component.wasm`, import.meta.url),
-      component,
+      component
     );
 
     const { files } = await transpile(component, { tracing: DEBUG_TRACING });
@@ -343,7 +327,7 @@ suite('WASI', () => {
     for (const file of Object.keys(files)) {
       await writeFile(
         new URL(`./output/wasi/${file}`, import.meta.url),
-        files[file],
+        files[file]
       );
     }
 

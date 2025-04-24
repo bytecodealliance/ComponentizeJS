@@ -8,17 +8,11 @@ import { getRandomPort } from '../util.js';
 
 const FETCH_URL = 'http://localhost';
 
-export const state = async () => {
-  const port = await getRandomPort();
-  return { port };
-};
+const port = await getRandomPort();
 
-export const source = (testState) => {
-  let port = testState?.port ? ':' + testState.port : '';
-  const url = FETCH_URL + port;
-  return `
+export const source = `
   export async function run () {
-    const res = await fetch('${url}');
+    const res = await fetch('${FETCH_URL}:${port}');
     const source = await res.json();
     console.log(source.url);
   }
@@ -26,18 +20,11 @@ export const source = (testState) => {
     return true;
   }
 `;
-};
 
 export const enableFeatures = ['http'];
 
-export async function test(run, testState) {
-  // Get the randomly generated port
-  const port = testState.port;
-  if (!port) {
-    throw new Error('missing port on test state');
-  }
-
-  const url = FETCH_URL + (port ? ':' + port : '');
+export async function test(run) {
+  const url = `${FETCH_URL}:${port}`;
 
   // Run a local server on some port
   const server = createServer(async (req, res) => {
