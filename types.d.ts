@@ -28,6 +28,10 @@ interface ComponentizeOptions {
    */
   wevalBin?: string,
   /**
+   * Use a pre-existing path to the `wizer` binary, if present
+   */
+  wizerBin?: string,
+  /**
    * Path to custom Preview2 Adapter
    */
   preview2Adapter?: string,

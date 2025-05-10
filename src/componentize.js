@@ -292,8 +292,14 @@ export async function componentize(opts,
       }
     );
   } else {
+    let wizerBin;
+    if (opts.wizerBin) {
+      wizerBin = opts.wizerBin;
+    } else {
+      wizerBin = wizer;
+    }
     wizerProcess = spawnSync(
-      wizer,
+      wizerBin,
       [
         '--allow-wasi',
         '--init-func',
