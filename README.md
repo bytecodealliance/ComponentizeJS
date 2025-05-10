@@ -119,9 +119,13 @@ AOT compilation can also be configured with the following options:
 
 [weval]: https://github.com/bytecodealliance/weval
 
-### Custom `weval` binary
+### Custom `weval` binary for AOT
 
 To use a custom (pre-downloaded) [`weval`][weval] binary, set the `wevalBin` option to the path to your desired weval binary.
+
+### Custom `wizer` binary when AOT is disabled
+
+To use a custom (pre-downloaded) [`wizer`](https://github.com/bytecodealliance/wizer) binary, set the `wizerBin` option to the path to your desired wizer binary.
 
 ### Async Support
 
