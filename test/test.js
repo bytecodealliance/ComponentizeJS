@@ -36,7 +36,7 @@ suite('Builtins', () => {
         `
         package local:runworld;
         world runworld {
-          export run: func() -> ();
+          export run: func();
         }
       `,
         {
@@ -271,6 +271,7 @@ suite('WASI', () => {
       export const run = {
         run () {
           result = \`NOW: \${now().seconds}, RANDOM: \${getRandomBytes(2n)}\`;
+          return { tag: 'ok' };
         }
       };
 

@@ -11,7 +11,7 @@ export function getResult() {
     new Fields([
       ['User-agent', encoder.encode('WASI-HTTP/0.0.1')],
       ['Content-type', encoder.encode('application/json')],
-    ])
+    ]),
   );
 
   req.setScheme({ tag: 'HTTPS' });
@@ -27,13 +27,14 @@ export function getResult() {
   const responseHeaders = incomingResponse.headers().entries();
 
   const headers = Object.fromEntries(
-    responseHeaders.map(([k, v]) => [k, decoder.decode(v)])
+    responseHeaders.map(([k, v]) => [k, decoder.decode(v)]),
   );
 
   let responseBody;
-  const incomingBody = incomingResponse.consume();
+
+  const incomingBody = incomingResponse.consume().val;
   {
-    const bodyStream = incomingBody.stream();
+    const bodyStream = incomingBody.stream().val;
     // const bodyStreamPollable = bodyStream.subscribe();
     const buf = bodyStream.blockingRead(500n);
     // TODO: actual streaming
