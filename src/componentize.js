@@ -94,7 +94,7 @@ export async function componentize(
 
   let {
     sourceName = 'source.js',
-    sourcePath = join(sourcesDir, sourceName),
+    sourcePath = maybeWindowsPath(join(sourcesDir, sourceName)),
     preview2Adapter = preview1AdapterReactorPath(),
     witPath,
     witWorld,
@@ -131,7 +131,7 @@ export async function componentize(
   const outputWasmPath = join(workDir, 'out.wasm');
 
   await writeFile(inputWasmPath, Buffer.from(wasm));
-  let initializerPath = join(sourcesDir, 'initializer.js');
+  let initializerPath = maybeWindowsPath(join(sourcesDir, 'initializer.js'));
   await writeFile(initializerPath, jsBindings);
 
   if (debugBindings) {
@@ -484,15 +484,15 @@ function getEnginePath(opts) {
 
 /** Prepare a work directory for use with componentization */
 async function prepWorkDir() {
-  const baseDir = join(
+  const baseDir = maybeWindowsPath(join(
     tmpdir(),
     createHash('sha256')
       .update(Math.random().toString())
       .digest('hex')
       .slice(0, 12),
-  );
+  ));
   await mkdir(baseDir);
-  const sourcesDir = join(baseDir, 'sources');
+  const sourcesDir = maybeWindowsPath(join(baseDir, 'sources'));
   await mkdir(sourcesDir);
   return { baseDir, sourcesDir };
 }
