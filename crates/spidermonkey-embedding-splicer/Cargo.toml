@@ -10,13 +10,14 @@ edition.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+clap = { version = "4.5.31", features = ["suggestions", "color", "derive"] }
 heck = { workspace = true }
-js-component-bindgen = { workspace = true }
-wasmparser = { workspace = true }
+js-component-bindgen = { workspace = true, features = [ "transpile-bindgen" ] }
+orca-wasm = { workspace = true }
+rand = { workspace = true }
 wasm-encoder = { workspace = true }
+wasmparser = { workspace = true }
+wit-bindgen = { workspace = true }
+wit-bindgen-core = { workspace = true }
 wit-component = { workspace = true }
 wit-parser = { workspace = true }
-wit-bindgen-core = { workspace = true }
-wit-bindgen = { workspace = true }
-orca-wasm.workspace = true
-clap = { version = "4.5.31", features = ["suggestions", "color", "derive"] }

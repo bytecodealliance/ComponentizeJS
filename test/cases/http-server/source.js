@@ -9,9 +9,9 @@ import {
 export const incomingHandler = {
   handle(incomingRequest, responseOutparam) {
     const outgoingResponse = new OutgoingResponse(new Fields());
-    let outgoingBody = outgoingResponse.body();
+    let outgoingBody = outgoingResponse.body().val;
     {
-      let outputStream = outgoingBody.write();
+      let outputStream = outgoingBody.write().val;
       outputStream.blockingWriteAndFlush(
         new Uint8Array(new TextEncoder().encode('Hello world!')),
       );
