@@ -905,7 +905,7 @@ impl JsBindgen<'_> {
             }
         }
 
-        let err = if get_thrown_type(self.resolve, func.result)
+        let err = if get_result_types(self.resolve, func.result)
             .is_some_and(|(_, err_ty)| err_ty.is_some())
         {
             match abi {
@@ -1347,8 +1347,8 @@ fn binding_name(func_name: &str, iface_name: &Option<String>) -> String {
     }
 }
 
-/// Utility function for deducing whether a type can throw
-pub fn get_thrown_type<'a>(
+/// Extract success and error types from a given optional type, if it is a Result
+pub fn get_result_types<'a>(
     resolve: &'a Resolve,
     return_type: Option<Type>,
 ) -> Option<(Option<&'a Type>, Option<&'a Type>)> {
