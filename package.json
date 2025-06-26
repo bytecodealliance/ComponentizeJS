@@ -14,7 +14,8 @@
   "devDependencies": {
     "@bytecodealliance/preview2-shim": "^0.17.1",
     "cross-env": "^7.0.3",
-    "mocha": "^11.1.0"
+    "mocha": "^11.1.0",
+    "semver": "^7.7.2"
   },
   "dependencies": {
     "@bytecodealliance/jco": "^1.9.1",
