@@ -1,0 +1,253 @@
+name: release
+run-name: release
+
+on:
+  push:
+    # NOTE: pushes from CI without a PAT will not trigger the tags below
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+*"
+      - "[0-9]+.[0-9]+.[0-9]+-*"
+    branches:
+      - "prep-release-v[0-9]+.[0-9]+.[0-9]+*"
+      - "prep-release-v[0-9]+.[0-9]+.[0-9]+-*"
+
+  workflow_dispatch:
+    inputs:
+      version:
+        type: string
+        required: true
+        description: |
+          Version tag to release (e.x. `0.1.0`, `0.2.0`)
+
+permissions:
+  contents: none
+
+jobs:
+  meta:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      project-dir: ${{ steps.project-meta.outputs.project-dir }}
+      artifacts-glob: ${{ steps.project-meta.outputs.artifacts-glob }}
+      artifact-name: ${{ steps.project-meta.outputs.artifact-name }}
+      next-release-tag: ${{ steps.project-meta.outputs.next-release-tag }}
+      is-prerelease: ${{ steps.project-meta.outputs.is-prerelease }}
+      prerelease-tag: ${{ steps.project-meta.outputs.prerelease-tag }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ">=22"
+
+      - name: Cache npm install
+        id: cache-node-modules
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          key: node-modules-dev-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/**/package.json') }}
+          path: |
+            node_modules
+      - name: Install debug NPM packages
+        run: |
+          npm install -D
+
+      - name: Collect metadata
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        id: meta
+        with:
+          script: |
+            if (context.payload.inputs?.version) {
+              core.setOutput('version', context.payload.inputs.version);
+              return;
+            }
+
+            if (context.ref.startsWith('refs/tags/')) {
+              match = context.ref.replace('refs/tags/', '').match(/^([^\s]+)$/);
+            } else if (context.ref.startsWith('refs/heads/')) {
+              match = context.ref.replace('refs/heads/', '').match(/^prep-release-v([^\s]+)$/);
+             } else {
+               throw new Error(`Unexpected context ref [${context.ref}]`);
+             }
+             if (!match) { throw new Error(`Failed to parse tag/branch: [${context.ref}]`); }
+             const [_, version] = match;
+             core.setOutput('version', version);
+
+      - name: Gather project metadata
+        id: project-meta
+        env:
+          NEXT_VERSION: ${{ steps.meta.outputs.version }}
+        shell: bash
+        run: |
+          if [[ $NEXT_VERSION == v* ]]; then
+            echo "::error::next version [$NEXT_VERSION] starts with 'v' -- enter only the semver version (ex. '0.1.0', not 'v0.1.0')";
+            exit 1;
+          fi
+
+          export PROJECT_DIR=$PWD;
+          export CURRENT_VERSION=$(node -e "process.stdout.write(require(process.env.PROJECT_DIR + '/package.json').version)");
+          export ARTIFACTS_GLOB="packages/componentize-js/bytecodealliance-componentize-js-*.tgz";
+          export ARTIFACT_NAME="bytecodealliance-componentize-js-$NEXT_VERSION.tgz";
+
+          echo -e "project-dir=$PROJECT_DIR" >> $GITHUB_OUTPUT;
+          echo -e "artifacts-glob=$ARTIFACTS_GLOB" >> $GITHUB_OUTPUT;
+          echo -e "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT;
+          echo -e "next-release-tag=${NEXT_VERSION}" >> $GITHUB_OUTPUT;
+
+          export IS_PRERELEASE=$(node scripts/semver-is-prerelease.mjs $NEXT_VERSION);
+          echo -e "is-prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT;
+          export PRERELEASE_TAG=$(node scripts/semver-get-prerelease.mjs $NEXT_VERSION);
+          echo -e "prerelease-tag=$PRERELEASE_TAG" >> $GITHUB_OUTPUT;
+
+  pack-npm-release:
+    if: ${{ needs.meta.outputs.is-js-project == 'true' }}
+    runs-on: ubuntu-24.04
+    needs:
+      - meta
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      # NOTE: we must use a node version new-enough to have --experimental-wasm-jspi
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ">=22"
+
+      - name: Cache npm install
+        id: cache-node-modules
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/**/package.json') }}
+          path: |
+            node_modules
+      - name: Install NPM packages
+        run: |
+          npm install
+
+      - name: Create release package
+        working-directory: ${{ needs.meta.outputs.project-dir }}
+        run: |
+          npm pack
+
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: ${{ needs.meta.outputs.artifacts-glob }}
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          if-no-files-found: error
+          name: ${{ needs.meta.outputs.project }}
+          path: |
+            ${{ needs.meta.outputs.artifacts-glob }}
+
+  test-npm-release:
+    runs-on: ubuntu-24.04
+    needs:
+      - meta
+      - pack-npm-release
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: artifacts
+
+      - name: Test built componentize-js NPM package
+        shell: bash
+        run: |
+          export PACKAGE_DIR=${{ github.workspace }}/artifacts/componentize-js/${{ needs.meta.outputs.artifact-name }}
+          cp -r examples/hello-world/guest /tmp/test
+          cd /tmp/test
+          npm install --save $PACKAGE_DIR
+          npm run all
+
+  npm-publish:
+    runs-on: ubuntu-24.04
+    needs:
+      - meta
+      - test-npm-release
+    steps:
+      # NOTE: we need to checkout to pull npmrc
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: artifacts
+
+      - name: Publish componentize-js to NPM
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          export PACKAGE_DIR=${{ github.workspace }}/artifacts/componentize-js/${{ needs.meta.outputs.artifact-name }}
+
+          export OPT_DRY_RUN="--dry-run"
+          if [ "tag" == "${{ github.ref_type }}" ]; then
+            export OPT_DRY_RUN="";
+          fi
+
+          export OPT_RELEASE_TAG=""
+          if [ "true" == "${{ needs.meta.outputs.is-prerelease }}" ]; then
+            export OPT_RELEASE_TAG="--tag ${{ needs.meta.outputs.prerelease-tag }}";
+          fi
+
+          npm publish -w @bytecodealliance/componentize-js $OPT_DRY_RUN $OPT_RELEASE_TAG $PACKAGE_DIR
+
+  create-gh-release:
+    runs-on: ubuntu-24.04
+    if: always()
+    needs:
+      - meta
+      - test-npm-release
+      - npm-publish
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - uses: taiki-e/install-action@2cab843126c0d8cf950bf55f4e9b8413f70f553f # v2.54.1
+        with:
+          fallback: none
+          tool: git-cliff
+
+      # Re-generate the current changelog so we can use it in the GH release announcement
+      #
+      # NOTE: if this workflow is being run due to a tag push, that's an *already committed* release
+      # tag and likely the one corresponding to this release, so we use the latest
+      #
+      - name: Re-generate current changelog
+        working-directory: ${{ needs.meta.outputs.project-dir }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+        run: |
+          if [ "tag" == "${{ github.ref_type }}" ]; then
+            git cliff --repository=${{ github.workspace }}/.git --latest > CHANGELOG.current;
+          else
+            git cliff \
+              --repository=${{ github.workspace }}/.git \
+              --unreleased \
+              --tag=${{ needs.meta.outputs.next-release-tag }} \
+              > CHANGELOG.current;
+          fi
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: artifacts
+
+      - name: Create GH release
+        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
+        with:
+          token: ${{ secrets.RELEASE_PAT || github.token }}
+          prerelease: ${{ github.ref_type != 'tag' }}
+          draft: ${{ github.ref_type != 'tag' }}
+          tag_name: ${{ needs.meta.outputs.next-release-tag }}
+          generate_release_notes: false
+          body_path: ${{ needs.meta.outputs.project-dir }}/CHANGELOG.current
+          files: |
+            ./artifacts/*/*
