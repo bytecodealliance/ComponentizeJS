@@ -63,7 +63,7 @@ commit_parsers = [
 ]
 
 # filter out the commits that are not matched by commit parsers
-filter_commits = true
+filter_commits = false
 
 filter = { exclude = { scopes = ["ci", "infra", "ops"] } }
 
