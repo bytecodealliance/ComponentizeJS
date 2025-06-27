@@ -83,7 +83,7 @@ jobs:
             exit 1;
           fi
 
-          export PROJECT_DIR=$PWD;
+          export PROJECT_DIR=${{ github.workspace }};
           export CURRENT_VERSION=$(node -e "process.stdout.write(require(process.env.PROJECT_DIR + '/package.json').version)");
           export ARTIFACTS_GLOB="packages/componentize-js/bytecodealliance-componentize-js-*.tgz";
           export ARTIFACT_NAME="bytecodealliance-componentize-js-$NEXT_VERSION.tgz";
