@@ -95,10 +95,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
         run: |
+          export IS_PRERELEASE=$(node scripts/semver-is-prerelease.mjs ${{ steps.project-meta.outputs.next-version }});
+
+          export START_ARG="--latest";
+          if [ "true" == "$IS_PRERELEASE" ]; then
+            export START_ARG="--unreleased";
+          fi
+
           git cliff \
             --repository=${{ github.workspace }}/.git \
             --config=./cliff.toml \
-            --latest \
+            $START_ARG \
             --tag=${{ steps.project-meta.outputs.next-version }} \
             --prepend=CHANGELOG.md
 
@@ -106,7 +113,7 @@ jobs:
       - name: Create release prep PR
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
         with:
-          branch: prep-release-${{ steps.project-meta.outputs.project}}-v${{ steps.project-meta.outputs.next-version }}
+          branch: prep-release-v${{ steps.project-meta.outputs.next-version }}
           token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
           commit-message: |
             release: componentize-js v${{ steps.project-meta.outputs.next-version }}
