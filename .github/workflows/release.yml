@@ -99,7 +99,6 @@ jobs:
           echo -e "prerelease-tag=$PRERELEASE_TAG" >> $GITHUB_OUTPUT;
 
   pack-npm-release:
-    if: ${{ needs.meta.outputs.is-js-project == 'true' }}
     runs-on: ubuntu-24.04
     needs:
       - meta
