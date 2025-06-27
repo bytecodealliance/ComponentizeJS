@@ -57,7 +57,7 @@ jobs:
             exit 1;
           fi
 
-          export PROJECT_DIR=$PWD;
+          export PROJECT_DIR=${{ github.workspace }};
           export CURRENT_VERSION=$(node -e "process.stdout.write(require(process.env.PROJECT_DIR + '/package.json').version)");
 
           echo -e "project-dir=$PROJECT_DIR"
