@@ -1,1 +1,33 @@
+# Changelog
 
+## [0.18.3-rc.0] - 2025-06-27
+
+### 🚀 Features
+
+* *(ci)* add release automation (#226) by @vados-cosmonic in #226
+
+
+### 🐛 Bug Fixes
+
+* *(ops)* add CHANGELOG.md (#229) by @vados-cosmonic in #229
+
+* do not skip wasi:http export processing (#218) by @vados-cosmonic in #218
+
+* *(ci)* use a local test server for fetch test (#207) by @vados-cosmonic in #207
+
+
+### 🚜 Refactor
+
+* componentize code (#203) by @vados-cosmonic in #203
+
+* *(splicer)* add explicit error for invalid WIT source (#219) by @vados-cosmonic in #219
+
+
+### ⚙️ Miscellaneous Tasks
+
+* add CHANGELOG.md (#227) by @vados-cosmonic in #227
+
+* *(deps)* update upstream wasm deps to *.227.1 (#204) by @vados-cosmonic in #204
+
+
+## [0.18.2] - 2025-04-09
