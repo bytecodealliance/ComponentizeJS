@@ -119,14 +119,7 @@ jobs:
         id: starlingmonkey-commit
         run: echo "STARLINGMONKEY_HASH=$(git submodule status | head -c9 | tail -c8)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        id: starlingmonkey-build
-        with:
-          key: starlingmonkey-release-${{ steps.starlingmonkey-commit.outputs.STARLINGMONKEY_HASH }}
-          path: lib
-
       - name: Install Rust Toolchain
-        if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
         run: |
           rustup toolchain install ${{ matrix.rust-version }}
           rustup target add wasm32-wasip1 --toolchain ${{ matrix.rust-version }}
