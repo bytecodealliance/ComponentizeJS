@@ -4,7 +4,7 @@
     "@bytecodealliance/componentize-js": "*"
   },
   "scripts": {
-    "build": "node componentize.js && cargo build --release",
+    "build": "node componentize.js",
     "all": "npm run build"
   }
 }

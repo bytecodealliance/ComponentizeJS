@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.3-rc.1] - 2025-06-30
+
+### 🐛 Bug Fixes
+
+* *(ci)* remove packages prefix (#232) by @vados-cosmonic in #232
+
+* *(ci)* remove if for JS projects (#231) by @vados-cosmonic in #231
+
+
+
+
 ## [0.18.3-rc.0] - 2025-06-27
 
 ### 🚀 Features

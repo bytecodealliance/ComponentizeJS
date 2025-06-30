@@ -105,10 +105,25 @@ jobs:
     permissions:
       id-token: write
       attestations: write
+    strategy:
+      matrix:
+        rust-version: 
+          - 1.80.0
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+          submodules: recursive
+
+      - name: Get StarlingMonkey Commit
+        id: starlingmonkey-commit
+        run: echo "STARLINGMONKEY_HASH=$(git submodule status | head -c9 | tail -c8)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust Toolchain
+        run: |
+          rustup toolchain install ${{ matrix.rust-version }}
+          rustup target add wasm32-wasip1 --toolchain ${{ matrix.rust-version }}
+          rustup target add wasm32-wasip1
 
       # NOTE: we must use a node version new-enough to have --experimental-wasm-jspi
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -116,15 +131,19 @@ jobs:
           node-version: ">=22"
 
       - name: Cache npm install
-        id: cache-node-modules
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json') }}
           path: |
             node_modules
+
       - name: Install NPM packages
         run: |
           npm install
+
+      - name: Perform release build
+        run: |
+          npm run build:release
 
       - name: Create release package
         working-directory: ${{ needs.meta.outputs.project-dir }}
@@ -138,7 +157,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           if-no-files-found: error
-          name: ${{ needs.meta.outputs.project }}
+          name: componentize-js
           path: |
             ${{ needs.meta.outputs.artifacts-glob }}
 
@@ -168,6 +187,8 @@ jobs:
     needs:
       - meta
       - test-npm-release
+    env:
+      PREPACK_SKIP_BUILD: "true"
     steps:
       # NOTE: we need to checkout to pull npmrc
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
