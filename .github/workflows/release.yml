@@ -141,6 +141,10 @@ jobs:
         run: |
           npm install
 
+      - name: Perform release build
+        run: |
+          npm run build:release
+
       - name: Create release package
         working-directory: ${{ needs.meta.outputs.project-dir }}
         run: |
