@@ -1,4 +1,5 @@
 #include "embedding.h"
+#include "debugger.h"
 #include "builtins/web/performance.h"
 
 namespace builtins::web::console {
@@ -147,6 +148,7 @@ cabi_realloc(void *ptr, size_t orig_size, size_t org_align, size_t new_size) {
 __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
                                                    void *argptr) {
   if (Runtime.first_call) {
+    content_debugger::maybe_init_debugger(Runtime.engine, true);
     js::ResetMathRandomSeed(Runtime.cx);
     Runtime.first_call = false;
     if (Runtime.clocks) {
