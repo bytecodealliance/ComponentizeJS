@@ -217,7 +217,7 @@ jobs:
             export OPT_RELEASE_TAG="--tag ${{ needs.meta.outputs.prerelease-tag }}";
           fi
 
-          npm publish -w @bytecodealliance/componentize-js $OPT_DRY_RUN $OPT_RELEASE_TAG $PACKAGE_DIR
+          npm publish -w @bytecodealliance/componentize-js $OPT_DRY_RUN $OPT_RELEASE_TAG $PACKAGE_DIR --access=public
 
   create-gh-release:
     runs-on: ubuntu-24.04
