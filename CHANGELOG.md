@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.18.3-rc.3] - 2025-07-07
+
+### 🐛 Bug Fixes
+
+* *(ci)* NPM public access release (#239) by @vados-cosmonic in #239
+
+
+
+
 ## [0.18.3-rc.2] - 2025-07-07
 
 
