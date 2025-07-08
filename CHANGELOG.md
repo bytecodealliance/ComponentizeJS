@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.18.3-rc.5] - 2025-07-08
+
+### 🐛 Bug Fixes
+
+* add repository.url to package.json (#243) by @vados-cosmonic in #243
+
+
+
+
 ## [0.18.3-rc.4] - 2025-07-08
 
 ### 🐛 Bug Fixes
