@@ -4,6 +4,9 @@
   "homepage": "https://github.com/bytecodealliance/componentize-js#readme",
   "description": "ESM -> WebAssembly Component creator, via a SpiderMonkey JS engine embedding",
   "type": "module",
+  "repository": {
+    "url": "https://github.com/bytecodealliance/ComponentizeJS"
+  },
   "bin": {
     "componentize-js": "src/cli.js"
   },
