@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.18.3-rc.4] - 2025-07-08
+
+### 🐛 Bug Fixes
+
+* *(ci)* npm release artifact (#241) by @vados-cosmonic in #241
+
+
+
+
 ## [0.18.3-rc.3] - 2025-07-07
 
 ### 🐛 Bug Fixes
