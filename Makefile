@@ -21,7 +21,7 @@ lib/spidermonkey-embedding-splicer.js: target/wasm32-wasip1/release/splicer_comp
 	@$(JCO) new target/wasm32-wasip1/release/splicer_component.wasm -o obj/spidermonkey-embedding-splicer.wasm --wasi-reactor
 	@$(JCO) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o lib -- -O1
 
-target/wasm32-wasip1/release/splicer_component.wasm: Cargo.toml crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/*.rs
+target/wasm32-wasip1/release/splicer_component.wasm: Cargo.toml crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/*.rs crates/splicer-component/src/*.rs
 	cargo build --lib --release --target wasm32-wasip1
 
 lib/starlingmonkey_embedding.wasm: $(STARLINGMONKEY_DEPS) | lib

@@ -1,19 +1,14 @@
-use anyhow::{bail, Context, Result};
 use std::path::Path;
+
+use anyhow::{bail, Context, Result};
+use wit_parser::{PackageId, Resolve};
 
 pub mod bindgen;
 pub mod splice;
 pub mod stub_wasi;
+pub mod wit;
 
-use crate::wit::{CoreFn, CoreTy};
-use wit_parser::{PackageId, Resolve};
-
-pub mod wit {
-    wit_bindgen::generate!({
-        world: "spidermonkey-embedding-splicer",
-        pub_export_macro: true
-    });
-}
+use wit::exports::local::spidermonkey_embedding_splicer::splicer::{CoreFn, CoreTy};
 
 /// Calls [`write!`] with the passed arguments and unwraps the result.
 ///

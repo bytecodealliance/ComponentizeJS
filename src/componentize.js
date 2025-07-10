@@ -10,6 +10,7 @@ import { readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
 import { rmSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
+import oxc from 'oxc-parser';
 import wizer from '@bytecodealliance/wizer';
 import getWeval from '@bytecodealliance/weval';
 import {
@@ -18,10 +19,7 @@ import {
   preview1AdapterReactorPath,
 } from '@bytecodealliance/jco';
 
-import {
-  spliceBindings,
-  stubWasi,
-} from '../lib/spidermonkey-embedding-splicer.js';
+import { splicer } from '../lib/spidermonkey-embedding-splicer.js';
 
 import { maybeWindowsPath } from './platform.js';
 
@@ -61,6 +59,9 @@ const DEFAULT_DEBUG_SETTINGS = {
 
   wizerLogging: false,
 };
+
+/** Features that are used by default if not explicitly disabled */
+const DEFAULT_FEATURES = ['stdio', 'random', 'clocks', 'http', 'fetch-event'];
 
 export async function componentize(
   opts,
@@ -119,8 +120,36 @@ export async function componentize(
   // Determine the path to the StarlingMonkey binary
   const engine = getEnginePath(opts);
 
-  let { wasm, jsBindings, exports, imports } = spliceBindings(
+  // Determine the default features that should be included
+  const features = DEFAULT_FEATURES.reduce((acc, f) => {
+    if (!disableFeatures.includes(f)) {
+      acc.push(f);
+    }
+    return acc;
+  }, []);
+
+  if (!jsSource && sourcePath) {
+    jsSource = await readFile(sourcePath, 'utf8');
+  }
+  const detectedExports = await detectKnownSourceExportNames(sourceName, jsSource);
+
+  // If there is an export of incomingHandler, there is likely to be a
+  // manual implementation of wasi:http/incoming-handler, so we should
+  // disable fetch-event
+  if (
+    features.includes('http-server') &&
+    detectedExports.contains('incomingHandler')
+  ) {
+    console.error(
+      'Detected `incomingHandler` export, disabling fetch-event...',
+    );
+    disableFeatures.push('fetch-event');
+  }
+
+  // Splice the bindigns for the given WIT world into the engine WASM
+  let { wasm, jsBindings, exports, imports } = splicer.spliceBindings(
     await readFile(engine),
+    [...features],
     witWorld,
     maybeWindowsPath(witPath),
     worldName,
@@ -178,21 +207,6 @@ export async function componentize(
       console.error(`> Writing JS source to ${tmpDir}/sources`);
     }
     await writeFile(sourcePath, jsSource);
-  }
-
-  // We never disable a feature that is already in the target world usage
-  const features = [];
-  if (!disableFeatures.includes('stdio')) {
-    features.push('stdio');
-  }
-  if (!disableFeatures.includes('random')) {
-    features.push('random');
-  }
-  if (!disableFeatures.includes('clocks')) {
-    features.push('clocks');
-  }
-  if (!disableFeatures.includes('http')) {
-    features.push('http');
   }
 
   let hostenv = {};
@@ -360,9 +374,9 @@ export async function componentize(
   );
 
   // After wizening, stub out the wasi imports depending on what features are enabled
-  const finalBin = stubWasi(
+  const finalBin = splicer.stubWasi(
     bin,
-    features,
+    [...features],
     witWorld,
     maybeWindowsPath(witPath),
     worldName,
@@ -485,13 +499,15 @@ function getEnginePath(opts) {
 
 /** Prepare a work directory for use with componentization */
 async function prepWorkDir() {
-  const baseDir = maybeWindowsPath(join(
-    tmpdir(),
-    createHash('sha256')
-      .update(Math.random().toString())
-      .digest('hex')
-      .slice(0, 12),
-  ));
+  const baseDir = maybeWindowsPath(
+    join(
+      tmpdir(),
+      createHash('sha256')
+        .update(Math.random().toString())
+        .digest('hex')
+        .slice(0, 12),
+    ),
+  );
   await mkdir(baseDir);
   const sourcesDir = maybeWindowsPath(join(baseDir, 'sources'));
   await mkdir(sourcesDir);
@@ -584,4 +600,37 @@ async function handleCheckInitOutput(
     }
     throw new Error(msg);
   }
+}
+
+/**
+ * Detect known exports that correspond to certain interfaces
+ *
+ * @param {string} filename - filename
+ * @param {string} code - JS source code
+ * @returns {Promise<string[]>} A Promise that resolves to a list of string that represent unversioned interfaces
+ */
+async function detectKnownSourceExportNames(filename, code) {
+  const names = [];
+
+  // TODO: determine whether the javascript source code has a wasi:http/incoming-handler export
+  if (!filename) {
+    throw new Error('missing filename');
+  }
+  if (!code) {
+    throw new Error('missing JS code');
+  }
+  const results = await oxc.parseAsync(filename, code);
+  if (results.errors.length > 0) {
+    throw new Error(
+      `failed to parse JS source, encountered [${results.errors.length}] errors`,
+    );
+  }
+
+  for (const staticExport of results.module.staticExports) {
+    for (const entry of staticExport.entries) {
+      names.push(entry);
+    }
+  }
+
+  return names;
 }
