@@ -27,8 +27,12 @@ jobs:
           rustup update stable
           rustup default stable
           rustup component add rustfmt
+
       - name: Format source code
         run: cargo fmt -- --check
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --all-features
 
   #########
   # Build #
