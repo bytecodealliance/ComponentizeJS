@@ -19,6 +19,8 @@ use wit_component::StringEncoding;
 use wit_parser::abi::WasmType;
 use wit_parser::abi::{AbiVariant, WasmSignature};
 
+use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::Features;
+
 use crate::{uwrite, uwriteln};
 
 #[derive(Debug)]
@@ -104,6 +106,9 @@ struct JsBindgen<'a> {
     resource_directions: HashMap<TypeId, AbiVariant>,
 
     imported_resources: BTreeSet<TypeId>,
+
+    /// Features that were enabled at the time of generation
+    features: &'a Vec<Features>,
 }
 
 #[derive(Debug)]
@@ -131,7 +136,11 @@ pub struct Componentization {
     pub resource_imports: Vec<(String, String, u32)>,
 }
 
-pub fn componentize_bindgen(resolve: &Resolve, wid: WorldId) -> Result<Componentization> {
+pub fn componentize_bindgen(
+    resolve: &Resolve,
+    wid: WorldId,
+    features: &Vec<Features>,
+) -> Result<Componentization> {
     let mut bindgen = JsBindgen {
         src: Source::default(),
         esm_bindgen: EsmBindgen::default(),
@@ -146,6 +155,7 @@ pub fn componentize_bindgen(resolve: &Resolve, wid: WorldId) -> Result<Component
         imports: Vec::new(),
         resource_directions: HashMap::new(),
         imported_resources: BTreeSet::new(),
+        features,
     };
 
     bindgen.sizes.fill(resolve);
@@ -390,57 +400,19 @@ impl JsBindgen<'_> {
         intrinsic.name().to_string()
     }
 
-    fn exports_bindgen(
-        &mut self,
-        // guest_exports: &Option<Vec<String>>,
-        // features: Vec<Features>,
-    ) -> Result<()> {
+    fn exports_bindgen(&mut self) -> Result<()> {
         for (key, export) in &self.resolve.worlds[self.world].exports {
             let name = self.resolve.name_world_key(key);
-            // Do not generate exports when the guest export is not implemented.
-            // We check both the full interface name - "ns:pkg@v/my-interface" and the
-            // aliased interface name "myInterface". All other names are always
-            // camel-case in the check.
-            // match key {
-            //     WorldKey::Interface(iface) => {
-            //         if !guest_exports.contains(&name) {
-            //             let iface = &self.resolve.interfaces[*iface];
-            //             if let Some(iface_name) = iface.name.as_ref() {
-            //                 let camel_case_name = iface_name.to_lower_camel_case();
-            //                 if !guest_exports.contains(&camel_case_name) {
-            //                     // For wasi:http/incoming-handler, we treat it
-            //                     // as a special case as the engine already
-            //                     // provides the export using fetchEvent and that
-            //                     // can be used when an explicit export is not
-            //                     // defined by the guest content.
-            //                     if iface_name == "incoming-handler"
-            //                         || name.starts_with("wasi:http/incoming-handler@0.2.")
-            //                     {
-            //                         if !features.contains(&Features::Http) {
-            //                             bail!(
-            //                                 "JS export definition for '{}' not found. Cannot use fetchEvent because the http feature is not enabled.",
-            //                                 camel_case_name
-            //                             )
-            //                         }
-            //                         continue;
-            //                     }
-            //                     bail!("Expected a JS export definition for '{}'", camel_case_name);
-            //                 }
-            //                 // TODO: move populate_export_aliases to a preprocessing
-            //                 // step that doesn't require esm_bindgen, so that we can
-            //                 // do alias deduping here as well.
-            //             } else {
-            //                 continue;
-            //             }
-            //         }
-            //     }
-            //     WorldKey::Name(export_name) => {
-            //         let camel_case_name = export_name.to_lower_camel_case();
-            //         if !guest_exports.contains(&camel_case_name) {
-            //             bail!("Expected a JS export definition for '{}'", camel_case_name);
-            //         }
-            //     }
-            // }
+
+            // Skip bindings generation for wasi:http/incoming-handler if the fetch-event
+            // feature was enabled. We expect that the built-in engine implementation will be used
+            if name.starts_with("wasi:http/incoming-handler@0.2.")
+                && self.features.contains(&Features::FetchEvent)
+            {
+                continue;
+            }
+
+            // TODO: check if the export is detected
 
             match export {
                 WorldItem::Function(func) => {

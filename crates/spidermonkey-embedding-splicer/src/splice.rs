@@ -18,7 +18,7 @@ use wit_parser::Resolve;
 
 use crate::bindgen::BindingItem;
 use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::{
-    CoreFn, CoreTy, SpliceResult,
+    CoreFn, CoreTy, Features, SpliceResult,
 };
 use crate::{bindgen, map_core_fn, parse_wit, splice};
 
@@ -32,6 +32,7 @@ use crate::{bindgen, map_core_fn, parse_wit, splice};
 // }
 pub fn splice_bindings(
     engine: Vec<u8>,
+    features: Vec<Features>,
     world_name: Option<String>,
     wit_path: Option<String>,
     wit_source: Option<String>,
@@ -60,6 +61,7 @@ pub fn splice_bindings(
         wit_component::dummy_module(&resolve, world, wit_parser::ManglingAndAbi::Standard32);
 
     // merge the engine world with the target world, retaining the engine producers
+
     let (engine_world, producers) = if let Ok((
         _,
         Bindgen {
@@ -113,7 +115,7 @@ pub fn splice_bindings(
     };
 
     let componentized =
-        bindgen::componentize_bindgen(&resolve, world).map_err(|err| err.to_string())?;
+        bindgen::componentize_bindgen(&resolve, world, &features).map_err(|err| err.to_string())?;
 
     resolve
         .merge_worlds(engine_world, world)
@@ -255,7 +257,8 @@ pub fn splice_bindings(
         ));
     }
 
-    let mut wasm = splice::splice(engine, imports, exports, debug).map_err(|e| format!("{e:?}"))?;
+    let mut wasm = splice::splice(engine, imports, exports, features, debug)
+        .map_err(|e| format!("{:?}", e))?;
 
     // add the world section to the spliced wasm
     wasm.push(section.id());
@@ -337,6 +340,7 @@ pub fn splice(
     engine: Vec<u8>,
     imports: Vec<(String, String, CoreFn, Option<i32>)>,
     exports: Vec<(String, CoreFn)>,
+    features: Vec<Features>,
     debug: bool,
 ) -> Result<Vec<u8>> {
     let mut module = Module::parse(&engine, false).unwrap();
@@ -344,12 +348,17 @@ pub fn splice(
     // since StarlingMonkey implements CLI Run and incoming handler,
     // we override them only if the guest content exports those functions
     remove_if_exported_by_js(&mut module, &exports, "wasi:cli/run@0.2.", "#run");
-    remove_if_exported_by_js(
-        &mut module,
-        &exports,
-        "wasi:http/incoming-handler@0.2.",
-        "#handle",
-    );
+
+    // if 'fetch-event' feature is disabled (default being default-enabled),
+    // remove the built-in incoming-handler which is built around it's use.
+    if !features.contains(&Features::FetchEvent) {
+        remove_if_exported_by_js(
+            &mut module,
+            &exports,
+            "wasi:http/incoming-handler@0.2.",
+            "#handle",
+        );
+    }
 
     // we reencode the WASI world component data, so strip it out from the
     // custom section
