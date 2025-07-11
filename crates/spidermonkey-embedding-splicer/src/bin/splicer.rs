@@ -127,7 +127,7 @@ fn main() -> Result<()> {
                 splice::splice_bindings(engine, features, None, wit_path_str, world_name, debug)
                     .map_err(|e| anyhow::anyhow!(e))?;
 
-            fs::write(&out_dir.join("component.wasm"), result.wasm).with_context(|| {
+            fs::write(out_dir.join("component.wasm"), result.wasm).with_context(|| {
                 format!(
                     "Failed to write output file: {}",
                     out_dir.join("component.wasm").display()

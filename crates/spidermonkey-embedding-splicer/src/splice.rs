@@ -257,8 +257,8 @@ pub fn splice_bindings(
         ));
     }
 
-    let mut wasm = splice::splice(engine, imports, exports, features, debug)
-        .map_err(|e| format!("{:?}", e))?;
+    let mut wasm =
+        splice::splice(engine, imports, exports, features, debug).map_err(|e| format!("{e:?}"))?;
 
     // add the world section to the spliced wasm
     wasm.push(section.id());
