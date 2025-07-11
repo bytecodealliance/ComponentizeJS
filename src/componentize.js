@@ -123,27 +123,27 @@ export async function componentize(
   // Determine the default features that should be included
   const features = DEFAULT_FEATURES.reduce((acc, f) => {
     if (!disableFeatures.includes(f)) {
-      acc.push(f);
+      acc.add(f);
     }
     return acc;
-  }, []);
+  }, new Set());
 
   if (!jsSource && sourcePath) {
     jsSource = await readFile(sourcePath, 'utf8');
   }
-  const detectedExports = await detectKnownSourceExportNames(sourceName, jsSource);
+  const detectedExports = await detectKnownSourceExportNames(
+    sourceName,
+    jsSource,
+  );
 
   // If there is an export of incomingHandler, there is likely to be a
   // manual implementation of wasi:http/incoming-handler, so we should
   // disable fetch-event
-  if (
-    features.includes('http') &&
-    detectedExports.includes('incomingHandler')
-  ) {
+  if (features.has('http') && detectedExports.has('incomingHandler')) {
     console.error(
       'Detected `incomingHandler` export, disabling fetch-event...',
     );
-    disableFeatures.push('fetch-event');
+    features.delete('fetch-event');
   }
 
   // Splice the bindigns for the given WIT world into the engine WASM
@@ -220,7 +220,7 @@ export async function componentize(
     DEBUG: enableWizerLogging ? '1' : '',
     SOURCE_NAME: sourceName,
     EXPORT_CNT: exports.length.toString(),
-    FEATURE_CLOCKS: features.includes('clocks') ? '1' : '',
+    FEATURE_CLOCKS: features.has('clocks') ? '1' : '',
   };
 
   for (const [idx, [export_name, expt]] of exports.entries()) {
@@ -610,15 +610,15 @@ async function handleCheckInitOutput(
  * @returns {Promise<string[]>} A Promise that resolves to a list of string that represent unversioned interfaces
  */
 async function detectKnownSourceExportNames(filename, code) {
-  const names = [];
-
-  // TODO: determine whether the javascript source code has a wasi:http/incoming-handler export
   if (!filename) {
     throw new Error('missing filename');
   }
   if (!code) {
     throw new Error('missing JS code');
   }
+
+  const names = new Set();
+
   const results = await oxc.parseAsync(filename, code);
   if (results.errors.length > 0) {
     throw new Error(
@@ -628,7 +628,7 @@ async function detectKnownSourceExportNames(filename, code) {
 
   for (const staticExport of results.module.staticExports) {
     for (const entry of staticExport.entries) {
-      names.push(entry);
+      names.add(entry.exportName.name);
     }
   }
 
