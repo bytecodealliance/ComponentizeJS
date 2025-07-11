@@ -1,6 +1,5 @@
-use crate::bindgen::BindingItem;
-use crate::wit::{CoreFn, CoreTy, SpliceResult};
-use crate::{bindgen, map_core_fn, parse_wit, splice};
+use std::path::PathBuf;
+
 use anyhow::Result;
 use orca_wasm::ir::function::{FunctionBuilder, FunctionModifier};
 use orca_wasm::ir::id::{ExportsID, FunctionID, LocalID};
@@ -9,7 +8,6 @@ use orca_wasm::ir::types::{BlockType, ElementItems, InstrumentationMode};
 use orca_wasm::module_builder::AddLocal;
 use orca_wasm::opcode::{Inject, InjectAt};
 use orca_wasm::{DataType, Opcode};
-use std::path::PathBuf;
 use wasm_encoder::{Encode, Section};
 use wasmparser::ExternalKind;
 use wasmparser::MemArg;
@@ -17,6 +15,12 @@ use wasmparser::Operator;
 use wit_component::metadata::{decode, Bindgen};
 use wit_component::StringEncoding;
 use wit_parser::Resolve;
+
+use crate::bindgen::BindingItem;
+use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::{
+    CoreFn, CoreTy, SpliceResult,
+};
+use crate::{bindgen, map_core_fn, parse_wit, splice};
 
 // Returns
 // pub struct SpliceResult {
@@ -42,7 +46,7 @@ pub fn splice_bindings(
                 .map_err(|e| e.to_string())?;
             (resolve, id)
         }
-        (_, Some(wit_path)) => parse_wit(&wit_path).map_err(|e| format!("{:?}", e))?,
+        (_, Some(wit_path)) => parse_wit(&wit_path).map_err(|e| format!("{e:?}"))?,
         (None, None) => {
             return Err("neither wit source nor path have been specified".into());
         }
@@ -187,7 +191,7 @@ pub fn splice_bindings(
     ) in &componentized.exports
     {
         let expt = if *iface {
-            let name = resource.canon_string(&name);
+            let name = resource.canon_string(name);
             format!("{export_name}#{name}")
         } else {
             export_name.clone()
@@ -210,7 +214,7 @@ pub fn splice_bindings(
         if *iface {
             imports.push((
                 specifier.to_string(),
-                resource.canon_string(&name),
+                resource.canon_string(name),
                 map_core_fn(func),
                 if func.retsize > 0 {
                     Some(func.retsize as i32)
@@ -251,8 +255,7 @@ pub fn splice_bindings(
         ));
     }
 
-    let mut wasm =
-        splice::splice(engine, imports, exports, debug).map_err(|e| format!("{:?}", e))?;
+    let mut wasm = splice::splice(engine, imports, exports, debug).map_err(|e| format!("{e:?}"))?;
 
     // add the world section to the spliced wasm
     wasm.push(section.id());
@@ -269,7 +272,7 @@ pub fn splice_bindings(
                     BindingItem {
                         binding_name, func, ..
                     },
-                )| { (binding_name.to_string(), map_core_fn(&func)) },
+                )| { (binding_name.to_string(), map_core_fn(func)) },
             )
             .collect(),
         imports: componentized
@@ -293,7 +296,7 @@ pub fn splice_bindings(
                             "$root".into()
                         },
                         if *iface {
-                            resource.canon_string(&name)
+                            resource.canon_string(name)
                         } else {
                             specifier.to_string()
                         },
@@ -336,7 +339,7 @@ pub fn splice(
     exports: Vec<(String, CoreFn)>,
     debug: bool,
 ) -> Result<Vec<u8>> {
-    let mut module = Module::parse(&*engine, false).unwrap();
+    let mut module = Module::parse(&engine, false).unwrap();
 
     // since StarlingMonkey implements CLI Run and incoming handler,
     // we override them only if the guest content exports those functions
@@ -370,7 +373,7 @@ pub fn splice(
 
 fn remove_if_exported_by_js(
     module: &mut Module,
-    content_exports: &Vec<(String, CoreFn)>,
+    content_exports: &[(String, CoreFn)],
     name_start: &str,
     name_end: &str,
 ) {
@@ -407,7 +410,7 @@ fn get_export_fid(module: &Module, expt_id: &ExportsID) -> FunctionID {
 
 fn synthesize_import_functions(
     module: &mut Module,
-    imports: &Vec<(String, String, CoreFn, Option<i32>)>,
+    imports: &[(String, String, CoreFn, Option<i32>)],
     debug: bool,
 ) -> Result<()> {
     let mut coreabi_get_import: Option<ExportsID> = None;
@@ -580,7 +583,7 @@ fn synthesize_import_functions(
                         func.i32_wrap_i64();
                     }
                     CoreTy::I64 => {
-                        func.call(get_export_fid(&module, &coreabi_from_bigint64));
+                        func.call(get_export_fid(module, &coreabi_from_bigint64));
                     }
                     CoreTy::F32 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
@@ -633,7 +636,7 @@ fn synthesize_import_functions(
             // if a retptr,
             // allocate and put the retptr on the call stack as the last passed argument
             if impt_sig.retptr {
-                assert!(!impt_sig.ret.is_some());
+                assert!(impt_sig.ret.is_none());
                 // prepare the context arg for the return set shortly
                 func.local_get(vp_arg);
 
@@ -669,7 +672,7 @@ fn synthesize_import_functions(
                     func.inject(instr.clone());
                 }),
                 Some(CoreTy::I64) => {
-                    func.call(get_export_fid(&module, &coreabi_to_bigint64));
+                    func.call(get_export_fid(module, &coreabi_to_bigint64));
                     func.i64_extend_i32u();
                     func.i64_const(-511101108224);
                     func.i64_or();
@@ -713,13 +716,10 @@ fn synthesize_import_functions(
 
         // create imported function table
         let els = module.elements.iter_mut().next().unwrap();
-        match &mut els.1 {
-            ElementItems::Functions(ref mut funcs) => {
-                for fid in import_fnids {
-                    funcs.push(fid);
-                }
+        if let ElementItems::Functions(ref mut funcs) = &mut els.1 {
+            for fid in import_fnids {
+                funcs.push(fid);
             }
-            _ => {}
         }
     }
 
@@ -787,7 +787,7 @@ fn synthesize_import_functions(
     Ok(())
 }
 
-fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreFn)>) -> Result<()> {
+fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]) -> Result<()> {
     let cabi_realloc = get_export_fid(
         module,
         &module
@@ -990,7 +990,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
             vec![]
         };
         let mut func = FunctionBuilder::new(&params, &[]);
-        func.set_name(format!("post_{}", expt_name));
+        func.set_name(format!("post_{expt_name}"));
 
         // calls post_call with just the function number argument
         // internally post_call is already tracking the frees needed
@@ -1000,7 +1000,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &Vec<(String, CoreF
         let fid = func.finish_module(module);
         module
             .exports
-            .add_export_func(format!("cabi_post_{}", expt_name), *fid);
+            .add_export_func(format!("cabi_post_{expt_name}"), *fid);
     }
 
     // remove unnecessary exports
