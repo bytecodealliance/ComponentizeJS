@@ -18,10 +18,7 @@ import {
   preview1AdapterReactorPath,
 } from '@bytecodealliance/jco';
 
-import {
-  spliceBindings,
-  stubWasi,
-} from '../lib/spidermonkey-embedding-splicer.js';
+import { splicer } from '../lib/spidermonkey-embedding-splicer.js';
 
 import { maybeWindowsPath } from './platform.js';
 
@@ -119,8 +116,24 @@ export async function componentize(
   // Determine the path to the StarlingMonkey binary
   const engine = getEnginePath(opts);
 
-  let { wasm, jsBindings, exports, imports } = spliceBindings(
+  // We never disable a feature that is already in the target world usage
+  const features = [];
+  if (!disableFeatures.includes('stdio')) {
+    features.push('stdio');
+  }
+  if (!disableFeatures.includes('random')) {
+    features.push('random');
+  }
+  if (!disableFeatures.includes('clocks')) {
+    features.push('clocks');
+  }
+  if (!disableFeatures.includes('http')) {
+    features.push('http');
+  }
+
+  let { wasm, jsBindings, exports, imports } = splicer.spliceBindings(
     await readFile(engine),
+    features,
     witWorld,
     maybeWindowsPath(witPath),
     worldName,
@@ -178,21 +191,6 @@ export async function componentize(
       console.error(`> Writing JS source to ${tmpDir}/sources`);
     }
     await writeFile(sourcePath, jsSource);
-  }
-
-  // We never disable a feature that is already in the target world usage
-  const features = [];
-  if (!disableFeatures.includes('stdio')) {
-    features.push('stdio');
-  }
-  if (!disableFeatures.includes('random')) {
-    features.push('random');
-  }
-  if (!disableFeatures.includes('clocks')) {
-    features.push('clocks');
-  }
-  if (!disableFeatures.includes('http')) {
-    features.push('http');
   }
 
   let hostenv = {};
@@ -360,7 +358,7 @@ export async function componentize(
   );
 
   // After wizening, stub out the wasi imports depending on what features are enabled
-  const finalBin = stubWasi(
+  const finalBin = splicer.stubWasi(
     bin,
     features,
     witWorld,

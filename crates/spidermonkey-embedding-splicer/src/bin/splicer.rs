@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use std::fs;
 use std::path::PathBuf;
 
-use spidermonkey_embedding_splicer::wit::Features;
+use spidermonkey_embedding_splicer::wit::exports::local::spidermonkey_embedding_splicer::splicer::Features;
 use spidermonkey_embedding_splicer::{splice, stub_wasi};
 
 #[derive(Parser, Debug)]
@@ -70,7 +70,7 @@ enum Commands {
 ///    random,
 ///    http,
 ///}
-fn map_features(features: &Vec<String>) -> Vec<Features> {
+fn map_features(features: &[String]) -> Vec<Features> {
     features
         .iter()
         .map(|f| match f.as_str() {
@@ -78,7 +78,7 @@ fn map_features(features: &Vec<String>) -> Vec<Features> {
             "clocks" => Features::Clocks,
             "random" => Features::Random,
             "http" => Features::Http,
-            _ => panic!("Unknown feature: {}", f),
+            _ => panic!("Unknown feature: {f}"),
         })
         .collect()
 }
@@ -131,13 +131,13 @@ fn main() -> Result<()> {
 
             let result = splice::splice_bindings(engine, world_name, wit_path_str, None, debug)
                 .map_err(|e| anyhow::anyhow!(e))?;
-            fs::write(&out_dir.join("component.wasm"), result.wasm).with_context(|| {
+            fs::write(out_dir.join("component.wasm"), result.wasm).with_context(|| {
                 format!(
                     "Failed to write output file: {}",
                     out_dir.join("component.wasm").display()
                 )
             })?;
-            fs::write(&out_dir.join("initializer.js"), result.js_bindings).with_context(|| {
+            fs::write(out_dir.join("initializer.js"), result.js_bindings).with_context(|| {
                 format!(
                     "Failed to write output file: {}",
                     out_dir.join("initializer.js").display()
