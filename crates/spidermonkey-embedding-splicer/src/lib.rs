@@ -55,10 +55,7 @@ fn map_core_fn(cfn: &bindgen::CoreFn) -> CoreFn {
     } = cfn;
     CoreFn {
         params: params.iter().map(&map_core_ty).collect(),
-        ret: match ret {
-            Some(ref core_ty) => Some(map_core_ty(core_ty)),
-            None => None,
-        },
+        ret: ret.as_ref().map(map_core_ty),
         retptr: *retptr,
         retsize: *retsize,
         paramptr: *paramptr,
@@ -70,17 +67,17 @@ fn parse_wit(path: impl AsRef<Path>) -> Result<(Resolve, PackageId)> {
     let path = path.as_ref();
     let id = if path.is_dir() {
         resolve
-            .push_dir(&path)
+            .push_dir(path)
             .with_context(|| format!("resolving WIT in {}", path.display()))?
             .0
     } else {
         let contents =
-            std::fs::read(&path).with_context(|| format!("reading file {}", path.display()))?;
+            std::fs::read(path).with_context(|| format!("reading file {}", path.display()))?;
         let text = match std::str::from_utf8(&contents) {
             Ok(s) => s,
             Err(_) => bail!("input file is not valid utf-8"),
         };
-        resolve.push_str(&path, text)?
+        resolve.push_str(path, text)?
     };
     Ok((resolve, id))
 }

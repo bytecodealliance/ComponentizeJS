@@ -77,7 +77,7 @@ enum Commands {
 ///    http,
 ///    fetch-event,
 ///}
-fn map_features(features: &Vec<String>) -> Result<Vec<Features>> {
+fn map_features(features: &[String]) -> Result<Vec<Features>> {
     features
         .iter()
         .map(|f| Features::from_str(f.as_str()))
@@ -137,13 +137,13 @@ fn main() -> Result<()> {
                 splice::splice_bindings(engine, features, None, wit_path_str, world_name, debug)
                     .map_err(|e| anyhow::anyhow!(e))?;
 
-            fs::write(&out_dir.join("component.wasm"), result.wasm).with_context(|| {
+            fs::write(out_dir.join("component.wasm"), result.wasm).with_context(|| {
                 format!(
                     "Failed to write output file: {}",
                     out_dir.join("component.wasm").display()
                 )
             })?;
-            fs::write(&out_dir.join("initializer.js"), result.js_bindings).with_context(|| {
+            fs::write(out_dir.join("initializer.js"), result.js_bindings).with_context(|| {
                 format!(
                     "Failed to write output file: {}",
                     out_dir.join("initializer.js").display()

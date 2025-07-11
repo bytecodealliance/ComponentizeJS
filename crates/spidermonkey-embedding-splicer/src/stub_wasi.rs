@@ -52,7 +52,7 @@ where
 
         return Ok(Some(fid));
     }
-    return Ok(None);
+    Ok(None)
 }
 
 fn stub_import<StubFn>(
@@ -108,7 +108,7 @@ pub fn stub_wasi(
 
         (resolve, ids)
     } else {
-        parse_wit(&PathBuf::from(wit_path.unwrap()))?
+        parse_wit(PathBuf::from(wit_path.unwrap()))?
     };
 
     let world = resolve.select_world(ids, world_name.as_deref())?;
