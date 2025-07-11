@@ -1,6 +1,7 @@
 use spidermonkey_embedding_splicer::stub_wasi::stub_wasi;
-use spidermonkey_embedding_splicer::wit::{export, Features, Guest, SpliceResult};
-use spidermonkey_embedding_splicer::{splice, wit};
+use spidermonkey_embedding_splicer::wit::{self, export};
+use spidermonkey_embedding_splicer::splice;
+use spidermonkey_embedding_splicer::wit::exports::local::spidermonkey_embedding_splicer::splicer::{Features, Guest, SpliceResult};
 
 struct SpidermonkeyEmbeddingSplicerComponent;
 
@@ -17,6 +18,7 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
 
     fn splice_bindings(
         engine: Vec<u8>,
+        _features: Vec<Features>,
         world_name: Option<String>,
         wit_path: Option<String>,
         wit_source: Option<String>,

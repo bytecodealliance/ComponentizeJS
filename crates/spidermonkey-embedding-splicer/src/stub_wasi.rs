@@ -1,5 +1,7 @@
-use crate::parse_wit;
-use crate::wit::Features;
+use std::collections::HashSet;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use anyhow::{bail, Result};
 use orca_wasm::ir::function::FunctionBuilder;
 use orca_wasm::ir::id::{FunctionID, LocalID};
@@ -7,13 +9,11 @@ use orca_wasm::ir::module::module_functions::FuncKind;
 use orca_wasm::ir::types::{BlockType, InitExpr, Value};
 use orca_wasm::module_builder::AddLocal;
 use orca_wasm::{DataType, Instructions, Module, Opcode};
-use std::{
-    collections::HashSet,
-    path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
-};
 use wasmparser::{MemArg, TypeRef};
 use wit_parser::Resolve;
+
+use crate::parse_wit;
+use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::Features;
 
 const WASI_VERSIONS: [&str; 4] = ["0.2.0", "0.2.1", "0.2.2", "0.2.3"];
 
@@ -52,7 +52,7 @@ where
 
         return Ok(Some(fid));
     }
-    return Ok(None);
+    Ok(None)
 }
 
 fn stub_import<StubFn>(
@@ -108,7 +108,7 @@ pub fn stub_wasi(
 
         (resolve, ids)
     } else {
-        parse_wit(&PathBuf::from(wit_path.unwrap()))?
+        parse_wit(PathBuf::from(wit_path.unwrap()))?
     };
 
     let world = resolve.select_world(ids, world_name.as_deref())?;

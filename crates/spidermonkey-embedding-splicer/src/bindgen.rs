@@ -191,7 +191,7 @@ pub fn componentize_bindgen(resolve: &Resolve, wid: WorldId) -> Result<Component
     for (specifier, by_resource) in by_specifier_by_resource {
         let mut specifier_list = Vec::new();
         for (resource, items) in by_resource {
-            let item = items.iter().next().unwrap();
+            let item = items.first().unwrap();
             if let Some(resource) = resource {
                 let export_name = resource.to_upper_camel_case();
                 let binding_name = binding_name(&export_name, &item.iface_name);
@@ -241,7 +241,7 @@ pub fn componentize_bindgen(resolve: &Resolve, wid: WorldId) -> Result<Component
                 if let TypeDefKind::Resource = &ty.kind {
                     let iface_prefix = interface_name(resolve, *iface_id)
                         .map(|s| format!("{s}$"))
-                        .unwrap_or_else(String::new);
+                        .unwrap_or_default();
                     let resource_name_camel = ty.name.as_ref().unwrap().to_lower_camel_case();
                     let resource_name_kebab = ty.name.as_ref().unwrap().to_kebab_case();
                     let module_name = format!("[export]{key_name}");
@@ -295,11 +295,8 @@ pub fn componentize_bindgen(resolve: &Resolve, wid: WorldId) -> Result<Component
             WorldItem::Function(_) => {}
             WorldItem::Type(id) => {
                 let ty = &resolve.types[*id];
-                match ty.kind {
-                    TypeDefKind::Resource => {
-                        imported_resource_modules.insert(*id, key_name.clone());
-                    }
-                    _ => {}
+                if ty.kind == TypeDefKind::Resource {
+                    imported_resource_modules.insert(*id, key_name.clone());
                 }
             }
         }
@@ -390,7 +387,7 @@ pub fn componentize_bindgen(resolve: &Resolve, wid: WorldId) -> Result<Component
 impl JsBindgen<'_> {
     fn intrinsic(&mut self, intrinsic: Intrinsic) -> String {
         self.all_intrinsics.insert(intrinsic);
-        return intrinsic.name().to_string();
+        intrinsic.name().to_string()
     }
 
     fn exports_bindgen(
@@ -448,14 +445,7 @@ impl JsBindgen<'_> {
             match export {
                 WorldItem::Function(func) => {
                     let local_name = self.local_names.create_once(&func.name).to_string();
-                    self.export_bindgen(
-                        name.into(),
-                        false,
-                        None,
-                        &local_name,
-                        StringEncoding::UTF8,
-                        func,
-                    );
+                    self.export_bindgen(name, false, None, &local_name, StringEncoding::UTF8, func);
                     self.esm_bindgen.add_export_func(
                         None,
                         local_name.to_string(),
@@ -484,7 +474,7 @@ impl JsBindgen<'_> {
                                     interface_name(self.resolve, *id),
                                     &local_name,
                                     StringEncoding::UTF8,
-                                    &func,
+                                    func,
                                 );
                                 self.esm_bindgen.add_export_func(
                                     Some(name),
@@ -501,7 +491,7 @@ impl JsBindgen<'_> {
                                 let local_name = self
                                     .local_names
                                     .get_or_create(
-                                        &format!("resource:{resource_name}"),
+                                        format!("resource:{resource_name}"),
                                         &resource_name,
                                     )
                                     .0
@@ -512,10 +502,10 @@ impl JsBindgen<'_> {
                                     interface_name(self.resolve, *id),
                                     &local_name,
                                     StringEncoding::UTF8,
-                                    &func,
+                                    func,
                                 );
                                 self.esm_bindgen.ensure_exported_resource(
-                                    Some(&name),
+                                    Some(name),
                                     local_name,
                                     resource_name,
                                 );
@@ -547,7 +537,7 @@ impl JsBindgen<'_> {
                 .as_ref()
                 .unwrap()
                 .to_upper_camel_case(),
-            &iface_name,
+            iface_name,
         );
 
         uwriteln!(self.src, "\nclass import_{name} {{");
@@ -568,7 +558,7 @@ impl JsBindgen<'_> {
         let prefix = iface_name
             .as_deref()
             .map(|s| format!("{s}$"))
-            .unwrap_or(String::new());
+            .unwrap_or_default();
 
         let resource_symbol = self.intrinsic(Intrinsic::SymbolResourceHandle);
         let dispose_symbol = self.intrinsic(Intrinsic::SymbolDispose);
@@ -646,44 +636,38 @@ impl JsBindgen<'_> {
                 }
                 WorldItem::Type(id) => {
                     let ty = &self.resolve.types[*id];
-                    match ty.kind {
-                        TypeDefKind::Resource => {
-                            self.resource_directions
-                                .insert(*id, AbiVariant::GuestImport);
+                    if ty.kind == TypeDefKind::Resource {
+                        self.resource_directions
+                            .insert(*id, AbiVariant::GuestImport);
 
-                            let resource_name = ty.name.as_ref().unwrap();
+                        let resource_name = ty.name.as_ref().unwrap();
 
-                            let mut resource_fns = Vec::new();
-                            for (_, impt) in &self.resolve.worlds[self.world].imports {
-                                match impt {
-                                    WorldItem::Function(function) => {
-                                        let stripped = if let Some(stripped) =
-                                            function.name.strip_prefix("[constructor]")
-                                        {
-                                            stripped
-                                        } else if let Some(stripped) =
-                                            function.name.strip_prefix("[method]")
-                                        {
-                                            stripped
-                                        } else if let Some(stripped) =
-                                            function.name.strip_prefix("[static]")
-                                        {
-                                            stripped
-                                        } else {
-                                            continue;
-                                        };
+                        let mut resource_fns = Vec::new();
+                        for (_, impt) in &self.resolve.worlds[self.world].imports {
+                            if let WorldItem::Function(function) = impt {
+                                let stripped = if let Some(stripped) =
+                                    function.name.strip_prefix("[constructor]")
+                                {
+                                    stripped
+                                } else if let Some(stripped) =
+                                    function.name.strip_prefix("[method]")
+                                {
+                                    stripped
+                                } else if let Some(stripped) =
+                                    function.name.strip_prefix("[static]")
+                                {
+                                    stripped
+                                } else {
+                                    continue;
+                                };
 
-                                        if stripped.starts_with(resource_name) {
-                                            resource_fns.push((function.name.as_str(), function));
-                                        }
-                                    }
-                                    _ => {}
+                                if stripped.starts_with(resource_name) {
+                                    resource_fns.push((function.name.as_str(), function));
                                 }
                             }
-
-                            self.resource_bindgen(*id, "$root", &None, resource_fns);
                         }
-                        _ => {}
+
+                        self.resource_bindgen(*id, "$root", &None, resource_fns);
                     }
                 }
             };
@@ -1112,8 +1096,7 @@ impl EsmBindgen {
             iface = match iface.get_mut(&iface_id_or_kebab).unwrap() {
                 Binding::Interface(iface) => iface,
                 Binding::Resource(_) | Binding::Local(_) => panic!(
-                    "Exported interface {} cannot be both a function and an interface or resource",
-                    iface_id_or_kebab
+                    "Exported interface {iface_id_or_kebab} cannot be both a function and an interface or resource"
                 ),
             };
         }
@@ -1143,8 +1126,7 @@ impl EsmBindgen {
             iface = match iface.get_mut(&iface_id_or_kebab).unwrap() {
                 Binding::Interface(iface) => iface,
                 Binding::Resource(_) | Binding::Local(_) => panic!(
-                    "Exported interface {} cannot be both a function and an interface or resource",
-                    iface_id_or_kebab
+                    "Exported interface {iface_id_or_kebab} cannot be both a function and an interface or resource"
                 ),
             };
         }
@@ -1158,7 +1140,7 @@ impl EsmBindgen {
             let expt_name_sans_version = if let Some(version_idx) = expt_name.find('@') {
                 &expt_name[0..version_idx]
             } else {
-                &expt_name
+                expt_name
             };
             if let Some(alias) = interface_name_from_string(expt_name_sans_version) {
                 if !self.exports.contains_key(&alias)
@@ -1178,7 +1160,7 @@ impl EsmBindgen {
     ) {
         // TODO: bring back these validations of imports
         // including using the flattened bindings
-        if self.exports.len() > 0 {
+        if !self.exports.is_empty() {
             // error handling
             uwriteln!(output, "
                 class BindingsError extends Error {{
@@ -1328,12 +1310,9 @@ fn interface_name_from_string(name: &str) -> Option<String> {
     let path_idx = name.rfind('/')?;
     let name = &name[path_idx + 1..];
     let at_idx = name.rfind('@');
-    let alias = name[..at_idx.unwrap_or_else(|| name.len())].to_lower_camel_case();
+    let alias = name[..at_idx.unwrap_or(name.len())].to_lower_camel_case();
     let iface_name = Some(if let Some(at_idx) = at_idx {
-        format!(
-            "{alias}_{}",
-            name[at_idx + 1..].replace('.', "_").replace('-', "_")
-        )
+        format!("{alias}_{}", name[at_idx + 1..].replace(['.', '-'], "_"))
     } else {
         alias
     });
@@ -1343,23 +1322,21 @@ fn interface_name_from_string(name: &str) -> Option<String> {
 fn binding_name(func_name: &str, iface_name: &Option<String>) -> String {
     match iface_name {
         Some(iface_name) => format!("{iface_name}${func_name}"),
-        None => format!("{func_name}"),
+        None => func_name.to_string(),
     }
 }
 
 /// Extract success and error types from a given optional type, if it is a Result
-pub fn get_result_types<'a>(
-    resolve: &'a Resolve,
+pub fn get_result_types(
+    resolve: &Resolve,
     return_type: Option<Type>,
-) -> Option<(Option<&'a Type>, Option<&'a Type>)> {
+) -> Option<(Option<&Type>, Option<&Type>)> {
     match return_type {
         None => None,
-        Some(ty) => match ty {
-            Type::Id(id) => match &resolve.types[id].kind {
-                TypeDefKind::Result(r) => Some((r.ok.as_ref(), r.err.as_ref())),
-                _ => None,
-            },
+        Some(Type::Id(id)) => match &resolve.types[id].kind {
+            TypeDefKind::Result(r) => Some((r.ok.as_ref(), r.err.as_ref())),
             _ => None,
         },
+        _ => None,
     }
 }
