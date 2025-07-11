@@ -1,9 +1,11 @@
-use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
 use std::fs;
 use std::path::PathBuf;
+use std::str::FromStr;
 
-use spidermonkey_embedding_splicer::wit::Features;
+use anyhow::{Context, Result};
+use clap::{Parser, Subcommand};
+
+use spidermonkey_embedding_splicer::wit::exports::local::spidermonkey_embedding_splicer::splicer::Features;
 use spidermonkey_embedding_splicer::{splice, stub_wasi};
 
 #[derive(Parser, Debug)]
@@ -48,6 +50,10 @@ enum Commands {
         #[arg(short, long)]
         out_dir: PathBuf,
 
+        /// Features to enable (multiple allowed)
+        #[arg(short, long)]
+        features: Vec<String>,
+
         /// Path to WIT file or directory
         #[arg(long)]
         wit_path: Option<PathBuf>,
@@ -69,18 +75,13 @@ enum Commands {
 ///    clocks,
 ///    random,
 ///    http,
+///    fetch-event,
 ///}
-fn map_features(features: &Vec<String>) -> Vec<Features> {
+fn map_features(features: &[String]) -> Result<Vec<Features>> {
     features
         .iter()
-        .map(|f| match f.as_str() {
-            "stdio" => Features::Stdio,
-            "clocks" => Features::Clocks,
-            "random" => Features::Random,
-            "http" => Features::Http,
-            _ => panic!("Unknown feature: {}", f),
-        })
-        .collect()
+        .map(|f| Features::from_str(f.as_str()))
+        .collect::<Result<Vec<Features>>>()
 }
 
 fn main() -> Result<()> {
@@ -98,7 +99,7 @@ fn main() -> Result<()> {
                 .with_context(|| format!("Failed to read input file: {}", input.display()))?;
 
             let wit_path_str = wit_path.as_ref().map(|p| p.to_string_lossy().to_string());
-            let features = map_features(&features);
+            let features = map_features(&features)?;
 
             let result = stub_wasi::stub_wasi(wasm, features, None, wit_path_str, world_name)
                 .map_err(|e| anyhow::anyhow!(e))?;
@@ -115,6 +116,7 @@ fn main() -> Result<()> {
         Commands::SpliceBindings {
             input,
             out_dir,
+            features,
             wit_path,
             world_name,
             debug,
@@ -129,15 +131,19 @@ fn main() -> Result<()> {
 
             let wit_path_str = wit_path.as_ref().map(|p| p.to_string_lossy().to_string());
 
-            let result = splice::splice_bindings(engine, world_name, wit_path_str, None, debug)
-                .map_err(|e| anyhow::anyhow!(e))?;
-            fs::write(&out_dir.join("component.wasm"), result.wasm).with_context(|| {
+            let features = map_features(&features)?;
+
+            let result =
+                splice::splice_bindings(engine, features, None, wit_path_str, world_name, debug)
+                    .map_err(|e| anyhow::anyhow!(e))?;
+
+            fs::write(out_dir.join("component.wasm"), result.wasm).with_context(|| {
                 format!(
                     "Failed to write output file: {}",
                     out_dir.join("component.wasm").display()
                 )
             })?;
-            fs::write(&out_dir.join("initializer.js"), result.js_bindings).with_context(|| {
+            fs::write(out_dir.join("initializer.js"), result.js_bindings).with_context(|| {
                 format!(
                     "Failed to write output file: {}",
                     out_dir.join("initializer.js").display()

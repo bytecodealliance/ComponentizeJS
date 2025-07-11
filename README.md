@@ -184,16 +184,29 @@ The default set of features includes:
 * `'random'`: Support for cryptographic random, depends on `wasi:random`. **When disabled, random numbers will still be generated but will not be random and instead fully deterministic.**
 * `'clocks'`: Support for clocks and duration polls, depends on `wasi:clocks` and `wasi:io`. **When disabled, using any timer functions like setTimeout or setInterval will panic.**
 * `'http'`: Support for outbound HTTP via the `fetch` global in JS.
+* `'fetch-event'`: Support for `fetch` based incoming request handling (i.e. `addEventListener('fetch', ...)`)
 
-Setting `disableFeatures: ['random', 'stdio', 'clocks', 'http']` will disable all features creating a minimal "pure component", that does not depend on any WASI APIs at all and just the target world.
+Setting `disableFeatures: ['random', 'stdio', 'clocks', 'http', 'fetch-event']` will disable all features creating a minimal "pure component", that does not depend on any WASI APIs at all and just the target world.
 
 Note that pure components **will not report errors and will instead trap**, so that this should only be enabled after very careful testing.
 
 Note that features explicitly imported by the target world cannot be disabled - if you target a component to a world that imports `wasi:clocks`, then `disableFeatures: ['clocks']` will not be supported.
 
+Note that depending on your component implementation, some features may be automatically disabled. For example, if using
+`wasi:http/incoming-handler` manually, the `fetch-event` cannot be used.
+
 ## Using StarlingMonkey's `fetch-event`
 
-The StarlingMonkey engine provides the ability to use `fetchEvent` to handle calls to `wasi:http/incoming-handler@0.2.0#handle`. When targeting worlds that export `wasi:http/incoming-handler@0.2.0` the fetch event will automatically be attached. Alternatively, to override the fetch event with a custom handler, export an explicit `incomingHandler` or `'wasi:http/incoming-handler@0.2.0'` object. Using the `fetchEvent` requires enabling the `http` feature.
+The StarlingMonkey engine provides the ability to use `fetchEvent` to handle calls to `wasi:http/incoming-handler@0.2.0#handle`.
+
+When targeting worlds that export `wasi:http/incoming-handler@0.2.0` the fetch event will automatically be attached. Alternatively,
+to override the fetch event with a custom handler, export an explicit `incomingHandler` or `'wasi:http/incoming-handler@0.2.0'`
+object. Using the `fetchEvent` requires enabling the `http` feature.
+
+> [!WARNING]
+> If using `fetch-event`, ensure that you *do not* manually import (i.e. exporting `incomingHandler` from your ES module).
+>
+> Modules that export `incomingHandler` and have the `http` feature enabled are assumed to be using `wasi:http` manually.
 
 ## API
 
@@ -206,7 +219,7 @@ export function componentize(opts: {
   debugBuild?: bool,
   engine?: string,
   preview2Adapter?: string,
-  disableFeatures?: ('stdio' | 'random' | 'clocks' | 'http')[],
+  disableFeatures?: ('stdio' | 'random' | 'clocks' | 'http', 'fetch-event')[],
 }): {
   component: Uint8Array,
   imports: string[]
