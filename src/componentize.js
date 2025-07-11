@@ -137,8 +137,8 @@ export async function componentize(
   // manual implementation of wasi:http/incoming-handler, so we should
   // disable fetch-event
   if (
-    features.includes('http-server') &&
-    detectedExports.contains('incomingHandler')
+    features.includes('http') &&
+    detectedExports.includes('incomingHandler')
   ) {
     console.error(
       'Detected `incomingHandler` export, disabling fetch-event...',

@@ -15,7 +15,7 @@ export async function test(instance) {
   try {
     const resp = await fetch(`http://localhost:${port}`);
     const text = await resp.text();
-    strictEqual(text, 'Hello world!');
+    strictEqual(text, 'Hello World');
   } finally {
     server.stop();
   }
