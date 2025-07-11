@@ -19,12 +19,12 @@ impl Guest for SpidermonkeyEmbeddingSplicerComponent {
     fn splice_bindings(
         engine: Vec<u8>,
         features: Vec<Features>,
-        world_name: Option<String>,
-        wit_path: Option<String>,
         wit_source: Option<String>,
+        wit_path: Option<String>,
+        world_name: Option<String>,
         debug: bool,
     ) -> Result<SpliceResult, String> {
-        splice::splice_bindings(engine, features, world_name, wit_path, wit_source, debug)
+        splice::splice_bindings(engine, features, wit_source, wit_path, world_name, debug)
     }
 }
 

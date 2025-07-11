@@ -124,7 +124,7 @@ fn main() -> Result<()> {
                 .collect::<Result<Vec<_>>>()?;
 
             let result =
-                splice::splice_bindings(engine, features, world_name, wit_path_str, None, debug)
+                splice::splice_bindings(engine, features, None, wit_path_str, world_name, debug)
                     .map_err(|e| anyhow::anyhow!(e))?;
 
             fs::write(&out_dir.join("component.wasm"), result.wasm).with_context(|| {

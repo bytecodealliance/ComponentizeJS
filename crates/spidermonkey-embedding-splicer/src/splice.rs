@@ -33,9 +33,9 @@ use crate::{bindgen, map_core_fn, parse_wit, splice};
 pub fn splice_bindings(
     engine: Vec<u8>,
     features: Vec<Features>,
-    world_name: Option<String>,
-    wit_path: Option<String>,
     wit_source: Option<String>,
+    wit_path: Option<String>,
+    world_name: Option<String>,
     debug: bool,
 ) -> Result<SpliceResult, String> {
     let (mut resolve, id) = match (wit_source, wit_path) {
