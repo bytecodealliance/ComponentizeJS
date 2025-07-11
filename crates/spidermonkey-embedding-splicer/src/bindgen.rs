@@ -412,8 +412,6 @@ impl JsBindgen<'_> {
                 continue;
             }
 
-            // TODO: check if the export is detected
-
             match export {
                 WorldItem::Function(func) => {
                     let local_name = self.local_names.create_once(&func.name).to_string();
