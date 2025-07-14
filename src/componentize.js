@@ -140,9 +140,11 @@ export async function componentize(
   // manual implementation of wasi:http/incoming-handler, so we should
   // disable fetch-event
   if (features.has('http') && detectedExports.has('incomingHandler')) {
-    console.error(
-      'Detected `incomingHandler` export, disabling fetch-event...',
-    );
+    if (debugBindings) {
+      console.error(
+        'Detected `incomingHandler` export, disabling fetch-event...',
+      );
+    }
     features.delete('fetch-event');
   }
 
