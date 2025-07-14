@@ -859,9 +859,7 @@ impl JsBindgen<'_> {
             }
         }
 
-        let err = if get_result_types(self.resolve, func.result)
-            .is_some_and(|(_, err_ty)| err_ty.is_some())
-        {
+        let err = if get_result_types(self.resolve, func.result).is_some() {
             match abi {
                 AbiVariant::GuestExport => ErrHandling::ThrowResultErr,
                 AbiVariant::GuestImport => ErrHandling::ResultCatchHandler,
