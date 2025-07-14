@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.18.3-rc.6] - 2025-07-14
+
+### 🐛 Bug Fixes
+
+* allow for use of both manual & fetchEvent based HTTP (#247) by @vados-cosmonic in #247
+
+* makefile dep for splicer component (#251) by @vados-cosmonic in #251
+
+
+### 🚜 Refactor
+
+* splicer WIT and generated bindings (#252) by @vados-cosmonic in #252
+
+
+### ⚙️ Miscellaneous Tasks
+
+* *(ci)* add clippy (#248) by @vados-cosmonic in #248
+
+
+
+
 ## [0.18.3-rc.5] - 2025-07-08
 
 ### 🐛 Bug Fixes
