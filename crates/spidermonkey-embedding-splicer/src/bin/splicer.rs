@@ -50,6 +50,10 @@ enum Commands {
         #[arg(short, long)]
         out_dir: PathBuf,
 
+        /// Features to enable (multiple allowed)
+        #[arg(short, long)]
+        features: Vec<String>,
+
         /// Path to WIT file or directory
         #[arg(long)]
         wit_path: Option<PathBuf>,
@@ -99,6 +103,7 @@ fn main() -> Result<()> {
         Commands::SpliceBindings {
             input,
             out_dir,
+            features,
             wit_path,
             world_name,
             debug,
@@ -113,8 +118,15 @@ fn main() -> Result<()> {
 
             let wit_path_str = wit_path.as_ref().map(|p| p.to_string_lossy().to_string());
 
-            let result = splice::splice_bindings(engine, world_name, wit_path_str, None, debug)
-                .map_err(|e| anyhow::anyhow!(e))?;
+            let features = features
+                .iter()
+                .map(|v| Features::from_str(v))
+                .collect::<Result<Vec<_>>>()?;
+
+            let result =
+                splice::splice_bindings(engine, features, None, wit_path_str, world_name, debug)
+                    .map_err(|e| anyhow::anyhow!(e))?;
+
             fs::write(out_dir.join("component.wasm"), result.wasm).with_context(|| {
                 format!(
                     "Failed to write output file: {}",

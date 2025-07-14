@@ -139,7 +139,7 @@ pub fn stub_wasi(
         stub_stdio(&mut module)?;
     }
 
-    if !features.contains(&Features::Http) {
+    if !features.contains(&Features::Http) && !features.contains(&Features::FetchEvent) {
         stub_http(&mut module)?;
     }
 

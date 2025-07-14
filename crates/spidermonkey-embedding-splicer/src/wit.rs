@@ -16,6 +16,7 @@ impl std::str::FromStr for Features {
             "clocks" => Ok(Features::Clocks),
             "random" => Ok(Features::Random),
             "http" => Ok(Features::Http),
+            "fetch-event" => Ok(Features::FetchEvent),
             _ => bail!("unrecognized feature string [{s}]"),
         }
     }

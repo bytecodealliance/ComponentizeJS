@@ -13,6 +13,7 @@ interface splicer {
     clocks,
     random,
     http,
+    fetch-event,
   }
 
   record core-fn {

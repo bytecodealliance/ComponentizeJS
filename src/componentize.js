@@ -10,6 +10,7 @@ import { readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
 import { rmSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
+import oxc from 'oxc-parser';
 import wizer from '@bytecodealliance/wizer';
 import getWeval from '@bytecodealliance/weval';
 import {
@@ -58,6 +59,9 @@ const DEFAULT_DEBUG_SETTINGS = {
 
   wizerLogging: false,
 };
+
+/** Features that are used by default if not explicitly disabled */
+const DEFAULT_FEATURES = ['stdio', 'random', 'clocks', 'http', 'fetch-event'];
 
 export async function componentize(
   opts,
@@ -116,24 +120,36 @@ export async function componentize(
   // Determine the path to the StarlingMonkey binary
   const engine = getEnginePath(opts);
 
-  // We never disable a feature that is already in the target world usage
-  const features = [];
-  if (!disableFeatures.includes('stdio')) {
-    features.push('stdio');
-  }
-  if (!disableFeatures.includes('random')) {
-    features.push('random');
-  }
-  if (!disableFeatures.includes('clocks')) {
-    features.push('clocks');
-  }
-  if (!disableFeatures.includes('http')) {
-    features.push('http');
+  // Determine the default features that should be included
+  const features = new Set();
+  for (let f of DEFAULT_FEATURES) {
+    if (!disableFeatures.includes(f)) {
+      features.add(f);
+    }
   }
 
+  if (!jsSource && sourcePath) {
+    jsSource = await readFile(sourcePath, 'utf8');
+  }
+  const detectedExports = await detectKnownSourceExportNames(
+    sourceName,
+    jsSource,
+  );
+
+  // If there is an export of incomingHandler, there is likely to be a
+  // manual implementation of wasi:http/incoming-handler, so we should
+  // disable fetch-event
+  if (features.has('http') && detectedExports.has('incomingHandler')) {
+    console.error(
+      'Detected `incomingHandler` export, disabling fetch-event...',
+    );
+    features.delete('fetch-event');
+  }
+
+  // Splice the bindigns for the given WIT world into the engine WASM
   let { wasm, jsBindings, exports, imports } = splicer.spliceBindings(
     await readFile(engine),
-    features,
+    [...features],
     witWorld,
     maybeWindowsPath(witPath),
     worldName,
@@ -204,7 +220,7 @@ export async function componentize(
     DEBUG: enableWizerLogging ? '1' : '',
     SOURCE_NAME: sourceName,
     EXPORT_CNT: exports.length.toString(),
-    FEATURE_CLOCKS: features.includes('clocks') ? '1' : '',
+    FEATURE_CLOCKS: features.has('clocks') ? '1' : '',
   };
 
   for (const [idx, [export_name, expt]] of exports.entries()) {
@@ -360,7 +376,7 @@ export async function componentize(
   // After wizening, stub out the wasi imports depending on what features are enabled
   const finalBin = splicer.stubWasi(
     bin,
-    features,
+    [...features],
     witWorld,
     maybeWindowsPath(witPath),
     worldName,
@@ -483,13 +499,15 @@ function getEnginePath(opts) {
 
 /** Prepare a work directory for use with componentization */
 async function prepWorkDir() {
-  const baseDir = maybeWindowsPath(join(
-    tmpdir(),
-    createHash('sha256')
-      .update(Math.random().toString())
-      .digest('hex')
-      .slice(0, 12),
-  ));
+  const baseDir = maybeWindowsPath(
+    join(
+      tmpdir(),
+      createHash('sha256')
+        .update(Math.random().toString())
+        .digest('hex')
+        .slice(0, 12),
+    ),
+  );
   await mkdir(baseDir);
   const sourcesDir = maybeWindowsPath(join(baseDir, 'sources'));
   await mkdir(sourcesDir);
@@ -582,4 +600,37 @@ async function handleCheckInitOutput(
     }
     throw new Error(msg);
   }
+}
+
+/**
+ * Detect known exports that correspond to certain interfaces
+ *
+ * @param {string} filename - filename
+ * @param {string} code - JS source code
+ * @returns {Promise<string[]>} A Promise that resolves to a list of string that represent unversioned interfaces
+ */
+async function detectKnownSourceExportNames(filename, code) {
+  if (!filename) {
+    throw new Error('missing filename');
+  }
+  if (!code) {
+    throw new Error('missing JS code');
+  }
+
+  const names = new Set();
+
+  const results = await oxc.parseAsync(filename, code);
+  if (results.errors.length > 0) {
+    throw new Error(
+      `failed to parse JS source, encountered [${results.errors.length}] errors`,
+    );
+  }
+
+  for (const staticExport of results.module.staticExports) {
+    for (const entry of staticExport.entries) {
+      names.add(entry.exportName.name);
+    }
+  }
+
+  return names;
 }
