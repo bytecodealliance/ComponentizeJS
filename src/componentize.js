@@ -121,12 +121,12 @@ export async function componentize(
   const engine = getEnginePath(opts);
 
   // Determine the default features that should be included
-  const features = DEFAULT_FEATURES.reduce((acc, f) => {
+  const features = new Set();
+  for (let f of DEFAULT_FEATURES) {
     if (!disableFeatures.includes(f)) {
-      acc.add(f);
+      features.add(f);
     }
-    return acc;
-  }, new Set());
+  }
 
   if (!jsSource && sourcePath) {
     jsSource = await readFile(sourcePath, 'utf8');
