@@ -1,6 +1,6 @@
 package local:spidermonkey-embedding-splicer;
 
-world spidermonkey-embedding-splicer {
+interface splicer {
   enum core-ty {
     i32,
     i64,
@@ -30,7 +30,31 @@ world spidermonkey-embedding-splicer {
     imports: list<tuple<string, string, u32>>,
   }
 
-  export stub-wasi: func(engine: list<u8>, features: list<features>, wit-world: option<string>, wit-path: option<string>, world-name: option<string>) -> result<list<u8>, string>;
+  /// Stub the WASI imports/exports of a given JS engine WebAssembly module
+  ///
+  /// Depending on which features have been enabled, different default-provided WASI
+  /// imports may be stubbed (for example to be made unreachable).
+  stub-wasi: func(
+      engine: list<u8>,
+      features: list<features>,
+      wit-world: option<string>,
+      wit-path: option<string>,
+      world-name: option<string>
+  ) -> result<list<u8>, string>;
 
-  export splice-bindings: func(spidermonkey-engine: list<u8>, wit-world: option<string>, wit-path: option<string>, world-name: option<string>, debug: bool) -> result<splice-result, string>;
+  /// Splice blindings for a given WIT world into the spider monkey engine binary (spidermonkey.wasm)
+  /// this function produces a new WebAssembly component
+  splice-bindings: func(
+      spidermonkey-engine: list<u8>,
+      features: list<features>,
+      wit-world: option<string>,
+      wit-path: option<string>,
+      world-name: option<string>,
+      debug: bool,
+  ) -> result<splice-result, string>;
+
+}
+
+world spidermonkey-embedding-splicer {
+  export splicer;
 }

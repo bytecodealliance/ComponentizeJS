@@ -1,9 +1,11 @@
-use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
 use std::fs;
 use std::path::PathBuf;
+use std::str::FromStr;
 
-use spidermonkey_embedding_splicer::wit::Features;
+use anyhow::{Context, Result};
+use clap::{Parser, Subcommand};
+
+use spidermonkey_embedding_splicer::wit::exports::local::spidermonkey_embedding_splicer::splicer::Features;
 use spidermonkey_embedding_splicer::{splice, stub_wasi};
 
 #[derive(Parser, Debug)]
@@ -62,27 +64,6 @@ enum Commands {
     },
 }
 
-/// Maps the list of features passed as strings into the list of features as given by the enum
-///
-/// enum features {
-///    stdio,
-///    clocks,
-///    random,
-///    http,
-///}
-fn map_features(features: &Vec<String>) -> Vec<Features> {
-    features
-        .iter()
-        .map(|f| match f.as_str() {
-            "stdio" => Features::Stdio,
-            "clocks" => Features::Clocks,
-            "random" => Features::Random,
-            "http" => Features::Http,
-            _ => panic!("Unknown feature: {}", f),
-        })
-        .collect()
-}
-
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -98,7 +79,10 @@ fn main() -> Result<()> {
                 .with_context(|| format!("Failed to read input file: {}", input.display()))?;
 
             let wit_path_str = wit_path.as_ref().map(|p| p.to_string_lossy().to_string());
-            let features = map_features(&features);
+            let features = features
+                .iter()
+                .map(|v| Features::from_str(v))
+                .collect::<Result<Vec<_>>>()?;
 
             let result = stub_wasi::stub_wasi(wasm, features, None, wit_path_str, world_name)
                 .map_err(|e| anyhow::anyhow!(e))?;
@@ -131,13 +115,13 @@ fn main() -> Result<()> {
 
             let result = splice::splice_bindings(engine, world_name, wit_path_str, None, debug)
                 .map_err(|e| anyhow::anyhow!(e))?;
-            fs::write(&out_dir.join("component.wasm"), result.wasm).with_context(|| {
+            fs::write(out_dir.join("component.wasm"), result.wasm).with_context(|| {
                 format!(
                     "Failed to write output file: {}",
                     out_dir.join("component.wasm").display()
                 )
             })?;
-            fs::write(&out_dir.join("initializer.js"), result.js_bindings).with_context(|| {
+            fs::write(out_dir.join("initializer.js"), result.js_bindings).with_context(|| {
                 format!(
                     "Failed to write output file: {}",
                     out_dir.join("initializer.js").display()
