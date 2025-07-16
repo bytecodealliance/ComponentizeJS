@@ -32,9 +32,9 @@ export function getResult() {
 
   let responseBody;
 
-  const incomingBody = incomingResponse.consume().val;
+  const incomingBody = incomingResponse.consume();
   {
-    const bodyStream = incomingBody.stream().val;
+    const bodyStream = incomingBody.stream();
     // const bodyStreamPollable = bodyStream.subscribe();
     const buf = bodyStream.blockingRead(500n);
     // TODO: actual streaming
