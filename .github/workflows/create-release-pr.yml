@@ -97,16 +97,19 @@ jobs:
         run: |
           export IS_PRERELEASE=$(node scripts/semver-is-prerelease.mjs ${{ steps.project-meta.outputs.next-version }});
 
-          export START_ARG="--latest";
+          export OPT_TAG=--tag=${{ steps.project-meta.outputs.next-version }};
+
+          export OPT_TAG_PATTERN=--tag-pattern='^[0-9]+.[0-9]+.[0-9]+$';
           if [ "true" == "$IS_PRERELEASE" ]; then
-            export START_ARG="--unreleased";
+            export OPT_TAG_PATTERN=--tag-pattern='^[0-9]+.[0-9]+.[0-9]+(-beta|-rc|-alpha)?';
           fi
 
           git cliff \
             --repository=${{ github.workspace }}/.git \
             --config=./cliff.toml \
-            $START_ARG \
-            --tag=${{ steps.project-meta.outputs.next-version }} \
+            --unreleased \
+            $OPT_TAG \
+            $OPT_TAG_PATTERN \
             --prepend=CHANGELOG.md
 
       # Create release PR
