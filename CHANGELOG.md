@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.18.4-rc.0] - 2025-07-21
+
+## Important Updates
+
+This release contains an update to [StarlingMonkey][sm], the engine that powers `componentize-js`.
+Important new features and bugfixes from StarlingMonkey relevant to `componentize-js` that are
+pulled in by this update are listed below:
+
+- Implement `EventTarget` and `Event` builtin ([#220](https://github.com/bytecodealliance/StarlingMonkey/pull/220))
+- Add support for two-argument `has` and `delete` in `URLSearchParams` ([#236](https://github.com/bytecodealliance/StarlingMonkey/pull/236)) 
+
+[sm]: https://github.com/bytecodealliance/StarlingMonkey
+
+### 🐛 Bug Fixes
+
+* *(ci)* release changelog generation (#263) by @vados-cosmonic in #263
+
+* *(ci)* create rc releases as prerelease (#264) by @vados-cosmonic in #264
+
+
+### 🚜 Refactor
+
+* *(tests)* refactor expected globals test (#262) by @vados-cosmonic in #262
+
+
+### ⚙️ Miscellaneous Tasks
+
+* update StarlingMonkey to commit 1f6f81f (#260) by @vados-cosmonic in #260
+
+* *(docs)* add comments to API type in README (#261) by @vados-cosmonic in #261
+
+
+
+
 ## [0.18.3] - 2025-07-16
 
 ### 🚀 Features
