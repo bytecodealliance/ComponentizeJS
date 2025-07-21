@@ -22,7 +22,7 @@ export async function componentizeCmd (jsSource, opts) {
 }
 
 program
-  .version('0.18.3')
+  .version('0.18.4-rc.0')
   .description('Create a component from a JavaScript module')
   .usage('<js-source> --wit wit-world.wit -o <component-path>')
   .argument('<js-source>', 'JS source file to build')
