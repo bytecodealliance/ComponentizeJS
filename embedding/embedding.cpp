@@ -132,6 +132,12 @@ cabi_realloc_adapter(void *ptr, size_t orig_size, size_t org_align,
 }
 
 // This MUST override the StarlingMonkey core cabi_realloc export
+//
+// NOTE: You *should* avoid external host calls during realloc
+// (ex. using the LOG macro to log a message), as this is a condition
+// under which the component may be marked to prevent leaving (doing a new host call).
+//
+// see: https://github.com/bytecodealliance/wasmtime/blob/aec935f2e746d71934c8a131be15bbbb4392138c/crates/wasmtime/src/runtime/component/func/host.rs#L741
 __attribute__((export_name("cabi_realloc"))) void *
 cabi_realloc(void *ptr, size_t orig_size, size_t org_align, size_t new_size) {
   void *ret = JS_realloc(Runtime.cx, ptr, orig_size, new_size);
@@ -140,8 +146,6 @@ cabi_realloc(void *ptr, size_t orig_size, size_t org_align, size_t new_size) {
   if (!ret) {
     Runtime.engine->abort("(cabi_realloc) Unable to realloc");
   }
-  LOG("(cabi_realloc) [%d %zu %zu] %d\n", (uint32_t)ptr, orig_size, new_size,
-      (uint32_t)ret);
   return ret;
 }
 
