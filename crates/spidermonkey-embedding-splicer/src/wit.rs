@@ -5,18 +5,18 @@ wit_bindgen::generate!({
     pub_export_macro: true
 });
 
-use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::Features;
+use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::Feature;
 
-impl std::str::FromStr for Features {
+impl std::str::FromStr for Feature {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            "stdio" => Ok(Features::Stdio),
-            "clocks" => Ok(Features::Clocks),
-            "random" => Ok(Features::Random),
-            "http" => Ok(Features::Http),
-            "fetch-event" => Ok(Features::FetchEvent),
+            "stdio" => Ok(Feature::Stdio),
+            "clocks" => Ok(Feature::Clocks),
+            "random" => Ok(Feature::Random),
+            "http" => Ok(Feature::Http),
+            "fetch-event" => Ok(Feature::FetchEvent),
             _ => bail!("unrecognized feature string [{s}]"),
         }
     }

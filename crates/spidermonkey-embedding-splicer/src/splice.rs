@@ -18,7 +18,7 @@ use wit_parser::Resolve;
 
 use crate::bindgen::BindingItem;
 use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::{
-    CoreFn, CoreTy, Features, SpliceResult,
+    CoreFn, CoreTy, Feature, SpliceResult,
 };
 use crate::{bindgen, map_core_fn, parse_wit, splice};
 
@@ -32,7 +32,7 @@ use crate::{bindgen, map_core_fn, parse_wit, splice};
 // }
 pub fn splice_bindings(
     engine: Vec<u8>,
-    features: Vec<Features>,
+    features: Vec<Feature>,
     wit_source: Option<String>,
     wit_path: Option<String>,
     world_name: Option<String>,
@@ -340,7 +340,7 @@ pub fn splice(
     engine: Vec<u8>,
     imports: Vec<(String, String, CoreFn, Option<i32>)>,
     exports: Vec<(String, CoreFn)>,
-    features: Vec<Features>,
+    features: Vec<Feature>,
     debug: bool,
 ) -> Result<Vec<u8>> {
     let mut module = Module::parse(&engine, false).unwrap();
@@ -351,7 +351,7 @@ pub fn splice(
 
     // if 'fetch-event' feature is disabled (default being default-enabled),
     // remove the built-in incoming-handler which is built around it's use.
-    if !features.contains(&Features::FetchEvent) {
+    if !features.contains(&Feature::FetchEvent) {
         remove_if_exported_by_js(
             &mut module,
             &exports,

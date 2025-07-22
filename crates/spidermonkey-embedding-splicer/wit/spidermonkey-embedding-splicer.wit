@@ -8,7 +8,7 @@ interface splicer {
     %f64
   }
 
-  enum features {
+  enum feature {
     stdio,
     clocks,
     random,
@@ -37,7 +37,7 @@ interface splicer {
   /// imports may be stubbed (for example to be made unreachable).
   stub-wasi: func(
       engine: list<u8>,
-      features: list<features>,
+      features: list<feature>,
       wit-world: option<string>,
       wit-path: option<string>,
       world-name: option<string>
@@ -47,7 +47,7 @@ interface splicer {
   /// this function produces a new WebAssembly component
   splice-bindings: func(
       spidermonkey-engine: list<u8>,
-      features: list<features>,
+      features: list<feature>,
       wit-world: option<string>,
       wit-path: option<string>,
       world-name: option<string>,
