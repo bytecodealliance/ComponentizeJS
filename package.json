@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@bytecodealliance/jco": "^1.9.1",
-    "@bytecodealliance/weval": "^0.3.3",
+    "@bytecodealliance/weval": "^0.3.4",
     "@bytecodealliance/wizer": "^7.0.5",
     "es-module-lexer": "^1.6.0",
     "oxc-parser": "^0.76.0"
