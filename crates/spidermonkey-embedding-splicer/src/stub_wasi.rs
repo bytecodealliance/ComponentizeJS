@@ -13,7 +13,7 @@ use wasmparser::{MemArg, TypeRef};
 use wit_parser::Resolve;
 
 use crate::parse_wit;
-use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::Features;
+use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::Feature;
 
 const WASI_VERSIONS: [&str; 4] = ["0.2.0", "0.2.1", "0.2.2", "0.2.3"];
 
@@ -96,7 +96,7 @@ fn unreachable_stub(body: &mut FunctionBuilder) -> Result<Vec<LocalID>> {
 
 pub fn stub_wasi(
     wasm: Vec<u8>,
-    features: Vec<Features>,
+    features: Vec<Feature>,
     wit_source: Option<String>,
     wit_path: Option<String>,
     world_name: Option<String>,
@@ -127,25 +127,25 @@ pub fn stub_wasi(
     stub_filesystem(&mut module, &target_world_imports)?;
     stub_cli(&mut module, &target_world_imports)?;
 
-    if !features.contains(&Features::Random) {
+    if !features.contains(&Feature::Random) {
         stub_random(&mut module)?;
     }
 
-    if !features.contains(&Features::Clocks) {
+    if !features.contains(&Feature::Clocks) {
         stub_clocks(&mut module)?;
     }
 
-    if !features.contains(&Features::Stdio) {
+    if !features.contains(&Feature::Stdio) {
         stub_stdio(&mut module)?;
     }
 
-    if !features.contains(&Features::Http) && !features.contains(&Features::FetchEvent) {
+    if !features.contains(&Feature::Http) && !features.contains(&Feature::FetchEvent) {
         stub_http(&mut module)?;
     }
 
-    let has_io = features.contains(&Features::Clocks)
-        || features.contains(&Features::Stdio)
-        || features.contains(&Features::Http)
+    let has_io = features.contains(&Feature::Clocks)
+        || features.contains(&Feature::Stdio)
+        || features.contains(&Feature::Http)
         || target_world_requires_io(&target_world_imports);
     if !has_io {
         stub_io(&mut module)?;

@@ -19,7 +19,7 @@ use wit_component::StringEncoding;
 use wit_parser::abi::WasmType;
 use wit_parser::abi::{AbiVariant, WasmSignature};
 
-use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::Features;
+use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::Feature;
 
 use crate::{uwrite, uwriteln};
 
@@ -108,7 +108,7 @@ struct JsBindgen<'a> {
     imported_resources: BTreeSet<TypeId>,
 
     /// Features that were enabled at the time of generation
-    features: &'a Vec<Features>,
+    features: &'a Vec<Feature>,
 }
 
 #[derive(Debug)]
@@ -139,7 +139,7 @@ pub struct Componentization {
 pub fn componentize_bindgen(
     resolve: &Resolve,
     wid: WorldId,
-    features: &Vec<Features>,
+    features: &Vec<Feature>,
 ) -> Result<Componentization> {
     let mut bindgen = JsBindgen {
         src: Source::default(),
@@ -407,7 +407,7 @@ impl JsBindgen<'_> {
             // Skip bindings generation for wasi:http/incoming-handler if the fetch-event
             // feature was enabled. We expect that the built-in engine implementation will be used
             if name.starts_with("wasi:http/incoming-handler@0.2.")
-                && self.features.contains(&Features::FetchEvent)
+                && self.features.contains(&Feature::FetchEvent)
             {
                 continue;
             }

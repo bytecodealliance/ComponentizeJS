@@ -5,7 +5,7 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
-use spidermonkey_embedding_splicer::wit::exports::local::spidermonkey_embedding_splicer::splicer::Features;
+use spidermonkey_embedding_splicer::wit::exports::local::spidermonkey_embedding_splicer::splicer::Feature;
 use spidermonkey_embedding_splicer::{splice, stub_wasi};
 
 #[derive(Parser, Debug)]
@@ -85,7 +85,7 @@ fn main() -> Result<()> {
             let wit_path_str = wit_path.as_ref().map(|p| p.to_string_lossy().to_string());
             let features = features
                 .iter()
-                .map(|v| Features::from_str(v))
+                .map(|v| Feature::from_str(v))
                 .collect::<Result<Vec<_>>>()?;
 
             let result = stub_wasi::stub_wasi(wasm, features, None, wit_path_str, world_name)
@@ -120,7 +120,7 @@ fn main() -> Result<()> {
 
             let features = features
                 .iter()
-                .map(|v| Features::from_str(v))
+                .map(|v| Feature::from_str(v))
                 .collect::<Result<Vec<_>>>()?;
 
             let result =
