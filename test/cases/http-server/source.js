@@ -19,7 +19,7 @@ export const incomingHandler = {
     }
     outgoingResponse.setStatusCode(200);
     OutgoingBody.finish(outgoingBody, undefined);
-    ResponseOutparam.set(outgoingResponse, {
+    ResponseOutparam.set(responseOutparam, {
       tag: 'ok',
       val: outgoingResponse,
     });
