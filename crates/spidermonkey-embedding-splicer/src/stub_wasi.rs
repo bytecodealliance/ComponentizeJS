@@ -148,8 +148,8 @@ pub fn stub_wasi(
             stub_http_types(&mut module)?;
             stub_http_outgoing(&mut module)?;
         }
-        // If HTTP is disabled but fetch-event is enabled we want to stub only the wasi:http/outgoing-handler
-        // import, and leave wasi:http/types will should be used by the fetch-event export.
+        // If HTTP is disabled but fetch-event is enabled we want to stub only the `wasi:http/outgoing-handler`
+        // and leave the rest of `wasi:http/types` in place for StarlingMonkey's implementation of `FetchEvent` to use.
         //
         // Note that we cannot *know* that the user will make use of fetch-event, but we must be prepared
         // for it, as the feature is enabled.
