@@ -61,7 +61,7 @@ const DEFAULT_DEBUG_SETTINGS = {
 };
 
 /** Features that are used by default if not explicitly disabled */
-const DEFAULT_FEATURES = ['stdio', 'random', 'clocks', 'http', 'fetch-event'];
+export const DEFAULT_FEATURES = ['stdio', 'random', 'clocks', 'http', 'fetch-event'];
 
 export async function componentize(
   opts,
