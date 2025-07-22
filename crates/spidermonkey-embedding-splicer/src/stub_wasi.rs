@@ -139,8 +139,25 @@ pub fn stub_wasi(
         stub_stdio(&mut module)?;
     }
 
-    if !features.contains(&Feature::Http) && !features.contains(&Feature::FetchEvent) {
-        stub_http(&mut module)?;
+    match (
+        features.contains(&Feature::Http),
+        features.contains(&Feature::FetchEvent),
+    ) {
+        // If both are disabled, then disable all HTTP related imports
+        (false, false) => {
+            stub_http_types(&mut module)?;
+            stub_http_outgoing(&mut module)?;
+        }
+        // If HTTP is disabled but fetch-event is enabled we want to stub only the `wasi:http/outgoing-handler`
+        // and leave the rest of `wasi:http/types` in place for StarlingMonkey's implementation of `FetchEvent` to use.
+        //
+        // Note that we cannot *know* that the user will make use of fetch-event, but we must be prepared
+        // for it, as the feature is enabled.
+        (false, true) => {
+            stub_http_outgoing(&mut module)?;
+        }
+        // For all other cases we can avoid stubbing
+        _ => {}
     }
 
     let has_io = features.contains(&Feature::Clocks)
@@ -380,7 +397,17 @@ fn stub_stdio(module: &mut Module) -> Result<()> {
     Ok(())
 }
 
-fn stub_http(module: &mut Module) -> Result<()> {
+fn stub_http_outgoing(module: &mut Module) -> Result<()> {
+    stub_wasi_imports(
+        module,
+        "wasi:http/outgoing-handler",
+        "handle",
+        unreachable_stub,
+    )?;
+    Ok(())
+}
+
+fn stub_http_types(module: &mut Module) -> Result<()> {
     stub_wasi_imports(
         module,
         "wasi:http/types",
@@ -751,12 +778,6 @@ fn stub_http(module: &mut Module) -> Result<()> {
         module,
         "wasi:http/types",
         "[method]future-incoming-response.get",
-        unreachable_stub,
-    )?;
-    stub_wasi_imports(
-        module,
-        "wasi:http/outgoing-handler",
-        "handle",
         unreachable_stub,
     )?;
     Ok(())
