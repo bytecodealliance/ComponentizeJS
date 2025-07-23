@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.18.4] - 2025-07-23
+
+### 🚀 Features
+
+* update weval to v0.3.4 (#267) by @vados-cosmonic in #267
+
+
+### 🐛 Bug Fixes
+
+* logic for stubbing outgoing http and fetch-event (#268) by @vados-cosmonic in #268
+
+* reuse feature list for CLI, add 'fetch-event' (#269) by @vados-cosmonic in #269
+
+* remove log during realloc (#273) by @vados-cosmonic in #273
+
+* *(tests)* responseOutparam usage (#271) by @vados-cosmonic in #271
+
+* *(ci)* release changelog generation (#263) by @vados-cosmonic in #263
+
+* *(ci)* create rc releases as prerelease (#264) by @vados-cosmonic in #264
+
+
+### 🚜 Refactor
+
+* 'features' -> 'feature' in WIT & Rust component (#270) by @vados-cosmonic in #270
+
+* *(tests)* refactor expected globals test (#262) by @vados-cosmonic in #262
+
+
+### ⚙️ Miscellaneous Tasks
+
+* update StarlingMonkey to commit 1f6f81f (#260) by @vados-cosmonic in #260
+
+* *(docs)* add comments to API type in README (#261) by @vados-cosmonic in #261
+
+
+
+
 ## [0.18.4-rc.1] - 2025-07-22
 
 ### 🚀 Features
