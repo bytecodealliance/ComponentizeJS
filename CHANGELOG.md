@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.18.4-rc.1] - 2025-07-22
+
+### 🚀 Features
+
+* update weval to v0.3.4 (#267) by @vados-cosmonic in #267
+
+
+### 🐛 Bug Fixes
+
+* logic for stubbing outgoing http and fetch-event (#268) by @vados-cosmonic in #268
+
+* reuse feature list for CLI, add 'fetch-event' (#269) by @vados-cosmonic in #269
+
+* remove log during realloc (#273) by @vados-cosmonic in #273
+
+* *(tests)* responseOutparam usage (#271) by @vados-cosmonic in #271
+
+
+### 🚜 Refactor
+
+* 'features' -> 'feature' in WIT & Rust component (#270) by @vados-cosmonic in #270
+
+
+
+
 ## [0.18.4-rc.0] - 2025-07-21
 
 ## Important Updates
