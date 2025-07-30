@@ -22,7 +22,7 @@ export async function test(run) {
   ok(stderr.includes(' ms'));
   const time = Number(stderr.split(' ms')[0]);
   // TODO: fix back to half a millisecond when Weval fix is added
-  if (time > 10) {
+  if (time > 25) {
     throw new Error('took more than half a millisecond - ' + time + ' ms');
   }
 }

@@ -1,9 +1,11 @@
-import { componentize } from '@bytecodealliance/componentize-js';
-import { transpile } from '@bytecodealliance/jco';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { strictEqual } from 'node:assert';
+import { fileURLToPath, URL } from 'node:url';
+
+import { componentize } from '@bytecodealliance/componentize-js';
+import { transpile } from '@bytecodealliance/jco';
+
+import { suite, test, assert } from 'vitest';
 
 const DEBUG_TRACING = false;
 const LOG_DEBUGGING = false;
@@ -29,7 +31,7 @@ suite('Builtins', () => {
         test: runTest,
         disableFeatures,
         enableFeatures,
-      } = await import(`./builtins/${filename}`);
+      } = await import(`./builtins/${name}.js`);
 
       const { component } = await componentize(
         source,
@@ -46,7 +48,7 @@ suite('Builtins', () => {
           enableFeatures,
           disableFeatures: maybeLogging(disableFeatures),
           enableAot,
-        }
+        },
       );
 
       const { files } = await transpile(component, {
@@ -61,13 +63,13 @@ suite('Builtins', () => {
 
       await writeFile(
         new URL(`./output/${name}.component.wasm`, import.meta.url),
-        component
+        component,
       );
 
       for (const file of Object.keys(files)) {
         await writeFile(
           new URL(`./output/${name}/${file}`, import.meta.url),
-          files[file]
+          files[file],
         );
       }
 
@@ -76,7 +78,7 @@ suite('Builtins', () => {
         `
         import { run } from './${name}.js';
         run();
-      `
+      `,
       );
 
       try {
@@ -90,10 +92,10 @@ suite('Builtins', () => {
                 process.argv[0],
                 [
                   fileURLToPath(
-                    new URL(`./output/${name}/run.js`, import.meta.url)
+                    new URL(`./output/${name}/run.js`, import.meta.url),
                   ),
                 ],
-                { stdio: 'pipe' }
+                { stdio: 'pipe' },
               );
               cp.stdout.on('data', (chunk) => {
                 stdout += chunk;
@@ -103,16 +105,16 @@ suite('Builtins', () => {
               });
               cp.on('error', reject);
               cp.on('exit', (code) =>
-                code === 0 ? resolve() : reject(new Error(stderr || stdout))
+                code === 0 ? resolve() : reject(new Error(stderr || stdout)),
               );
               timeout = setTimeout(() => {
                 reject(
                   new Error(
                     'test timed out with output:\n' +
-                    stdout +
-                    '\n\nstderr:\n' +
-                    stderr
-                  )
+                      stdout +
+                      '\n\nstderr:\n' +
+                      stderr,
+                  ),
                 );
               }, 10_000);
             });
@@ -247,7 +249,10 @@ suite('Bindings', () => {
           );
         }
 
-        var instance = await import(`./output/${name}/${name}.js`);
+        const instancePath = fileURLToPath(
+          new URL(`./output/${name}/${name}.js`, import.meta.url),
+        );
+        var instance = await import(instancePath);
       } catch (e) {
         if (test.err) {
           test.err(e);
@@ -282,12 +287,12 @@ suite('WASI', () => {
         worldName: 'test1',
         enableAot,
         debugBuild,
-      }
+      },
     );
 
     await writeFile(
       new URL(`./output/wasi.component.wasm`, import.meta.url),
-      component
+      component,
     );
 
     const { files } = await transpile(component, { tracing: DEBUG_TRACING });
@@ -299,31 +304,32 @@ suite('WASI', () => {
     for (const file of Object.keys(files)) {
       await writeFile(
         new URL(`./output/wasi/${file}`, import.meta.url),
-        files[file]
+        files[file],
       );
     }
 
     var instance = await import(`./output/wasi/component.js`);
     instance.run.run();
     const result = instance.getResult();
-    strictEqual(result.slice(0, 10), `NOW: ${String(Date.now()).slice(0, 5)}`);
-    strictEqual(result.split(',').length, 3);
+    assert.strictEqual(
+      result.slice(0, 10),
+      `NOW: ${String(Date.now()).slice(0, 5)}`,
+    );
+    assert.strictEqual(result.split(',').length, 3);
   });
 
   test('basic app (OriginalSourceFile API)', async () => {
-    const { component } = await componentize(
-      {
-        sourcePath: "./test/api/index.js",
-        witPath: fileURLToPath(new URL('./wit', import.meta.url)),
-        worldName: 'test1',
-        enableAot,
-        debugBuild,
-      }
-    );
+    const { component } = await componentize({
+      sourcePath: './test/api/index.js',
+      witPath: fileURLToPath(new URL('./wit', import.meta.url)),
+      worldName: 'test1',
+      enableAot,
+      debugBuild,
+    });
 
     await writeFile(
       new URL(`./output/wasi.component.wasm`, import.meta.url),
-      component
+      component,
     );
 
     const { files } = await transpile(component, { tracing: DEBUG_TRACING });
@@ -335,14 +341,17 @@ suite('WASI', () => {
     for (const file of Object.keys(files)) {
       await writeFile(
         new URL(`./output/wasi/${file}`, import.meta.url),
-        files[file]
+        files[file],
       );
     }
 
     var instance = await import(`./output/wasi/component.js`);
     instance.run.run();
     const result = instance.getResult();
-    strictEqual(result.slice(0, 10), `NOW: ${String(Date.now()).slice(0, 5)}`);
-    strictEqual(result.split(',').length, 3);
+    assert.strictEqual(
+      result.slice(0, 10),
+      `NOW: ${String(Date.now()).slice(0, 5)}`,
+    );
+    assert.strictEqual(result.split(',').length, 3);
   });
 });
