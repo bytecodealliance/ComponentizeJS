@@ -25,7 +25,7 @@ const builtinsCases = await readdir(new URL('./builtins', import.meta.url));
 suite('Builtins', () => {
   for (const filename of builtinsCases) {
     const name = filename.slice(0, -3);
-    test.concurrent(name, async () => {
+    test(name, async () => {
       const {
         source,
         test: runTest,
@@ -137,7 +137,7 @@ suite('Builtins', () => {
 const bindingsCases = await readdir(new URL('./cases', import.meta.url));
 suite('Bindings', () => {
   for (const name of bindingsCases) {
-    test.concurrent(name, async () => {
+    test(name, async () => {
       const source = await readFile(
         new URL(`./cases/${name}/source.js`, import.meta.url),
         'utf8',
