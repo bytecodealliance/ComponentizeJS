@@ -1,15 +1,32 @@
 import { defineConfig } from 'vitest/config';
 
-const DEFAULT_TIMEOUT_MS = 120_000;
+/**
+ * Under high concurrency, tests (in partticular bindings generation) can take
+ * much longer than expected.
+ *
+ * This issues primarily happen in CI and not locally on a sufficiently powerful machine.
+ */
+const TIMEOUT_MS = process.env.CI ? 240_000 : 120_000;
 
 const REPORTERS = process.env.GITHUB_ACTIONS
   ? ['verbose', 'github-actions']
   : ['verbose'];
 
+/**
+ *
+ * Retry is set because there are issues that can randomly happen under high test concurrency:
+ *   - file systems issues (weval[.exe] is busy)
+ *   - performance under concurrency issues (see `builtins.performance.js` test)
+ *
+ * These issues primarily happen in CI and not locally, on a sufficiently powerful machine.
+ */
+const RETRY = process.env.CI ? 3 : 0;
+
 export default defineConfig({
   test: {
     reporters: REPORTERS,
     disableConsoleIntercept: true,
+    retry: RETRY,
     printConsoleTrace: true,
     passWithNoTests: false,
     include: ['test/**/*.js'],
@@ -21,8 +38,8 @@ export default defineConfig({
       'test/output/*',
       'test/util.js',
     ],
-    testTimeout: DEFAULT_TIMEOUT_MS,
-    hookTimeout: DEFAULT_TIMEOUT_MS,
-    teardownTimeout: DEFAULT_TIMEOUT_MS,
+    testTimeout: TIMEOUT_MS,
+    hookTimeout: TIMEOUT_MS,
+    teardownTimeout: TIMEOUT_MS,
   },
 });
