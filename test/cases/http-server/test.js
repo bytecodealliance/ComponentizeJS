@@ -8,15 +8,17 @@ export const enableFeatures = ['http'];
 export const worldName = 'test3';
 
 export async function test(instance) {
-  const server = new HTTPServer(instance.incomingHandler);
-  let port = await getRandomPort();
-  server.listen(port);
-
+  let server;
   try {
+    server = new HTTPServer(instance.incomingHandler);
+    let port = await getRandomPort();
+    server.listen(port);
     const resp = await fetch(`http://localhost:${port}`);
     const text = await resp.text();
     strictEqual(text, 'Hello world!');
   } finally {
-    server.stop();
+    if (server) {
+      server.stop();
+    }
   }
 }
