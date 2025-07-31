@@ -17,7 +17,8 @@ suite('Bindings', async () => {
   const bindingsCases = await readdir(new URL('./cases', import.meta.url));
 
   for (const name of bindingsCases) {
-    test.concurrent(name, async () => {
+    const testFn = WEVAL_TEST_ENABLED ? test : test.concurrent;
+    testFn(name, async () => {
       const source = await readFile(
         new URL(`./cases/${name}/source.js`, import.meta.url),
         'utf8',

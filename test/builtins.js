@@ -19,7 +19,8 @@ suite('Builtins', async () => {
 
   for (const filename of builtins) {
     const name = filename.slice(0, -3);
-    test.concurrent(name, async () => {
+    const testFn = WEVAL_TEST_ENABLED ? test : test.concurrent;
+    testFn(name, async () => {
       const {
         source,
         test: runTest,
