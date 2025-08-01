@@ -52,7 +52,6 @@ Establishing this initial prototype as a singular flexible engine foundation tha
 ### Weval AOT Compilation
 
 
-
 ## Platform APIs
 
 The following APIs are available:
@@ -330,21 +329,20 @@ imports. Direct component analysis should be used to correctly infer the real im
 
 ## Contributing
 
-### Pre-requisites
+To contribute, you'll need to set up the following:
 
 * `git submodule update --init --recursive` to update the submodules.
 * Stable Rust with the `wasm32-unknown-unknown` and `wasm32-wasi` targets
   installed.
 * `wasi-sdk-20.0` installed at `/opt/wasi-sdk/`
 
-### Building and testing
+## Building
 
 Building and testing the project can be performed via NPM scripts (see [`package.json`](./package.json)):
 
 ```console
 npm install
 npm run build
-npm run test
 ```
 
 Before being able to use `componetize-js` (ex. via `npm link`, from `jco`), you'll need to run:
@@ -361,12 +359,30 @@ To clean up a local installation (i.e. remove the installation of StarlingMonkey
 npm run clean
 ```
 
+## Testing
+
+To run all tests:
+
+```console
+npm run test
+```
+
+### Running a specific test
+
+To run a specific test suite, you can pass an argument to [`vitest`][vitest]:
+
+```console
+npm run test -- test/wasi.js
+```
+
+[vitest]: https://vitest.dev
+
 # License
 
 This project is licensed under the Apache 2.0 license with the LLVM exception.
 See [LICENSE](LICENSE) for more details.
 
-### Contribution
+## Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in this project by you, as defined in the Apache-2.0 license,
