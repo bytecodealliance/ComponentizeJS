@@ -105,7 +105,7 @@ await writeFile('test.component.wasm', component);
 
 See [types.d.ts](types.d.ts) for the full interface options.
 
-The component iself can be executed in any component runtime, see the [example](EXAMPLE.md) for an end to end workflow in Wasmtime.
+The component itself can be executed in any component runtime, see the [example](EXAMPLE.md) for an end to end workflow in Wasmtime.
 
 ### AOT Compilation
 
