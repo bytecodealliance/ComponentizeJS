@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.18.5] - 2025-08-28
+
+### 🚀 Features
+
+* *(tests)* replace mocha with vitest (#277) by @vados-cosmonic in #277
+
+
+### 🐛 Bug Fixes
+
+* *(docs)* Fix typo (#280) by @Mishra-Suraj in #280
+
+
+### 🚜 Refactor
+
+* *(tests)* split up test suites, update docs (#278) by @vados-cosmonic in #278
+
+
+### ⚙️ Miscellaneous Tasks
+
+* *(deps)* update wizer to ^10.0.0 (#283) by @vados-cosmonic in #283
+
+
+
+## New Contributors
+* @Mishra-Suraj made their first contribution in [#280](https://github.com/bytecodealliance/ComponentizeJS/pull/280)
+
+
 ## [0.18.4] - 2025-07-23
 
 ### 🚀 Features
