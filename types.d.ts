@@ -18,18 +18,6 @@ interface ComponentizeOptions {
    */
   engine?: string;
   /**
-   * Path to custom weval cache to use
-   */
-  aotCache?: string;
-  /**
-   * Enable AoT using weval
-   */
-  enableAot?: boolean;
-  /**
-   * Use a pre-existing path to the `weval` binary, if present
-   */
-  wevalBin?: string;
-  /**
    * Use a pre-existing path to the `wizer` binary, if present
    */
   wizerBin?: string;
@@ -54,7 +42,7 @@ interface ComponentizeOptions {
    */
   enableFeatures?: [];
   /**
-   * Pass environment variables to the spawned Wizer or Weval Process
+   * Pass environment variables to the spawned Wizer Process
    * If set to true, all host environment variables are passed
    * To pass only a subset, provide an object with the desired variables
    */
