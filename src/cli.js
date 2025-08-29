@@ -11,7 +11,6 @@ export async function componentizeCmd(jsSource, opts) {
     witPath: resolve(opts.wit),
     worldName: opts.worldName,
     runtimeArgs: opts.runtimeArgs,
-    enableAot: opts.aot,
     disableFeatures: opts.disable,
     preview2Adapter: opts.preview2Adapter,
     debugBindings: opts.debugBindings,
@@ -29,7 +28,6 @@ program
   .requiredOption('-w, --wit <path>', 'WIT path to build with')
   .option('-n, --world-name <name>', 'WIT world to build')
   .option('--runtime-args <string>', 'arguments to pass to the runtime')
-  .option('--aot', 'enable AOT compilation')
   .addOption(
     new Option('-d, --disable <feature...>', 'disable WASI features').choices(
       DEFAULT_FEATURES,

@@ -11,7 +11,6 @@ import { suite, test, assert } from 'vitest';
 
 import {
   DEBUG_TRACING_ENABLED,
-  WEVAL_TEST_ENABLED,
   DEBUG_TEST_ENABLED,
 } from './util.js';
 
@@ -36,7 +35,6 @@ suite('WASI', () => {
         opts: {
           witPath: fileURLToPath(new URL('./wit', import.meta.url)),
           worldName: 'test1',
-          enableAot: WEVAL_TEST_ENABLED,
           debugBuild: DEBUG_TEST_ENABLED,
         },
       },
@@ -58,14 +56,13 @@ suite('WASI', () => {
     assert.strictEqual(result.split(',').length, 3);
   });
 
-    test('basic app (OriginalSourceFile API)', async () => {
+  test('basic app (OriginalSourceFile API)', async () => {
     const { instance } = await setupComponent({
       componentize: {
         opts: {
           sourcePath: './test/api/index.js',
           witPath: fileURLToPath(new URL('./wit', import.meta.url)),
           worldName: 'test1',
-          enableAot: WEVAL_TEST_ENABLED,
           debugBuild: DEBUG_TEST_ENABLED,
         },
       },
@@ -104,7 +101,7 @@ async function setupComponent(opts) {
     throw new Error('no componentize options or src provided');
   }
 
-  const outputDir = join('./out', 'wasi-test');
+  const outputDir = join('./test/output', 'wasi-test');
   await mkdir(outputDir, { recursive: true });
 
   await writeFile(join(outputDir, 'wasi.component.wasm'), component);

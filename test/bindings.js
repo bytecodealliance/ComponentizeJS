@@ -8,7 +8,6 @@ import { suite, test } from 'vitest';
 
 import {
   DEBUG_TRACING_ENABLED,
-  WEVAL_TEST_ENABLED,
   DEBUG_TEST_ENABLED,
   maybeLogging,
 } from './util.js';
@@ -17,7 +16,7 @@ suite('Bindings', async () => {
   const bindingsCases = await readdir(new URL('./cases', import.meta.url));
 
   for (const name of bindingsCases) {
-    const testFn = WEVAL_TEST_ENABLED ? test : test.concurrent;
+    const testFn = test.concurrent;
     testFn(name, async () => {
       const source = await readFile(
         new URL(`./cases/${name}/source.js`, import.meta.url),
@@ -77,7 +76,6 @@ suite('Bindings', async () => {
           worldName,
           enableFeatures,
           disableFeatures: maybeLogging(disableFeatures),
-          enableAot: WEVAL_TEST_ENABLED,
           debugBuild: DEBUG_TEST_ENABLED,
         });
         const map = {

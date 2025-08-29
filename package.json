@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "@bytecodealliance/jco": "^1.9.1",
-    "@bytecodealliance/weval": "^0.3.4",
     "@bytecodealliance/wizer": "^10.0.0",
     "es-module-lexer": "^1.6.0",
     "oxc-parser": "^0.76.0"
@@ -31,13 +30,11 @@
   "scripts": {
     "clean": "npm run clean:starlingmonkey",
     "clean:starlingmonkey": "rm -rf build-release",
-    "build": "npm run build:release && npm run build:debug && npm run build:weval",
+    "build": "npm run build:release && npm run build:debug",
     "build:release": "make release",
-    "build:weval": "make release-weval",
     "build:debug": "make debug",
     "test": "vitest run -c test/vitest.ts",
     "test:release": "vitest run -c test/vitest.ts",
-    "test:weval": "cross-env WEVAL_TEST=1 vitest run -c test/vitest.ts",
     "test:debug": "cross-env DEBUG_TEST=1 vitest run -c test/vitest.ts",
     "prepack": "node scripts/prepack.mjs"
   },
@@ -46,8 +43,6 @@
     "lib/spidermonkey-*",
     "lib/starlingmonkey_embedding.wasm",
     "lib/starlingmonkey_embedding.debug.wasm",
-    "lib/starlingmonkey_embedding_weval.wasm",
-    "lib/starlingmonkey_ics.wevalcache",
     "src",
     "types.d.ts"
   ],

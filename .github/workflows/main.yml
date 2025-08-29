@@ -87,7 +87,6 @@ jobs:
         build-type:
           - 'release'
           - 'debug'
-          - 'weval'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -159,7 +158,6 @@ jobs:
         build-type:
           - 'release'
           - 'debug'
-          - 'weval'
     steps:
       - uses: actions/checkout@v4
 
