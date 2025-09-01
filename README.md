@@ -49,6 +49,10 @@ As more components are written in JavaScript, and there exist scenarios where mu
 
 Establishing this initial prototype as a singular flexible engine foundation that can be turned into a shared library is therefore the focus for this project.
 
+### Weval AOT Compilation
+
+Note: unfortunately Weval AOT Compilation is disabled for the time being, due to incompatibilities with newer versions of the LLVM toolchain used to compile StarlingMonkey. See [this](https://bytecodealliance.zulipchat.com/#narrow/channel/459697-StarlingMonkey/topic/Updating.20Gecko.20version/near/527089464) and the following messages for details.
+
 ## Platform APIs
 
 The following APIs are available:
