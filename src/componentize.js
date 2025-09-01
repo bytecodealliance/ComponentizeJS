@@ -240,7 +240,10 @@ export async function componentize(
   sourcePath = maybeWindowsPath(sourcePath);
   let workspacePrefix = dirname(sourcePath);
 
-
+  // If the source path is within the current working directory, strip the
+  // cwd as a prefix from the source path, and remap the paths seen by the
+  // component to be relative to the current working directory.
+  // This only works in wizer.
   if (!useOriginalSourceFile) {
     workspacePrefix = sourcesDir;
     sourcePath = sourceName;

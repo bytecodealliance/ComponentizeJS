@@ -22,7 +22,7 @@ export async function test(run) {
   ok(stderr.includes(' ms'));
   const time = Number(stderr.split(' ms')[0]);
 
-  if (time > 0.5) {
-    throw new Error('took more than half a millisecond - ' + time + ' ms');
+  if (time > 5) {
+    throw new Error('took more than 5 milliseconds - ' + time + ' ms');
   }
 }

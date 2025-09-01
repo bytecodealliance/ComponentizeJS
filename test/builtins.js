@@ -18,8 +18,7 @@ suite('Builtins', async () => {
 
   for (const filename of builtins) {
     const name = filename.slice(0, -3);
-    const testFn = test.concurrent;
-    testFn(name, async () => {
+    test.concurrent(name, async () => {
       const {
         source,
         test: runTest,
@@ -37,7 +36,6 @@ suite('Builtins', async () => {
       `,
         {
           sourceName: `${name}.js`,
-          // also test the debug build while we are about it
           debugBuild: DEBUG_TEST_ENABLED,
           enableFeatures,
           disableFeatures: maybeLogging(disableFeatures),

@@ -16,8 +16,7 @@ suite('Bindings', async () => {
   const bindingsCases = await readdir(new URL('./cases', import.meta.url));
 
   for (const name of bindingsCases) {
-    const testFn = test.concurrent;
-    testFn(name, async () => {
+    test.concurrent(name, async () => {
       const source = await readFile(
         new URL(`./cases/${name}/source.js`, import.meta.url),
         'utf8',

@@ -314,8 +314,6 @@ npm install
 npm run build
 ```
 
-Before being able to use `componetize-js` (ex. via `npm link`, from `jco`), you'll need to run:
-
 To clean up a local installation (i.e. remove the installation of StarlingMonkey):
 
 ```console
