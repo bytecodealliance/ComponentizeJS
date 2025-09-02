@@ -59,16 +59,17 @@ The following APIs are available:
 
 * **Legacy Encoding**: `atob`, `btoa`, `decodeURI`, `encodeURI`, `decodeURIComponent`, `encodeURIComponent`
 * **Streams**: `ReadableStream`, `ReadableStreamBYOBReader`, `ReadableStreamBYOBRequest`, `ReadableStreamDefaultReader`, `ReadableStreamDefaultController`, `ReadableByteStreamController`, `WritableStream` `ByteLengthQueuingStrategy` `CountQueuingStrategy`, `TransformStream`
-* **URL**: `URL` `URLSearchParams`
+* **URL**: `URL`, `URLSearchParams`
 * **Console**: `console`
 * **Performance**: `Performance`
 * **Task**: `queueMicrotask`, `setInterval` `setTimeout` `clearInterval` `clearTimeout`
 * **Location**: `WorkerLocation`, `location`
 * **Encoding**: `TextEncoder`, `TextDecoder`, `CompressionStream`, `DecompressionStream`
 * **Structured Clone**: `structuredClone`
-* **Fetch**: `fetch` `Request` `Response` `Headers`
+* **Fetch**: `fetch`, `Request`, `Response`, `Headers`
 * **Forms, Files, and Blobs**: `FormData`, `MultipartFormData`, `File`, `Blob`
-* **Crypto**: `SubtleCrypto` `Crypto` `crypto` `CryptoKey`
+* **Crypto**: `SubtleCrypto`, `Crypto`, `crypto`, `CryptoKey`
+* **Abort**: `AbortController`, `AbortSignal`
 
 ## Usage
 
