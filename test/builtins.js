@@ -9,7 +9,6 @@ import { suite, test, assert } from 'vitest';
 
 import {
   DEBUG_TRACING_ENABLED,
-  WEVAL_TEST_ENABLED,
   DEBUG_TEST_ENABLED,
   maybeLogging,
 } from './util.js';
@@ -19,8 +18,7 @@ suite('Builtins', async () => {
 
   for (const filename of builtins) {
     const name = filename.slice(0, -3);
-    const testFn = WEVAL_TEST_ENABLED ? test : test.concurrent;
-    testFn(name, async () => {
+    test.concurrent(name, async () => {
       const {
         source,
         test: runTest,
@@ -38,11 +36,9 @@ suite('Builtins', async () => {
       `,
         {
           sourceName: `${name}.js`,
-          // also test the debug build while we are about it (unless testing Weval)
           debugBuild: DEBUG_TEST_ENABLED,
           enableFeatures,
           disableFeatures: maybeLogging(disableFeatures),
-          enableAot: WEVAL_TEST_ENABLED,
         },
       );
 
@@ -106,9 +102,9 @@ suite('Builtins', async () => {
                 reject(
                   new Error(
                     'test timed out with output:\n' +
-                      stdout +
-                      '\n\nstderr:\n' +
-                      stderr,
+                    stdout +
+                    '\n\nstderr:\n' +
+                    stderr,
                   ),
                 );
               }, 10_000);

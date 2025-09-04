@@ -10,7 +10,6 @@ examples/hello-world/guest/package-lock.json
 examples/hello-world/guest/hello.component.wasm
 /build-debug
 /build-release
-/build-release-weval
 .vscode
 /package-lock.json
 .idea

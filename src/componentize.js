@@ -12,7 +12,6 @@ import { createHash } from 'node:crypto';
 
 import oxc from 'oxc-parser';
 import wizer from '@bytecodealliance/wizer';
-import getWeval from '@bytecodealliance/weval';
 import {
   componentNew,
   metadataAdd,
@@ -43,11 +42,6 @@ const CHECK_INIT_RETURN_FN_LIST = 1;
 
 /** Response code from check_init() that denotes being unable to parse core ABI export types */
 const CHECK_INIT_RETURN_TYPE_PARSE = 2;
-
-/** Default path to the AOT weval cache */
-const DEFAULT_AOT_CACHE = fileURLToPath(
-  new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url),
-);
 
 /** Default settings for debug options */
 const DEFAULT_DEBUG_SETTINGS = {
@@ -110,7 +104,6 @@ export async function componentize(
 
     runtimeArgs,
 
-    aotCache = DEFAULT_AOT_CACHE,
   } = opts;
 
   debugBindings = debugBindings || debug?.bindings;
@@ -250,97 +243,48 @@ export async function componentize(
   // If the source path is within the current working directory, strip the
   // cwd as a prefix from the source path, and remap the paths seen by the
   // component to be relative to the current working directory.
-  // This only works in wizer, not in weval, because the latter doesn't
-  // support --mapdir.
-  if (!opts.enableAot) {
-    if (!useOriginalSourceFile) {
-      workspacePrefix = sourcesDir;
-      sourcePath = sourceName;
-    }
-    let currentDir = maybeWindowsPath(cwd());
-    if (workspacePrefix.startsWith(currentDir)) {
-      workspacePrefix = currentDir;
-      sourcePath = sourcePath.slice(workspacePrefix.length + 1);
-    }
+  // This only works in wizer.
+  if (!useOriginalSourceFile) {
+    workspacePrefix = sourcesDir;
+    sourcePath = sourceName;
+  }
+  let currentDir = maybeWindowsPath(cwd());
+  if (workspacePrefix.startsWith(currentDir)) {
+    workspacePrefix = currentDir;
+    sourcePath = sourcePath.slice(workspacePrefix.length + 1);
   }
 
   let args = `--initializer-script-path ${initializerPath} --strip-path-prefix ${workspacePrefix}/ ${sourcePath}`;
   runtimeArgs = runtimeArgs ? `${runtimeArgs} ${args}` : args;
 
   let preopens = [`--dir ${sourcesDir}`];
-  if (opts.enableAot) {
-    preopens.push(`--dir ${workspacePrefix}`);
-  } else {
-    preopens.push(`--mapdir /::${workspacePrefix}`);
-  }
+  preopens.push(`--mapdir /::${workspacePrefix}`);
 
   let postProcess;
-  if (opts.enableAot) {
-    // Determine the weval bin path, possibly using a pre-downloaded version
-    let wevalBin;
-    if (opts.wevalBin && existsSync(opts.wevalBin)) {
-      wevalBin = opts.wevalBin;
-    } else {
-      wevalBin = await getWeval();
-    }
 
-    // Set the min stack size, if one was provided
-    if (opts.aotMinStackSizeBytes) {
-      if (!isNumeric(opts.aotMinStackSizeBytes)) {
-        throw new TypeError(
-          `aotMinStackSizeBytes must be a numeric value, received [${opts.aotMinStackSizeBytes}] (type ${typeof opts.aotMinStackSizeBytes})`,
-        );
-      }
-      env.RUST_MIN_STACK = opts.aotMinStackSizeBytes;
-    } else {
-      env.RUST_MIN_STACK = defaultMinStackSize();
-    }
+  const wizerBin = opts.wizerBin ?? wizer;
+  postProcess = spawnSync(
+    wizerBin,
+    [
+      '--allow-wasi',
+      '--init-func',
+      'componentize.wizer',
+      ...preopens,
+      `--wasm-bulk-memory=true`,
+      '--inherit-env=true',
+      `-o=${outputWasmPath}`,
+      inputWasmPath,
+    ],
+    {
+      stdio: [null, stdout, 'pipe'],
+      env,
+      input: runtimeArgs,
+      shell: true,
+      encoding: 'utf-8',
+    },
+  );
 
-    postProcess = spawnSync(
-      wevalBin,
-      [
-        'weval',
-        `--cache-ro ${aotCache}`,
-        ...preopens,
-        '-w',
-        '--init-func',
-        'componentize.wizer',
-        `-i ${inputWasmPath}`,
-        `-o ${outputWasmPath}`,
-      ],
-      {
-        stdio: [null, stdout, 'pipe'],
-        env,
-        input: runtimeArgs,
-        shell: true,
-        encoding: 'utf-8',
-      },
-    );
-  } else {
-    const wizerBin = opts.wizerBin ?? wizer;
-    postProcess = spawnSync(
-      wizerBin,
-      [
-        '--allow-wasi',
-        '--init-func',
-        'componentize.wizer',
-        ...preopens,
-        `--wasm-bulk-memory=true`,
-        '--inherit-env=true',
-        `-o=${outputWasmPath}`,
-        inputWasmPath,
-      ],
-      {
-        stdio: [null, stdout, 'pipe'],
-        env,
-        input: runtimeArgs,
-        shell: true,
-        encoding: 'utf-8',
-      },
-    );
-  }
-
-  // If the wizer (or weval) process failed, parse the output and display to the user
+  // If the wizer process failed, parse the output and display to the user
   if (postProcess.status !== 0) {
     let wizerErr = parseWizerStderr(postProcess.stderr);
     let err = `Failed to initialize component:\n${wizerErr}`;
@@ -451,7 +395,7 @@ function stripLinesPrefixes(input, prefixPatterns) {
 }
 
 /**
- * Parse output of post-processing step (whether Wizer or Weval)
+ * Parse output of post-processing Wizer step
  *
  * @param {Stream} stderr
  * @returns {string} String that can be printed to describe error output
@@ -493,9 +437,7 @@ function getEnginePath(opts) {
   }
   const debugSuffix = opts?.debugBuild ? '.debug' : '';
   let engineBinaryRelPath = `../lib/starlingmonkey_embedding${debugSuffix}.wasm`;
-  if (opts.enableAot) {
-    engineBinaryRelPath = '../lib/starlingmonkey_embedding_weval.wasm';
-  }
+
   return fileURLToPath(new URL(engineBinaryRelPath, import.meta.url));
 }
 
