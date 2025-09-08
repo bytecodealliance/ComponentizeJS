@@ -4,11 +4,30 @@ import { createServer } from 'node:http';
 import { strictEqual, ok } from 'node:assert';
 
 import { maybeWindowsPath } from '../../src/platform.js';
-import { getRandomPort } from '../util.js';
 
 const FETCH_URL = 'http://localhost';
 
-const port = await getRandomPort();
+const [server, port, url] = await new Promise((resolve, reject) => {
+  let port;
+  const server = createServer(async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.write(
+      JSON.stringify({
+        status: 'ok',
+        url,
+      }),
+    );
+    res.end();
+  });
+  server.listen(0, function (err) {
+    if (err) {
+      reject(err);
+      return;
+    }
+    port = this.address().port;
+    resolve([server, port, `${FETCH_URL}:${port}`]);
+  });
+});
 
 export const source = `
   export async function run () {
@@ -24,20 +43,6 @@ export const source = `
 export const enableFeatures = ['http'];
 
 export async function test(run) {
-  const url = `${FETCH_URL}:${port}`;
-
-  // Run a local server on some port
-  const server = createServer(async (req, res) => {
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.write(
-      JSON.stringify({
-        status: 'ok',
-        url,
-      }),
-    );
-    res.end();
-  }).listen(port);
-
   // Wait until the server is ready
   let ready = false;
   while (!ready) {
