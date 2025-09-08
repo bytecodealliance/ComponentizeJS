@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.19.0] - 2025-09-08
+
+### 🐛 Bug Fixes
+
+* *(tests)* race condition with server random port (#288) by @vados-cosmonic in #288
+
+
+
+
 ## [0.18.5] - 2025-08-28
 
 ### 🚀 Features
