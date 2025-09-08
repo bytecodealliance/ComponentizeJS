@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.19.0] - 2025-09-08
+
+### 🐛 Bug Fixes
+
+* *(ops)* add catch-all for non-conventional commits (#290) by @vados-cosmonic in #290
+
+* *(tests)* race condition with server random port (#288) by @vados-cosmonic in #288
+
+
+### Other Changes
+
+* *(other changes)* Update starlingmonkey to 0.2.0 (#285) by @karthik2804 in #285
+
+
+
+
 ## [0.18.5] - 2025-08-28
 
 ### 🚀 Features
