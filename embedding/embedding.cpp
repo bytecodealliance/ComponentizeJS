@@ -232,7 +232,7 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
   void *retptr = nullptr;
   if (fn->retptr) {
     LOG("(call) setting retptr at arg %d\n", argcnt);
-    retptr = JS_realloc(Runtime.cx, 0, 0, fn->retsize);
+    retptr = cabi_realloc(nullptr, 0, 4, fn->retsize);
     args[argcnt].setInt32((uint32_t)retptr);
   }
 
