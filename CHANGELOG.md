@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.19.1] - 2025-09-16
+
+### 🐛 Bug Fixes
+
+* *(ci)* set latest release when creating GH release (#294) by @vados-cosmonic in #294
+
+
+### Other Changes
+
+* *(other changes)* Fix memory leak in call() retptr allocation (#295) by @ludfjig in #295
+
+
+
+## New Contributors
+* @ludfjig made their first contribution in [#295](https://github.com/bytecodealliance/ComponentizeJS/pull/295)
+
+
 ## [0.19.0] - 2025-09-08
 
 ### 🐛 Bug Fixes
