@@ -764,6 +764,8 @@ fn synthesize_import_functions(
             let ops_ro = builder.body.instructions.get_ops();
             for (idx, op) in ops_ro.iter().enumerate() {
                 if let Operator::I32Const { value } = op {
+                    // we specifically need the const "around" 3393
+                    // which is the coreabi_sample_i32 table offset
                     if *value < 1000 || *value > 5000 {
                         continue;
                     }

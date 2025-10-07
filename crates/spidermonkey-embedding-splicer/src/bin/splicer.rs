@@ -208,7 +208,7 @@ fn serialize_imports(imports: &[(String, String, u32)]) -> String {
 /// Manually serialize CoreFn to JSON
 fn serialize_core_fn(core_fn: &CoreFn) -> String {
     let mut result = String::from("{");
-    
+
     // params
     result.push_str("\"params\": [");
     for (i, param) in core_fn.params.iter().enumerate() {
@@ -218,7 +218,7 @@ fn serialize_core_fn(core_fn: &CoreFn) -> String {
         result.push_str(&serialize_core_ty(param));
     }
     result.push_str("], ");
-    
+
     // ret
     result.push_str("\"ret\": ");
     if let Some(ref ret) = core_fn.ret {
@@ -227,16 +227,16 @@ fn serialize_core_fn(core_fn: &CoreFn) -> String {
         result.push_str("null");
     }
     result.push_str(", ");
-    
+
     // retptr
     result.push_str(&format!("\"retptr\": {}, ", core_fn.retptr));
-    
+
     // retsize
     result.push_str(&format!("\"retsize\": {}, ", core_fn.retsize));
-    
+
     // paramptr
     result.push_str(&format!("\"paramptr\": {}", core_fn.paramptr));
-    
+
     result.push('}');
     result
 }

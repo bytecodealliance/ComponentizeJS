@@ -26,7 +26,6 @@ wasmparser = { version = "0.239.0", features = ["features",
     "std",
     "validate",
 ] }
-
 wit-bindgen = { version = "0.41.0", features = [ "macros", "async", "realloc" ] }
 wit-bindgen-core = { version = "0.41.0", default-features = false }
 wit-component = { version = "0.227.1", features = ["dummy-module"] }
