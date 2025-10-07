@@ -62,6 +62,7 @@ export async function componentize(
   _deprecatedWitWorldOrOpts = undefined,
   _deprecatedOpts = undefined,
 ) {
+  const t_start = Date.now();
   let useOriginalSourceFile = true;
   let jsSource;
 
@@ -142,6 +143,7 @@ export async function componentize(
   }
 
   // Splice the bindigns for the given WIT world into the engine WASM
+  const t_splice_start = Date.now();
   let { wasm, jsBindings, exports, imports } = splicer.spliceBindings(
     await readFile(engine),
     [...features],
@@ -149,6 +151,10 @@ export async function componentize(
     maybeWindowsPath(witPath),
     worldName,
     false,
+  );
+  const t_splice_end = Date.now();
+  console.error(
+    `trace(node:spliceBindings): ${(t_splice_end - t_splice_start)} ms`,
   );
 
   const inputWasmPath = join(workDir, 'in.wasm');
@@ -263,6 +269,8 @@ export async function componentize(
   let postProcess;
 
   const wizerBin = opts.wizerBin ?? wizer;
+  console.error('trace(node:wizer): starting');
+  const t_wizer_start = Date.now();
   postProcess = spawnSync(
     wizerBin,
     [
@@ -283,6 +291,10 @@ export async function componentize(
       encoding: 'utf-8',
     },
   );
+  const t_wizer_end = Date.now();
+  console.error(
+    `trace(node:wizer): ${(t_wizer_end - t_wizer_start)} ms (includes engine init + snapshot)`,
+  );
 
   // If the wizer process failed, parse the output and display to the user
   if (postProcess.status !== 0) {
@@ -297,14 +309,20 @@ export async function componentize(
   }
 
   // Read the generated WASM back into memory
+  const t_read_out_start = Date.now();
   const bin = await readFile(outputWasmPath);
+  const t_read_out_end = Date.now();
+  console.error(
+    `trace(node:read-out-wasm): ${(t_read_out_end - t_read_out_start)} ms`);
 
   // Check for initialization errors, by actually executing the binary in
   // a mini sandbox to get back the initialization state
+  const t_check_start = Date.now();
   const {
     exports: { check_init },
     getStderr,
   } = await initWasm(bin);
+  const t_check_mid = Date.now();
 
   // If not in debug mode, clean up
   if (!debugBindings) {
@@ -318,8 +336,13 @@ export async function componentize(
     workDir,
     getStderr,
   );
+  const t_check_end = Date.now();
+  console.error(
+    `trace(node:check-init): initWasm ${(t_check_mid - t_check_start)} ms, check_init ${(t_check_end - t_check_mid)} ms`,
+  );
 
   // After wizening, stub out the wasi imports depending on what features are enabled
+  const t_stub_start = Date.now();
   const finalBin = splicer.stubWasi(
     bin,
     [...features],
@@ -327,23 +350,35 @@ export async function componentize(
     maybeWindowsPath(witPath),
     worldName,
   );
+  const t_stub_end = Date.now();
+  console.error(
+    `trace(node:stubWasi): ${(t_stub_end - t_stub_start)} ms`,
+  );
 
   if (debugBindings) {
     await writeFile('binary.wasm', finalBin);
   }
 
+  const t_component_start = Date.now();
+  const adapterBytes = await readFile(preview2Adapter);
+  const rt = await componentNew(
+    finalBin,
+    Object.entries({
+      wasi_snapshot_preview1: adapterBytes,
+    }),
+    false,
+  );
+  const t_component_mid = Date.now();
   const component = await metadataAdd(
-    await componentNew(
-      finalBin,
-      Object.entries({
-        wasi_snapshot_preview1: await readFile(preview2Adapter),
-      }),
-      false,
-    ),
+    rt,
     Object.entries({
       language: [['JavaScript', '']],
       'processed-by': [['ComponentizeJS', version]],
     }),
+  );
+  const t_component_end = Date.now();
+  console.error(
+    `trace(node:componentize): componentNew ${(t_component_mid - t_component_start)} ms, metadataAdd ${(t_component_end - t_component_mid)} ms`,
   );
 
   // Convert CABI import conventions to ESM import conventions
