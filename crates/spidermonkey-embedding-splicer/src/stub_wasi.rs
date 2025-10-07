@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Result};
-use orca_wasm::ir::function::FunctionBuilder;
-use orca_wasm::ir::id::{FunctionID, LocalID};
-use orca_wasm::ir::module::module_functions::FuncKind;
-use orca_wasm::ir::types::{BlockType, InitExpr, Value};
-use orca_wasm::module_builder::AddLocal;
-use orca_wasm::{DataType, Instructions, Module, Opcode};
 use wasmparser::{MemArg, TypeRef};
+use wirm::ir::function::FunctionBuilder;
+use wirm::ir::id::{FunctionID, LocalID};
+use wirm::ir::module::module_functions::FuncKind;
+use wirm::ir::types::{BlockType, InitExpr, Value};
+use wirm::module_builder::AddLocal;
+use wirm::{DataType, InitInstr, Module, Opcode};
 use wit_parser::Resolve;
 
 use crate::parse_wit;
@@ -44,14 +44,14 @@ where
         };
 
         let ty = module.types.get(ty_id).unwrap();
-        let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
-        let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
+        let mut builder = FunctionBuilder::new(ty.params().as_slice(), ty.results().as_slice());
         let _args = stub(&mut builder)?;
 
         builder.replace_import_in_module(module, iid);
 
         return Ok(Some(fid));
     }
+
     Ok(None)
 }
 
@@ -206,7 +206,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
     // create a mutable random seed global
     let seed_val: i64 = 0;
     let seed_global = module.add_global(
-        InitExpr::new(vec![Instructions::Value(Value::I64(seed_val))]),
+        InitExpr::new(vec![InitInstr::Value(Value::I64(seed_val))]),
         DataType::I64,
         true,
         false,
