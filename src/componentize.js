@@ -2,7 +2,7 @@ import { freemem } from 'node:os';
 import { TextDecoder } from 'node:util';
 import { Buffer } from 'node:buffer';
 import { fileURLToPath, URL } from 'node:url';
-import { cwd, stdout, platform } from 'node:process';
+import { cwd, stdout } from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve, join, dirname } from 'node:path';
@@ -19,6 +19,12 @@ import {
 } from '@bytecodealliance/jco';
 
 import { maybeWindowsPath } from './platform.js';
+import {
+	spliceBindingsCli,
+	stubWasiCli,
+	spliceBindingsWasm,
+	stubWasiWasm,
+} from './splicer.js';
 
 export const { version } = JSON.parse(
 	await readFile(new URL('../package.json', import.meta.url), 'utf8'),
@@ -100,6 +106,7 @@ export async function componentize(
 		debugBuild = false,
 		debugBindings = false,
 		enableWizerLogging = false,
+		splicerBin,
 
 		runtimeArgs,
 
@@ -141,73 +148,43 @@ export async function componentize(
 	}
 
 	// Splice the bindings for the given WIT world into the engine WASM
-	const t_splice_start = Date.now();
-	
-	// Prepare temporary directory for splicer output
-	const splicerOutDir = join(workDir, 'splicer-out');
-	await mkdir(splicerOutDir);
-	
-	// Write engine wasm to temp file
-	const engineInputPath = join(workDir, 'engine.wasm');
-	await writeFile(engineInputPath, await readFile(engine));
-	
-	// Get splicer binary path
-	const splicerBin = getSplicerPath(opts);
-	
-	// Build splicer CLI arguments
-	const splicerArgs = [
-		'splice-bindings',
-		'--input', engineInputPath,
-		'--out-dir', splicerOutDir,
-	];
-	
-	// Add features
-	for (const feature of features) {
-		splicerArgs.push('--features', feature);
-	}
-	
-	// Add WIT path if provided
-	if (witPath) {
-		splicerArgs.push('--wit-path', maybeWindowsPath(witPath));
-	}
-	
-	// Add world name if provided
-	if (worldName) {
-		splicerArgs.push('--world-name', worldName);
-	}
-	
-	// Add debug flag if needed
-	if (debugBindings) {
-		splicerArgs.push('--debug');
-	}
-	
-	// Run splicer CLI
-	console.error('trace(node:splicer): starting');
-	const splicerProcess = spawnSync(splicerBin, splicerArgs, {
-		stdio: ['pipe', 'inherit', 'inherit'],
-		encoding: 'utf-8',
-	});
-	
-	if (splicerProcess.status !== 0) {
-		const err = `Failed to splice bindings: splicer exited with status ${splicerProcess.status}`;
+	const engineWasm = await readFile(engine);
+
+	let result;
+	try {
+		if (splicerBin != undefined) {
+			result = await spliceBindingsCli(
+				engineWasm,
+				[...features],
+				witPath,
+				worldName,
+				debugBindings,
+				workDir,
+				opts,
+			);
+		} else {
+			result = await spliceBindingsWasm(
+				engineWasm,
+				[...features],
+				witWorld,
+				witPath,
+				worldName,
+				debugBindings,
+			);
+		}
+	} catch (err) {
 		if (debugBindings) {
 			console.error(`\n\nBinary and sources available for debugging at ${workDir}\n`);
 		} else {
 			await rm(workDir, { recursive: true });
 		}
-		throw new Error(err);
+		throw err;
 	}
-	
-	// Read the outputs
-	const wasm = await readFile(join(splicerOutDir, 'component.wasm'));
-	const jsBindings = await readFile(join(splicerOutDir, 'initializer.js'), 'utf8');
-	const exports = JSON.parse(await readFile(join(splicerOutDir, 'exports.json'), 'utf8'));
-	let imports = JSON.parse(await readFile(join(splicerOutDir, 'imports.json'), 'utf8'));
-	
-	const t_splice_end = Date.now();
-	console.error(
-		`trace(node:spliceBindings): ${(t_splice_end - t_splice_start)} ms`,
-	);
+
+	let wasm = result.wasm;
+	let jsBindings = result.jsBindings;
+	let exports = result.exports;
+	let imports = result.imports;
 
 	const inputWasmPath = join(workDir, 'in.wasm');
 	const outputWasmPath = join(workDir, 'out.wasm');
@@ -389,59 +366,34 @@ export async function componentize(
 	);
 
 	// After wizening, stub out the wasi imports depending on what features are enabled
-	const t_stub_start = Date.now();
-	
-	// Write wasm to temp file for stubbing
-	const stubInputPath = join(workDir, 'stub-input.wasm');
-	const stubOutputPath = join(workDir, 'stub-output.wasm');
-	await writeFile(stubInputPath, bin);
-	
-	// Build stub-wasi CLI arguments
-	const stubArgs = [
-		'stub-wasi',
-		'--input', stubInputPath,
-		'--output', stubOutputPath,
-	];
-	
-	// Add features
-	for (const feature of features) {
-		stubArgs.push('--features', feature);
-	}
-	
-	// Add WIT path if provided
-	if (witPath) {
-		stubArgs.push('--wit-path', maybeWindowsPath(witPath));
-	}
-	
-	// Add world name if provided
-	if (worldName) {
-		stubArgs.push('--world-name', worldName);
-	}
-	
-	// Run stub-wasi CLI
-	console.error('trace(node:stub-wasi): starting');
-	const stubProcess = spawnSync(splicerBin, stubArgs, {
-		stdio: ['pipe', 'inherit', 'inherit'],
-		encoding: 'utf-8',
-	});
-	
-	if (stubProcess.status !== 0) {
-		const err = `Failed to stub WASI: splicer exited with status ${stubProcess.status}`;
+	let finalBin;
+	try {
+		if (splicerBin != undefined) {
+			finalBin = await stubWasiCli(
+				bin,
+				[...features],
+				witPath,
+				worldName,
+				workDir,
+				opts,
+			);
+		} else {
+			finalBin = await stubWasiWasm(
+				bin,
+				[...features],
+				witWorld,
+				witPath,
+				worldName,
+			);
+		}
+	} catch (err) {
 		if (debugBindings) {
 			console.error(`\n\nBinary and sources available for debugging at ${workDir}\n`);
 		} else {
 			await rm(workDir, { recursive: true });
 		}
-		throw new Error(err);
+		throw err;
 	}
-	
-	// Read the stubbed wasm
-	const finalBin = await readFile(stubOutputPath);
-	
-	const t_stub_end = Date.now();
-	console.error(
-		`trace(node:stubWasi): ${(t_stub_end - t_stub_start)} ms`,
-	);
 
 	if (debugBindings) {
 		await writeFile('binary.wasm', finalBin);
@@ -567,19 +519,6 @@ function getEnginePath(opts) {
 	let engineBinaryRelPath = `../lib/starlingmonkey_embedding${debugSuffix}.wasm`;
 
 	return fileURLToPath(new URL(engineBinaryRelPath, import.meta.url));
-}
-
-/** Determine the correct path for the splicer binary */
-function getSplicerPath(opts) {
-	if (opts.splicerBin) {
-		return opts.splicerBin;
-	}
-	// The splicer binary should be in target/release or target/debug
-	const mode = opts?.debugBuild ? 'debug' : 'release';
-	const binaryName = platform === 'win32' ? 'splicer.exe' : 'splicer';
-	const splicerBinaryRelPath = `../target/${mode}/${binaryName}`;
-	
-	return fileURLToPath(new URL(splicerBinaryRelPath, import.meta.url));
 }
 
 /** Prepare a work directory for use with componentization */

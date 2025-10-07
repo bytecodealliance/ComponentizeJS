@@ -2,6 +2,10 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::Result;
+use wasm_encoder::{Encode, Section};
+use wasmparser::ExternalKind;
+use wasmparser::MemArg;
+use wasmparser::Operator;
 use wirm::ir::function::{FunctionBuilder, FunctionModifier};
 use wirm::ir::id::{ExportsID, FunctionID, LocalID};
 use wirm::ir::module::Module;
@@ -9,10 +13,6 @@ use wirm::ir::types::{BlockType, ElementItems, InstrumentationMode};
 use wirm::module_builder::AddLocal;
 use wirm::opcode::{Inject, InjectAt};
 use wirm::{DataType, Opcode};
-use wasm_encoder::{Encode, Section};
-use wasmparser::ExternalKind;
-use wasmparser::MemArg;
-use wasmparser::Operator;
 use wit_component::metadata::{decode, Bindgen};
 use wit_component::StringEncoding;
 use wit_parser::Resolve;
@@ -312,10 +312,7 @@ pub fn splice_bindings(
     wasm.push(section.id());
     section.encode(&mut wasm);
 
-    eprintln!(
-        "trace(splice:total): {} ms",
-        t_total.elapsed().as_millis()
-    );
+    eprintln!("trace(splice:total): {} ms", t_total.elapsed().as_millis());
     Ok(SpliceResult {
         wasm,
         exports: componentized
@@ -443,7 +440,9 @@ pub fn splice(
                     exports_cnt = s.count();
                     section_sizes.push(("export".into(), range.end - range.start));
                 }
-                Ok(StartSection { range, .. }) => section_sizes.push(("start".into(), range.end - range.start)),
+                Ok(StartSection { range, .. }) => {
+                    section_sizes.push(("start".into(), range.end - range.start))
+                }
                 Ok(ElementSection(s)) => {
                     let range = s.range();
                     section_sizes.push(("element".into(), range.end - range.start));
@@ -461,8 +460,8 @@ pub fn splice(
                     custom_sections += 1;
                     section_sizes.push((format!("custom:{name}"), size));
                 }
-                Ok(Version { .. }) | Ok(End(_)) => {},
-                Ok(_) => {},
+                Ok(Version { .. }) | Ok(End(_)) => {}
+                Ok(_) => {}
                 Err(_) => {}
             }
         }
@@ -479,7 +478,12 @@ pub fn splice(
         // Top 5 largest sections
         section_sizes.sort_by(|a, b| b.1.cmp(&a.1));
         for (i, (name, sz)) in section_sizes.iter().take(5).enumerate() {
-            eprintln!("trace(wasm-splice:scan-top{}): {} bytes [{}]", i + 1, sz, name);
+            eprintln!(
+                "trace(wasm-splice:scan-top{}): {} bytes [{}]",
+                i + 1,
+                sz,
+                name
+            );
         }
     }
 
@@ -992,23 +996,17 @@ fn synthesize_import_functions(
                 .instructions
                 .add_instr(table_instr_idx, Operator::I32Add);
         }
-        builder
-            .body
-            .instructions
-            .add_instr(
-                table_instr_idx,
-                Operator::LocalGet {
-                    local_index: *arg_idx,
-                },
-            );
+        builder.body.instructions.add_instr(
+            table_instr_idx,
+            Operator::LocalGet {
+                local_index: *arg_idx,
+            },
+        );
         builder
             .body
             .instructions
             .add_instr(table_instr_idx, Operator::I32Add);
-        builder
-            .body
-            .instructions
-            .finish_instr(table_instr_idx);
+        builder.body.instructions.finish_instr(table_instr_idx);
         eprintln!(
             "trace(wasm-splice:imports:fixup-get-import): {} ms",
             t_stage.elapsed().as_millis()
