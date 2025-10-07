@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write;
 
 use anyhow::Result;
-use std::time::Instant;
 use heck::*;
 use js_component_bindgen::function_bindgen::{
     ErrHandling, FunctionBindgen, ResourceData, ResourceMap, ResourceTable,
@@ -142,8 +141,6 @@ pub fn componentize_bindgen(
     wid: WorldId,
     features: &Vec<Feature>,
 ) -> Result<Componentization> {
-    let t_total = Instant::now();
-    let mut t_stage = Instant::now();
     let mut bindgen = JsBindgen {
         src: Source::default(),
         esm_bindgen: EsmBindgen::default(),
@@ -167,19 +164,9 @@ pub fn componentize_bindgen(
         .local_names
         .exclude_globals(Intrinsic::get_global_names());
 
-    t_stage = Instant::now();
     bindgen.imports_bindgen();
-    eprintln!(
-        "trace(bindgen:imports): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
-    t_stage = Instant::now();
     bindgen.exports_bindgen()?;
-    eprintln!(
-        "trace(bindgen:exports): {} ms",
-        t_stage.elapsed().as_millis()
-    );
     bindgen.esm_bindgen.populate_export_aliases();
 
     // consolidate import specifiers and generate wrappers
@@ -387,32 +374,18 @@ pub fn componentize_bindgen(
             .concat(),
     );
 
-    t_stage = Instant::now();
     let js_intrinsics = render_intrinsics(&mut bindgen.all_intrinsics, false, true);
     output.push_str(&js_intrinsics);
     output.push_str(&bindgen.src);
-    eprintln!(
-        "trace(bindgen:intrinsics+emit): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
     import_wrappers
         .iter()
         .for_each(|(_, src)| output.push_str(&format!("\n\n{src}")));
 
-    t_stage = Instant::now();
     bindgen
         .esm_bindgen
         .render_export_imports(&mut output, "$source_mod", &mut bindgen.local_names);
-    eprintln!(
-        "trace(bindgen:render-exports-imports): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
-    eprintln!(
-        "trace(bindgen:total): {} ms",
-        t_total.elapsed().as_millis()
-    );
     Ok(Componentization {
         js_bindings: output.to_string(),
         exports: bindgen.exports,

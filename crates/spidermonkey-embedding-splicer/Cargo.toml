@@ -16,7 +16,6 @@ anyhow = { workspace = true }
 clap = { version = "4.5.31", features = ["suggestions", "color", "derive"] }
 heck = { workspace = true }
 js-component-bindgen = { workspace = true, features = [ "transpile-bindgen" ] }
-#orca-wasm = { workspace = true }
 wirm = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }

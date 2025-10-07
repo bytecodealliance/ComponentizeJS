@@ -298,8 +298,6 @@ export async function componentize(
 	let postProcess;
 
 	const wizerBin = opts.wizerBin ?? wizer;
-	console.error('trace(node:wizer): starting');
-	const t_wizer_start = Date.now();
 	postProcess = spawnSync(
 		wizerBin,
 		[
@@ -320,10 +318,6 @@ export async function componentize(
 			encoding: 'utf-8',
 		},
 	);
-	const t_wizer_end = Date.now();
-	console.error(
-		`trace(node:wizer): ${(t_wizer_end - t_wizer_start)} ms (includes engine init + snapshot)`,
-	);
 
 	// If the wizer process failed, parse the output and display to the user
 	if (postProcess.status !== 0) {
@@ -338,20 +332,14 @@ export async function componentize(
 	}
 
 	// Read the generated WASM back into memory
-	const t_read_out_start = Date.now();
 	const bin = await readFile(outputWasmPath);
-	const t_read_out_end = Date.now();
-	console.error(
-		`trace(node:read-out-wasm): ${(t_read_out_end - t_read_out_start)} ms`);
 
 	// Check for initialization errors, by actually executing the binary in
 	// a mini sandbox to get back the initialization state
-	const t_check_start = Date.now();
 	const {
 		exports: { check_init },
 		getStderr,
 	} = await initWasm(bin);
-	const t_check_mid = Date.now();
 
 	/// Process output of check init, throwing if necessary
 	await handleCheckInitOutput(
@@ -359,10 +347,6 @@ export async function componentize(
 		initializerPath,
 		workDir,
 		getStderr,
-	);
-	const t_check_end = Date.now();
-	console.error(
-		`trace(node:check-init): initWasm ${(t_check_mid - t_check_start)} ms, check_init ${(t_check_end - t_check_mid)} ms`,
 	);
 
 	// After wizening, stub out the wasi imports depending on what features are enabled
@@ -399,7 +383,6 @@ export async function componentize(
 		await writeFile('binary.wasm', finalBin);
 	}
 
-	const t_component_start = Date.now();
 	const adapterBytes = await readFile(preview2Adapter);
 	const rt = await componentNew(
 		finalBin,
@@ -408,17 +391,12 @@ export async function componentize(
 		}),
 		false,
 	);
-	const t_component_mid = Date.now();
 	const component = await metadataAdd(
 		rt,
 		Object.entries({
 			language: [['JavaScript', '']],
 			'processed-by': [['ComponentizeJS', version]],
 		}),
-	);
-	const t_component_end = Date.now();
-	console.error(
-		`trace(node:componentize): componentNew ${(t_component_mid - t_component_start)} ms, metadataAdd ${(t_component_end - t_component_mid)} ms`,
 	);
 
 	// Convert CABI import conventions to ESM import conventions

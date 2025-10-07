@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::time::Instant;
 
 use anyhow::Result;
 use wasm_encoder::{Encode, Section};
@@ -11,7 +10,7 @@ use wirm::ir::id::{ExportsID, FunctionID, LocalID};
 use wirm::ir::module::Module;
 use wirm::ir::types::{BlockType, ElementItems, InstrumentationMode};
 use wirm::module_builder::AddLocal;
-use wirm::opcode::{Inject, InjectAt};
+use wirm::opcode::Inject;
 use wirm::{DataType, Opcode};
 use wit_component::metadata::{decode, Bindgen};
 use wit_component::StringEncoding;
@@ -39,20 +38,13 @@ pub fn splice_bindings(
     world_name: Option<String>,
     debug: bool,
 ) -> Result<SpliceResult, String> {
-    let t_total = Instant::now();
-    let mut t_stage = Instant::now();
     let (mut resolve, id) = match (wit_source, wit_path) {
         (Some(wit_source), _) => {
-            t_stage = Instant::now();
             let mut resolve = Resolve::default();
             let path = PathBuf::from("component.wit");
             let id = resolve
                 .push_str(&path, &wit_source)
                 .map_err(|e| e.to_string())?;
-            eprintln!(
-                "trace(splice:wit-parse): {} ms",
-                t_stage.elapsed().as_millis()
-            );
             (resolve, id)
         }
         (_, Some(wit_path)) => parse_wit(&wit_path).map_err(|e| format!("{e:?}"))?,
@@ -61,26 +53,15 @@ pub fn splice_bindings(
         }
     };
 
-    t_stage = Instant::now();
     let world = resolve
         .select_world(id, world_name.as_deref())
         .map_err(|e| e.to_string())?;
-    eprintln!(
-        "trace(splice:wit-select-world): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
-    t_stage = Instant::now();
     let mut wasm_bytes =
         wit_component::dummy_module(&resolve, world, wit_parser::ManglingAndAbi::Standard32);
-    eprintln!(
-        "trace(splice:dummy-module): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
     // merge the engine world with the target world, retaining the engine producers
 
-    t_stage = Instant::now();
     let (engine_world, producers) = if let Ok((
         _,
         Bindgen {
@@ -91,10 +72,6 @@ pub fn splice_bindings(
         },
     )) = decode(&engine)
     {
-        eprintln!(
-            "trace(splice:engine-decode): {} ms",
-            t_stage.elapsed().as_millis()
-        );
         // we disable the engine run and incoming handler as we recreate these exports
         // when needed, so remove these from the world before initiating the merge
         let maybe_run = engine_resolve.worlds[engine_world]
@@ -128,45 +105,25 @@ pub fn splice_bindings(
                 .shift_remove(&serve)
                 .unwrap();
         }
-        t_stage = Instant::now();
         let map = resolve
             .merge(engine_resolve)
             .expect("unable to merge with engine world");
         let engine_world = map.map_world(engine_world, None).unwrap();
-        eprintln!(
-            "trace(splice:merge-engine-world): {} ms",
-            t_stage.elapsed().as_millis()
-        );
         (engine_world, producers)
     } else {
         unreachable!();
     };
 
-    t_stage = Instant::now();
     let componentized =
         bindgen::componentize_bindgen(&resolve, world, &features).map_err(|err| err.to_string())?;
-    eprintln!(
-        "trace(splice:bindgen): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
-    t_stage = Instant::now();
     resolve
         .merge_worlds(engine_world, world)
         .expect("unable to merge with engine world");
-    eprintln!(
-        "trace(splice:merge-worlds): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
-    t_stage = Instant::now();
     let encoded =
         wit_component::metadata::encode(&resolve, world, StringEncoding::UTF8, producers.as_ref())
             .map_err(|e| e.to_string())?;
-    eprintln!(
-        "trace(splice:metadata-encode): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
     let section = wasm_encoder::CustomSection {
         name: "component-type".into(),
@@ -300,19 +257,13 @@ pub fn splice_bindings(
         ));
     }
 
-    t_stage = Instant::now();
     let mut wasm =
         splice::splice(engine, imports, exports, features, debug).map_err(|e| format!("{e:?}"))?;
-    eprintln!(
-        "trace(splice:wasm-splice): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
     // add the world section to the spliced wasm
     wasm.push(section.id());
     section.encode(&mut wasm);
 
-    eprintln!("trace(splice:total): {} ms", t_total.elapsed().as_millis());
     Ok(SpliceResult {
         wasm,
         exports: componentized
@@ -392,181 +343,41 @@ pub fn splice(
     features: Vec<Feature>,
     debug: bool,
 ) -> Result<Vec<u8>> {
-    let t_total = Instant::now();
-    let mut t_stage = Instant::now();
-
-    // Pre-scan sections to understand where bytes are concentrated
-    {
-        let t_scan = Instant::now();
-        let mut section_sizes: Vec<(String, usize)> = Vec::new();
-        let mut custom_sections: usize = 0;
-        let mut functions_declared: u32 = 0;
-        let mut data_bytes: usize = 0;
-        let mut imports_cnt: u32 = 0;
-        let mut exports_cnt: u32 = 0;
-
-        let mut parser = wasmparser::Parser::new(0);
-        for payload in parser.parse_all(&engine) {
-            use wasmparser::Payload::*;
-            match payload {
-                Ok(TypeSection(s)) => {
-                    let range = s.range();
-                    section_sizes.push(("type".into(), range.end - range.start));
-                }
-                Ok(ImportSection(s)) => {
-                    let range = s.range();
-                    imports_cnt = s.count();
-                    section_sizes.push(("import".into(), range.end - range.start));
-                }
-                Ok(FunctionSection(s)) => {
-                    let range = s.range();
-                    functions_declared = s.count();
-                    section_sizes.push(("function".into(), range.end - range.start));
-                }
-                Ok(TableSection(s)) => {
-                    let range = s.range();
-                    section_sizes.push(("table".into(), range.end - range.start));
-                }
-                Ok(MemorySection(s)) => {
-                    let range = s.range();
-                    section_sizes.push(("memory".into(), range.end - range.start));
-                }
-                Ok(GlobalSection(s)) => {
-                    let range = s.range();
-                    section_sizes.push(("global".into(), range.end - range.start));
-                }
-                Ok(ExportSection(s)) => {
-                    let range = s.range();
-                    exports_cnt = s.count();
-                    section_sizes.push(("export".into(), range.end - range.start));
-                }
-                Ok(StartSection { range, .. }) => {
-                    section_sizes.push(("start".into(), range.end - range.start))
-                }
-                Ok(ElementSection(s)) => {
-                    let range = s.range();
-                    section_sizes.push(("element".into(), range.end - range.start));
-                }
-                Ok(CodeSectionStart { .. }) => {}
-                Ok(CodeSectionEntry(_)) => {}
-                Ok(DataSection(s)) => {
-                    let range = s.range();
-                    data_bytes += range.end - range.start;
-                    section_sizes.push(("data".into(), range.end - range.start));
-                }
-                Ok(CustomSection(cs)) => {
-                    let name = cs.name().to_string();
-                    let size = cs.data().len();
-                    custom_sections += 1;
-                    section_sizes.push((format!("custom:{name}"), size));
-                }
-                Ok(Version { .. }) | Ok(End(_)) => {}
-                Ok(_) => {}
-                Err(_) => {}
-            }
-        }
-        // Print a concise summary
-        eprintln!(
-            "trace(wasm-splice:scan-sections): {} ms (imports {}, exports {}, decl funcs {}, data {} bytes, custom {})",
-            t_scan.elapsed().as_millis(),
-            imports_cnt,
-            exports_cnt,
-            functions_declared,
-            data_bytes,
-            custom_sections
-        );
-        // Top 5 largest sections
-        section_sizes.sort_by(|a, b| b.1.cmp(&a.1));
-        for (i, (name, sz)) in section_sizes.iter().take(5).enumerate() {
-            eprintln!(
-                "trace(wasm-splice:scan-top{}): {} bytes [{}]",
-                i + 1,
-                sz,
-                name
-            );
-        }
-    }
-
     let mut module = Module::parse(&engine, false).unwrap();
-    eprintln!(
-        "trace(wasm-splice:parse): {} ms (engine bytes: {})",
-        t_stage.elapsed().as_millis(),
-        engine.len()
-    );
 
     // since StarlingMonkey implements CLI Run and incoming handler,
     // we override them only if the guest content exports those functions
-    t_stage = Instant::now();
     remove_if_exported_by_js(&mut module, &exports, "wasi:cli/run@0.2.", "#run");
-    eprintln!(
-        "trace(wasm-splice:remove-run-if-exported): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
     // if 'fetch-event' feature is disabled (default being default-enabled),
     // remove the built-in incoming-handler which is built around it's use.
     if !features.contains(&Feature::FetchEvent) {
-        t_stage = Instant::now();
         remove_if_exported_by_js(
             &mut module,
             &exports,
             "wasi:http/incoming-handler@0.2.",
             "#handle",
         );
-        eprintln!(
-            "trace(wasm-splice:remove-incoming-handler): {} ms",
-            t_stage.elapsed().as_millis()
-        );
     }
 
     // we reencode the WASI world component data, so strip it out from the
     // custom section
-    t_stage = Instant::now();
     let maybe_component_section_id = module
         .custom_sections
         .get_id("component-type:bindings".to_string());
     if let Some(component_section_id) = maybe_component_section_id {
         module.custom_sections.delete(component_section_id);
     }
-    eprintln!(
-        "trace(wasm-splice:strip-component-section): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
     // extract the native instructions from sample functions
     // then inline the imported functions and main import gating function
     // (erasing sample functions in the process)
-    t_stage = Instant::now();
-    let import_cnt = imports.len();
     synthesize_import_functions(&mut module, &imports, debug)?;
-    eprintln!(
-        "trace(wasm-splice:imports): {} ms ({} imports)",
-        t_stage.elapsed().as_millis(),
-        import_cnt
-    );
 
     // create the exported functions as wrappers around the "cabi_call" function
-    t_stage = Instant::now();
-    let export_cnt = exports.len();
     synthesize_export_functions(&mut module, &exports)?;
-    eprintln!(
-        "trace(wasm-splice:exports): {} ms ({} exports)",
-        t_stage.elapsed().as_millis(),
-        export_cnt
-    );
 
-    t_stage = Instant::now();
-    let out = module.encode();
-    eprintln!(
-        "trace(wasm-splice:encode): {} ms (out bytes: {})",
-        t_stage.elapsed().as_millis(),
-        out.len()
-    );
-    eprintln!(
-        "trace(wasm-splice:total): {} ms",
-        t_total.elapsed().as_millis()
-    );
-    Ok(out)
+    Ok(module.encode())
 }
 
 fn remove_if_exported_by_js(
@@ -611,13 +422,10 @@ fn synthesize_import_functions(
     imports: &[(String, String, CoreFn, Option<i32>)],
     debug: bool,
 ) -> Result<()> {
-    let t_total = Instant::now();
-    let mut t_stage = Instant::now();
     let mut coreabi_get_import: Option<ExportsID> = None;
     let mut cabi_realloc: Option<ExportsID> = None;
 
     let mut coreabi_sample_ids = Vec::new();
-    t_stage = Instant::now();
     for (id, expt) in module.exports.iter().enumerate() {
         match expt.name.as_str() {
             "coreabi_sample_i32" | "coreabi_sample_i64" | "coreabi_sample_f32"
@@ -627,10 +435,6 @@ fn synthesize_import_functions(
             _ => {}
         };
     }
-    eprintln!(
-        "trace(wasm-splice:imports:scan-exports): {} ms",
-        t_stage.elapsed().as_millis()
-    );
 
     let memory = 0;
 
@@ -697,7 +501,6 @@ fn synthesize_import_functions(
     //
     let mut import_fnids: Vec<FunctionID> = Vec::new();
     {
-        let t_loop = Instant::now();
         // synthesized native import function parameters (in order)
         let ctx_arg = coreabi_sample_i32.args[0];
         // let argc_arg = coreabi_sample_i32.args[1]; // Unused
@@ -914,14 +717,8 @@ fn synthesize_import_functions(
             let fid = func.finish_module(module);
             import_fnids.push(fid);
         }
-        eprintln!(
-            "trace(wasm-splice:imports:build-fns): {} ms ({} imports)",
-            t_loop.elapsed().as_millis(),
-            imports.len()
-        );
 
         // extend the main table to include indices for generated imported functions
-        t_stage = Instant::now();
         let table = module.tables.get_mut(main_tid);
         table.initial += imports.len() as u64;
         table.maximum = Some(table.maximum.unwrap() + imports.len() as u64);
@@ -933,10 +730,6 @@ fn synthesize_import_functions(
                 funcs.push(fid);
             }
         }
-        eprintln!(
-            "trace(wasm-splice:imports:update-table): {} ms",
-            t_stage.elapsed().as_millis()
-        );
     }
 
     // Populate the import creation function of the form:
@@ -948,7 +741,6 @@ fn synthesize_import_functions(
     // }
     //
     {
-        t_stage = Instant::now();
         let coreabi_get_import_fid = get_export_fid(module, &coreabi_get_import.unwrap());
 
         let args = &module
@@ -1007,36 +799,20 @@ fn synthesize_import_functions(
             .instructions
             .add_instr(table_instr_idx, Operator::I32Add);
         builder.body.instructions.finish_instr(table_instr_idx);
-        eprintln!(
-            "trace(wasm-splice:imports:fixup-get-import): {} ms",
-            t_stage.elapsed().as_millis()
-        );
     }
 
     // remove unnecessary exports
-    t_stage = Instant::now();
     module.exports.delete(coreabi_to_bigint64);
     module.exports.delete(coreabi_from_bigint64);
     module.exports.delete(coreabi_get_import.unwrap());
     for id in coreabi_sample_ids {
         module.exports.delete(id);
     }
-    eprintln!(
-        "trace(wasm-splice:imports:prune-exports): {} ms",
-        t_stage.elapsed().as_millis()
-    );
-
-    eprintln!(
-        "trace(wasm-splice:imports:total): {} ms",
-        t_total.elapsed().as_millis()
-    );
 
     Ok(())
 }
 
 fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]) -> Result<()> {
-    let t_total = Instant::now();
-    let mut t_stage = Instant::now();
     let cabi_realloc = get_export_fid(
         module,
         &module
@@ -1057,7 +833,6 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
 
     let memory = 0;
     // (2) Export call function synthesis
-    let t_loop = Instant::now();
     for (export_num, (expt_name, expt_sig)) in exports.iter().enumerate() {
         // Export function synthesis
         {
@@ -1252,25 +1027,10 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
             .exports
             .add_export_func(format!("cabi_post_{expt_name}"), *fid);
     }
-    eprintln!(
-        "trace(wasm-splice:exports:build-fns): {} ms ({} exports)",
-        t_loop.elapsed().as_millis(),
-        exports.len()
-    );
 
     // remove unnecessary exports
-    t_stage = Instant::now();
     module.exports.delete(call_expt);
     module.exports.delete(post_call_expt);
-    eprintln!(
-        "trace(wasm-splice:exports:prune-exports): {} ms",
-        t_stage.elapsed().as_millis()
-    );
-
-    eprintln!(
-        "trace(wasm-splice:exports:total): {} ms",
-        t_total.elapsed().as_millis()
-    );
 
     Ok(())
 }

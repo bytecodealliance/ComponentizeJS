@@ -120,9 +120,7 @@ pub fn stub_wasi(
         target_world_imports.insert(resolve.name_canonicalized_world_key(key));
     }
 
-    let start_time = std::time::Instant::now();
     let mut module = Module::parse(wasm.as_slice(), false).unwrap();
-    println!("stub_wasi module parse took {:?}", start_time.elapsed());
 
     stub_preview1(&mut module)?;
 

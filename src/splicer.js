@@ -97,8 +97,6 @@ export async function spliceBindingsCli(
 	workDir,
 	opts = {},
 ) {
-	const t_start = Date.now();
-
 	// Prepare temporary directory for splicer output
 	const splicerOutDir = join(workDir, 'splicer-out');
 	await mkdir(splicerOutDir);
@@ -127,9 +125,6 @@ export async function spliceBindingsCli(
 	const exports = JSON.parse(await readFile(join(splicerOutDir, 'exports.json'), 'utf8'));
 	const imports = JSON.parse(await readFile(join(splicerOutDir, 'imports.json'), 'utf8'));
 
-	const t_end = Date.now();
-	console.error(`trace(splicer-cli:splice-bindings): ${t_end - t_start} ms`);
-
 	return { wasm, jsBindings, exports, imports };
 }
 
@@ -151,8 +146,6 @@ export async function stubWasiCli(
 	workDir,
 	opts = {},
 ) {
-	const t_start = Date.now();
-
 	// Write wasm to temp file for stubbing
 	const stubInputPath = join(workDir, 'stub-input.wasm');
 	const stubOutputPath = join(workDir, 'stub-output.wasm');
@@ -169,9 +162,6 @@ export async function stubWasiCli(
 
 	// Read the stubbed wasm
 	const finalBin = await readFile(stubOutputPath);
-
-	const t_end = Date.now();
-	console.error(`trace(splicer-cli:stub-wasi): ${t_end - t_start} ms`);
 
 	return finalBin;
 }
@@ -194,8 +184,6 @@ export async function spliceBindingsWasm(
 	worldName,
 	debug,
 ) {
-	const t_start = Date.now();
-
 	const result = wasmSplicer.spliceBindings(
 		engineWasm,
 		features,
@@ -204,9 +192,6 @@ export async function spliceBindingsWasm(
 		worldName,
 		debug,
 	);
-
-	const t_end = Date.now();
-	console.error(`trace(splicer-wasm:splice-bindings): ${t_end - t_start} ms`);
 
 	return {
 		wasm: Buffer.from(result.wasm),
@@ -232,8 +217,6 @@ export async function stubWasiWasm(
 	witPath,
 	worldName,
 ) {
-	const t_start = Date.now();
-
 	const result = wasmSplicer.stubWasi(
 		wasmBinary,
 		features,
@@ -241,9 +224,6 @@ export async function stubWasiWasm(
 		maybeWindowsPath(witPath),
 		worldName,
 	);
-
-	const t_end = Date.now();
-	console.error(`trace(splicer-wasm:stub-wasi): ${t_end - t_start} ms`);
 
 	return Buffer.from(result);
 }
