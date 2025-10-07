@@ -14,7 +14,7 @@ too_many_arguments = 'allow'
 anyhow = { version = "1.0.95", default-features = false }
 heck = { version = "0.5", default-features = false }
 js-component-bindgen = { version = "1.11.0" }
-wirm = { version = "2.1.0", features = ["parallel"] }
+wirm = { version = "2.1.0", default-features = false }
 rand = { version = "0.8", default-features = false }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 wasm-encoder = { version = "0.227.1", features = [ "component-model", "std" ] }

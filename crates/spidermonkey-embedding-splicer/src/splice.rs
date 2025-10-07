@@ -10,7 +10,7 @@ use wirm::ir::id::{ExportsID, FunctionID, LocalID};
 use wirm::ir::module::Module;
 use wirm::ir::types::{BlockType, ElementItems, InstrumentationMode};
 use wirm::module_builder::AddLocal;
-use wirm::opcode::Inject;
+use wirm::opcode::{Inject, InjectAt};
 use wirm::{DataType, Opcode};
 use wit_component::metadata::{decode, Bindgen};
 use wit_component::StringEncoding;
@@ -775,11 +775,20 @@ fn synthesize_import_functions(
                 }
             }
         }
-        // Inject adjustments after the located instruction: add delta and add arg index
-        builder
-            .body
-            .instructions
-            .set_current_mode(table_instr_idx, InstrumentationMode::After);
+
+        builder.inject_at(
+            table_instr_idx,
+            InstrumentationMode::Before,
+            Operator::LocalGet {
+                local_index: *arg_idx,
+            },
+        );
+        builder.inject_at(
+            table_instr_idx + 1,
+            InstrumentationMode::Before,
+            Operator::I32Add,
+        );
+
         if delta != 0 {
             builder
                 .body
@@ -790,17 +799,6 @@ fn synthesize_import_functions(
                 .instructions
                 .add_instr(table_instr_idx, Operator::I32Add);
         }
-        builder.body.instructions.add_instr(
-            table_instr_idx,
-            Operator::LocalGet {
-                local_index: *arg_idx,
-            },
-        );
-        builder
-            .body
-            .instructions
-            .add_instr(table_instr_idx, Operator::I32Add);
-        builder.body.instructions.finish_instr(table_instr_idx);
     }
 
     // remove unnecessary exports
