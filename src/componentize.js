@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { cwd, stdout, platform } from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { resolve, join, dirname } from 'node:path';
+import { resolve, join, dirname, relative } from 'node:path';
 import { readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
 import { rmSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -249,9 +249,16 @@ export async function componentize(
     sourcePath = sourceName;
   }
   let currentDir = maybeWindowsPath(cwd());
+
   if (workspacePrefix.startsWith(currentDir)) {
     workspacePrefix = currentDir;
     sourcePath = sourcePath.slice(workspacePrefix.length + 1);
+  }
+
+  // Ensure source path is relative to workspacePrefix for the args list,
+  // regardless of the directory
+  if (resolve(sourcePath).startsWith(resolve(workspacePrefix))) {
+      sourcePath = relative(workspacePrefix, sourcePath);
   }
 
   let args = `--initializer-script-path ${initializerPath} --strip-path-prefix ${workspacePrefix}/ ${sourcePath}`;
