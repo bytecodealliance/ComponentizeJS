@@ -13,8 +13,8 @@ endif
 STARLINGMONKEY_DEPS = $(STARLINGMONKEY_SRC)/cmake/* embedding/* $(STARLINGMONKEY_SRC)/runtime/* $(STARLINGMONKEY_SRC)/builtins/* $(STARLINGMONKEY_SRC)/builtins/*/* $(STARLINGMONKEY_SRC)/builtins/*/*/* $(STARLINGMONKEY_SRC)/include/*
 
 all: release
-debug: lib/starlingmonkey_embedding.debug.wasm lib/spidermonkey-embedding-splicer.js
-release: lib/starlingmonkey_embedding.wasm lib/spidermonkey-embedding-splicer.js
+debug: lib/starlingmonkey_embedding.debug.wasm lib/spidermonkey-embedding-splicer.js target/debug/splicer
+release: lib/starlingmonkey_embedding.wasm lib/spidermonkey-embedding-splicer.js target/release/splicer
 
 lib/spidermonkey-embedding-splicer.js: target/wasm32-wasip1/release/splicer_component.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj lib
 	@$(JCO) new target/wasm32-wasip1/release/splicer_component.wasm -o obj/spidermonkey-embedding-splicer.wasm --wasi-reactor
@@ -22,6 +22,12 @@ lib/spidermonkey-embedding-splicer.js: target/wasm32-wasip1/release/splicer_comp
 
 target/wasm32-wasip1/release/splicer_component.wasm: Cargo.toml crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/*.rs crates/splicer-component/src/*.rs
 	cargo build --lib --release --target wasm32-wasip1
+
+target/release/splicer: Cargo.toml crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/*.rs crates/spidermonkey-embedding-splicer/src/bin/splicer.rs
+	cargo build --bin splicer --release
+
+target/debug/splicer: Cargo.toml crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/*.rs crates/spidermonkey-embedding-splicer/src/bin/splicer.rs
+	cargo build --bin splicer
 
 lib/starlingmonkey_embedding.wasm: $(STARLINGMONKEY_DEPS) | lib
 	cmake -B build-release -DCMAKE_BUILD_TYPE=Release

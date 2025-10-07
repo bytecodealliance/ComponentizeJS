@@ -19,6 +19,7 @@ js-component-bindgen = { workspace = true, features = [ "transpile-bindgen" ] }
 #orca-wasm = { workspace = true }
 wirm = { workspace = true }
 rand = { workspace = true }
+serde_json = { workspace = true }
 wasm-encoder = { workspace = true }
 wasmparser = { workspace = true }
 wit-bindgen = { workspace = true }

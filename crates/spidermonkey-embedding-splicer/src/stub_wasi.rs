@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Result};
+use wasmparser::{MemArg, TypeRef};
 use wirm::ir::function::FunctionBuilder;
 use wirm::ir::id::{FunctionID, LocalID};
 use wirm::ir::module::module_functions::FuncKind;
-use wirm::ir::types::{BlockType, InitExpr, Value, Instructions};
+use wirm::ir::types::{BlockType, InitExpr, Value};
 use wirm::module_builder::AddLocal;
 use wirm::{DataType, InitInstr, Module, Opcode};
-use wasmparser::{MemArg, Operator, TypeRef};
 use wit_parser::Resolve;
 
 use crate::parse_wit;
@@ -44,14 +44,14 @@ where
         };
 
         let ty = module.types.get(ty_id).unwrap();
-        let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
-        let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
+        let mut builder = FunctionBuilder::new(ty.params().as_slice(), ty.results().as_slice());
         let _args = stub(&mut builder)?;
 
         builder.replace_import_in_module(module, iid);
 
         return Ok(Some(fid));
     }
+
     Ok(None)
 }
 
@@ -120,7 +120,9 @@ pub fn stub_wasi(
         target_world_imports.insert(resolve.name_canonicalized_world_key(key));
     }
 
+    let start_time = std::time::Instant::now();
     let mut module = Module::parse(wasm.as_slice(), false).unwrap();
+    println!("stub_wasi module parse took {:?}", start_time.elapsed());
 
     stub_preview1(&mut module)?;
 
