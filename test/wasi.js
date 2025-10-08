@@ -9,6 +9,8 @@ import { transpile } from '@bytecodealliance/jco';
 
 import { suite, test, assert } from 'vitest';
 
+import { setupComponent } from "./util.js";
+
 import {
   DEBUG_TRACING_ENABLED,
   DEBUG_TEST_ENABLED,
@@ -85,42 +87,3 @@ suite('WASI', () => {
   });
 });
 
-async function setupComponent(opts) {
-  const componentizeSrc = opts?.componentize?.src;
-  const componentizeOpts = opts?.componentize?.opts;
-  const transpileOpts = opts?.transpile?.opts;
-
-  let component;
-  if (componentizeSrc) {
-    const srcBuild = await componentize(componentizeSrc, componentizeOpts);
-    component = srcBuild.component;
-  } else if (!componentizeSrc && componentizeOpts) {
-    const optsBuild = await componentize(componentizeOpts);
-    component = optsBuild.component;
-  } else {
-    throw new Error('no componentize options or src provided');
-  }
-
-  const outputDir = join('./test/output', 'wasi-test');
-  await mkdir(outputDir, { recursive: true });
-
-  await writeFile(join(outputDir, 'wasi.component.wasm'), component);
-
-  const { files } = await transpile(component, transpileOpts);
-
-  const wasiDir = join(outputDir, 'wasi');
-  const interfacesDir = join(wasiDir, 'interfaces');
-  await mkdir(interfacesDir, { recursive: true });
-
-  for (const file of Object.keys(files)) {
-    await writeFile(join(wasiDir, file), files[file]);
-  }
-
-  const componentJsPath = join(wasiDir, 'component.js');
-  var instance = await import(componentJsPath);
-
-  return {
-    instance,
-    outputDir,
-  };
-}
