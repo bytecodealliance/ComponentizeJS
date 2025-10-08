@@ -153,7 +153,8 @@ jobs:
           # - latest reenable when https://github.com/nodejs/node/issues/57172 is fixed
         os:
           - ubuntu-latest
-          - windows-latest
+          # NOTE: windows-2025 (which is now latest) seems to hang on test runs
+          - windows-2022
           - macos-latest
         build-type:
           - 'release'

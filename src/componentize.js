@@ -264,8 +264,8 @@ export async function componentize(
   let args = `--initializer-script-path ${initializerPath} --strip-path-prefix ${workspacePrefix}/ ${sourcePath}`;
   runtimeArgs = runtimeArgs ? `${runtimeArgs} ${args}` : args;
 
-  let preopens = [`--dir ${sourcesDir}`];
-  preopens.push(`--mapdir /::${workspacePrefix}`);
+  let preopens = [`--dir=${sourcesDir}`];
+  preopens.push(`--mapdir=/::${workspacePrefix}`);
 
   let postProcess;
 
@@ -286,7 +286,6 @@ export async function componentize(
       stdio: [null, stdout, 'pipe'],
       env,
       input: runtimeArgs,
-      shell: true,
       encoding: 'utf-8',
     },
   );
