@@ -16,6 +16,7 @@ export async function componentizeCmd(jsSource, opts) {
     debugBindings: opts.debugBindings,
     debugBuild: opts.useDebugBuild,
     enableWizerLogging: opts.enableWizerLogging,
+    packageJsonPath: opts.ociPackageJson,
   });
   await writeFile(opts.out, component);
 }
@@ -42,6 +43,10 @@ program
   .option(
     '--enable-wizer-logging',
     'enable debug logging for calls in the generated component',
+  )
+  .option(
+    '--oci-package-json <path>',
+    'path to package.json for OCI annotations (auto-detected if not specified)',
   )
   .requiredOption('-o, --out <out>', 'output component file')
   .action(asyncAction(componentizeCmd));

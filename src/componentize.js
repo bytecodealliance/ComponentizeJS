@@ -21,6 +21,7 @@ import {
 import { splicer } from '../lib/spidermonkey-embedding-splicer.js';
 
 import { maybeWindowsPath } from './platform.js';
+import { addOCIAnnotations, extractAnnotationsFromPackageJson } from './oci-annotations.js';
 
 export const { version } = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8'),
@@ -103,6 +104,10 @@ export async function componentize(
     enableWizerLogging = false,
 
     runtimeArgs,
+
+    // OCI Annotations options
+    ociAnnotations = undefined,  // Can be an object with explicit annotations
+    packageJsonPath = undefined,  // Path to package.json to extract annotations from
 
   } = opts;
 
@@ -338,7 +343,7 @@ export async function componentize(
     await writeFile('binary.wasm', finalBin);
   }
 
-  const component = await metadataAdd(
+  let component = await metadataAdd(
     await componentNew(
       finalBin,
       Object.entries({
@@ -351,6 +356,49 @@ export async function componentize(
       'processed-by': [['ComponentizeJS', version]],
     }),
   );
+
+  // Add OCI annotations
+  let annotations = ociAnnotations || {};
+
+  // If no explicit annotations provided, try to load from package.json
+  if (Object.keys(annotations).length === 0) {
+    let packageJsonPath = packageJsonPath;
+
+    // If no package.json path specified, try to find it relative to sourcePath
+    if (!packageJsonPath && sourcePath) {
+      const sourceDir = dirname(resolve(sourcePath));
+      const candidatePath = join(sourceDir, 'package.json');
+      if (existsSync(candidatePath)) {
+        packageJsonPath = candidatePath;
+      }
+    }
+
+    // Try to load and extract annotations from package.json
+    if (packageJsonPath) {
+      try {
+        const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8'));
+        annotations = extractAnnotationsFromPackageJson(packageJson);
+
+        if (debugBindings) {
+          console.error('--- OCI Annotations (from package.json) ---');
+          console.error(annotations);
+        }
+      } catch (err) {
+        // If we can't read the package.json, just skip OCI annotations
+        if (debugBindings) {
+          console.error(`Note: Could not load package.json from ${packageJsonPath}: ${err.message}`);
+        }
+      }
+    }
+  } else if (debugBindings) {
+    console.error('--- OCI Annotations (explicit) ---');
+    console.error(annotations);
+  }
+
+  // Apply OCI annotations to the component
+  if (Object.keys(annotations).length > 0) {
+    component = addOCIAnnotations(component, annotations);
+  }
 
   // Convert CABI import conventions to ESM import conventions
   imports = imports.map(([specifier, impt]) =>
