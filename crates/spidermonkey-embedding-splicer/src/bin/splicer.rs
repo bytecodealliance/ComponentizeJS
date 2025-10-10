@@ -5,9 +5,7 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
-use spidermonkey_embedding_splicer::wit::exports::local::spidermonkey_embedding_splicer::splicer::{
-    CoreFn, CoreTy, Feature,
-};
+use spidermonkey_embedding_splicer::wit::exports::local::spidermonkey_embedding_splicer::splicer::Feature;
 use spidermonkey_embedding_splicer::{splice, stub_wasi};
 
 #[derive(Parser, Debug)]
