@@ -1306,8 +1306,7 @@ fn binding_name_import(func_name: &str, iface_name: &Option<String>, import_name
         .collect::<String>();
 
     if import_name != "<<INVALID>>" {
-        let s = valid_import.to_string();
-        format!("{s}${func_name}")
+        format!("{valid_import}${func_name}")
     } else if let Some(iface_name) = iface_name {
         format!("{iface_name}${func_name}")
     } else {
