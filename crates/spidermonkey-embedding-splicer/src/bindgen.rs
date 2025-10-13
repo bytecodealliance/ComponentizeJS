@@ -205,7 +205,8 @@ pub fn componentize_bindgen(
             let item = items.first().unwrap();
             if let Some(resource) = resource {
                 let export_name = resource.to_upper_camel_case();
-                let binding_name = binding_name_import(&export_name, &item.iface_name, &item.binding_name);
+                let binding_name =
+                    binding_name_import(&export_name, &item.iface_name, &item.binding_name);
                 if item.iface {
                     specifier_list.push(format!("{export_name}: import_{binding_name}"));
                 } else {
@@ -702,7 +703,11 @@ impl JsBindgen<'_> {
             func.params.len(),
             &format!(
                 "$import_{}",
-                binding_name_fn(&resource.func_name(fn_name), &iface_name, import_name.as_str())
+                binding_name_fn(
+                    &resource.func_name(fn_name),
+                    &iface_name,
+                    import_name.as_str()
+                )
             ),
             StringEncoding::UTF8,
             func,
