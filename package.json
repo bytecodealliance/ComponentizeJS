@@ -15,13 +15,13 @@
     "import": "./src/componentize.js"
   },
   "devDependencies": {
+    "@bytecodealliance/jco": "^1.15.1",
     "@bytecodealliance/preview2-shim": "^0.17.4",
     "cross-env": "^7.0.3",
     "semver": "^7.7.2",
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "^1.9.1",
     "@bytecodealliance/wizer": "^10.0.0",
     "es-module-lexer": "^1.6.0",
     "oxc-parser": "^0.76.0"
