@@ -56,10 +56,21 @@ export async function setupComponent(opts) {
   }
 
   const componentJsPath = join(wasiDir, 'component.js');
-  var instance = await import(componentJsPath);
 
-  return {
-    instance,
-    outputDir,
-  };
+  // NOTE: On Windows, vitest has stated suddenly hanging when processing code with an
+  // `await import(...)` in it, when the `...` is a bare identifier.
+  //
+  // This can be worked around in many ways:
+  // - doing a trivial tranformation on the identifier/argument
+  // - returning a more traditional promise
+  // - separating await and import() calls
+  //
+  // Here we choose to return the promise more traditionally
+  return import(componentJsPath)
+    .then(instance => {
+        return {
+            instance,
+            outputDir,
+        };
+    });
 }
