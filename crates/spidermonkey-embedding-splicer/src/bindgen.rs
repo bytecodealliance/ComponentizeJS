@@ -1300,12 +1300,11 @@ fn binding_name(func_name: &str, iface_name: &Option<String>) -> String {
 }
 
 fn binding_name_import(func_name: &str, iface_name: &Option<String>, import_name: &str) -> String {
-    let valid_import = import_name
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '_' })
-        .collect::<String>();
-
     if import_name != "<<INVALID>>" {
+        let valid_import = import_name
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '_' })
+            .collect::<String>();
         format!("{valid_import}${func_name}")
     } else if let Some(iface_name) = iface_name {
         format!("{iface_name}${func_name}")

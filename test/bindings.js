@@ -96,7 +96,7 @@ suite('Bindings', async () => {
         for (let [impt] of imports) {
           if (impt.startsWith('wasi:')) continue;
           if (impt.startsWith('[')) impt = impt.slice(impt.indexOf(']') + 1);
-          let importName = impt.split('/').pop();
+          let importName = impt.replace('/', '-');
           if (importName === 'test') importName = 'imports';
           map[impt] = `../../cases/${name}/${importName}.js`;
         }

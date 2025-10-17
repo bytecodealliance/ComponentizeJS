@@ -1,0 +1,6 @@
+package local:http-request;
+
+interface http {
+  run: func(endpoint: string) -> result<string, string>;
+}
+

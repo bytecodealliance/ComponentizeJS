@@ -1,0 +1,27 @@
+package local:custom;
+
+interface actions {
+    type json-string = string;
+
+    record payload {
+        input: json-string,
+    }
+
+    record input {
+        action-id: string,
+        payload: payload,
+    }
+
+    record output {
+        %result: json-string,
+    }
+
+    call: func(input: input) -> result<output, string>;
+}
+
+world main {
+    import local:http-request/http;
+    import local:http-request-part-two/http;
+
+    export actions;
+}
