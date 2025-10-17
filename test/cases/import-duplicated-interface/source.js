@@ -1,13 +1,14 @@
-import * as $local$e1ab0bfa$1 from 'local:http-request/http';
-import * as $local$15f12255$1 from 'local:http-request-part-two/http';
+import { hello as hello1 } from 'local:hello/hello';
+import { hello as hello2 } from 'local:hello-second/hello';
 
-export function call(parameters) {
-  console.log('call called with', parameters);
-  // $local$e1ab0bfa$1.import.run('http://example.com');
-  // $local$15f12255$1.import.run('http://example.com');
-  return parameters;
-}
-
-export const actions = {
-  call,
+export const exports = {
+  hello(str) {
+    if (str === 'hello') {
+      return `world ${str} (${hello1('world')})`;
+    }
+    if (str === 'hello-second') {
+      return `world ${str} (${hello2('world')})`;
+    }
+    return `world unknown ${str}`;
+  },
 };

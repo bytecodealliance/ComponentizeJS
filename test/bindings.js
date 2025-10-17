@@ -96,7 +96,9 @@ suite('Bindings', async () => {
         for (let [impt] of imports) {
           if (impt.startsWith('wasi:')) continue;
           if (impt.startsWith('[')) impt = impt.slice(impt.indexOf(']') + 1);
-          let importName = impt.replace('/', '-');
+          let importName = impt.split('/').pop();
+          if (name === 'import-duplicated-interface')
+            importName = impt.replace('/', '-').replace(':', '-');
           if (importName === 'test') importName = 'imports';
           map[impt] = `../../cases/${name}/${importName}.js`;
         }

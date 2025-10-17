@@ -1,27 +1,10 @@
-package local:custom;
+package test:test;
 
-interface actions {
-    type json-string = string;
+world hello {
+  import local:hello/hello;
+  import local:hello-second/hello;
 
-    record payload {
-        input: json-string,
-    }
-
-    record input {
-        action-id: string,
-        payload: payload,
-    }
-
-    record output {
-        %result: json-string,
-    }
-
-    call: func(input: input) -> result<output, string>;
-}
-
-world main {
-    import local:http-request/http;
-    import local:http-request-part-two/http;
-
-    export actions;
+  export exports: interface {
+    hello: func(name: string) -> string;
+  }
 }

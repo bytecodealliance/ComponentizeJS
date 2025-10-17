@@ -1,18 +1,13 @@
 import { strictEqual } from 'node:assert';
 
-export function test(instance, args) {
+export function test(instance) {
   strictEqual(
-    instance['actions'].call({
-      actionId: '123',
-      payload: { input: '' },
-    }),
-    ''
+    instance.exports.hello('hello'),
+    'world hello (Hello 1.0.0, world)'
   );
   strictEqual(
-    instance['actions'].instance.call({
-      actionId: '123',
-      payload: { input: '' },
-    }),
-    'http://example.com'
+    instance.exports.hello('hello-second'),
+    'world hello-second (Hello 2.0.0, world)'
   );
+  strictEqual(instance.exports.hello('unknown'), 'world unknown unknown');
 }
