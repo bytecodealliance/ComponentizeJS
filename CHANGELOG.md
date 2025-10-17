@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.19.2] - 2025-10-17
+
+### 🐛 Bug Fixes
+
+* *(ci)* test runs on windows runner (#308) by @vados-cosmonic in #308
+
+* separate folder component path use (#299) by @vados-cosmonic in #299
+
+* remove shell setting for wizer call (#303) by @vados-cosmonic in #303
+
+* *(ci)* temporarily downgrade windows runners from latest to 2022 (#302) by @vados-cosmonic in #302
+
+
+
+
 ## [0.19.1] - 2025-09-16
 
 ### 🐛 Bug Fixes
