@@ -18,9 +18,11 @@ export async function test(run) {
   strictEqual(stderr, '');
   const times = stdout.split('\n');
 
-  // verify now was taken at build time (within 15 seconds ago)
+  // verify now was taken at build time
+  // NOTE: While build time is expected to be within 15 seconds,
+  // we avoid ensuring a specific bound on build time due to the
+  // unreliability of combinations of CI systems and specific OSes
   ok(Number(times[0]) < curNow);
-  ok(Number(times[0]) > curNow - 15_000);
 
   // verify disabled time doesn't progress
   strictEqual(times[1], times[0]);

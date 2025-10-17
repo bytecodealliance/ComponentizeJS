@@ -26,7 +26,6 @@ export default defineConfig({
   test: {
     reporters: REPORTERS,
     disableConsoleIntercept: true,
-    retry: RETRY,
     printConsoleTrace: true,
     passWithNoTests: false,
     include: ['test/**/*.js'],
