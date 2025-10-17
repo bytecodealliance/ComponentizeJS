@@ -1,0 +1,5 @@
+package local:hello-second;
+
+interface hello {
+  hello: func(name: option<string>) -> option<string>;
+}
