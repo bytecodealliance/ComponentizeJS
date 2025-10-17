@@ -22,16 +22,18 @@ suite('Bindings', async () => {
         'utf8',
       );
 
-      const test = await import(`./cases/${name}/test.js`);
+      // NOTE: import separated from await due to issues on windows (see note in util.js)
+      const testcasePromise = import(`./cases/${name}/test.js`);
+      const testcase = await testcasePromise;
 
       // Determine the relevant WIT world to use
       let witWorld,
         witPath,
         worldName,
         isWasiTarget = false;
-      if (test.worldName) {
+      if (testcase.worldName) {
         witPath = fileURLToPath(new URL('./wit', import.meta.url));
-        worldName = test.worldName;
+        worldName = testcase.worldName;
         isWasiTarget = true;
       } else {
         try {
@@ -61,12 +63,13 @@ suite('Bindings', async () => {
         }
       }
 
-      const enableFeatures = test.enableFeatures || ['http'];
+      const enableFeatures = testcase.enableFeatures || ['http'];
       const disableFeatures =
-        test.disableFeatures ||
+        testcase.disableFeatures ||
         (isWasiTarget ? [] : ['random', 'clocks', 'http', 'stdio']);
 
       let testArg;
+      let instance;
       try {
         const { component, imports } = await componentize(source, {
           sourceName: `${name}.js`,
@@ -77,6 +80,7 @@ suite('Bindings', async () => {
           disableFeatures: maybeLogging(disableFeatures),
           debugBuild: DEBUG_TEST_ENABLED,
         });
+
         const map = {
           'wasi:cli-base/*': '@bytecodealliance/preview2-shim/cli-base#*',
           'wasi:clocks/*': '@bytecodealliance/preview2-shim/clocks#*',
@@ -88,6 +92,7 @@ suite('Bindings', async () => {
           'wasi:random/*': '@bytecodealliance/preview2-shim/random#*',
           'wasi:sockets/*': '@bytecodealliance/preview2-shim/sockets#*',
         };
+
         for (let [impt] of imports) {
           if (impt.startsWith('wasi:')) continue;
           if (impt.startsWith('[')) impt = impt.slice(impt.indexOf(']') + 1);
@@ -130,15 +135,20 @@ suite('Bindings', async () => {
         const outputPath = fileURLToPath(
           new URL(`./output/${name}/${name}.js`, import.meta.url),
         );
-        var instance = await import(outputPath);
+
+        // NOTE: import separated from await due to issues on windows (see note in util.js)
+        const instancePromise = import(outputPath);
+        instance = await instancePromise;
+
       } catch (e) {
-        if (test.err) {
-          test.err(e);
+        if (testcase.err) {
+          testcase.err(e);
           return;
         }
         throw e;
       }
-      await test.test(instance, testArg);
+
+      await testcase.test(instance, testArg);
     });
   }
 });

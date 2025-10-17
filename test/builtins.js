@@ -19,12 +19,15 @@ suite('Builtins', async () => {
   for (const filename of builtins) {
     const name = filename.slice(0, -3);
     test.concurrent(name, async () => {
+      // NOTE: import separated from await due to issues on windows (see note in util.js)
+      const builtinModulePromise = import(`./builtins/${name}.js`);
+
       const {
         source,
         test: runTest,
         disableFeatures,
         enableFeatures,
-      } = await import(`./builtins/${name}.js`);
+      } = await builtinModulePromise;
 
       const { component } = await componentize(
         source,
