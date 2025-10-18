@@ -1,17 +1,17 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use orca_wasm::ir::function::{FunctionBuilder, FunctionModifier};
-use orca_wasm::ir::id::{ExportsID, FunctionID, LocalID};
-use orca_wasm::ir::module::Module;
-use orca_wasm::ir::types::{BlockType, ElementItems, InstrumentationMode};
-use orca_wasm::module_builder::AddLocal;
-use orca_wasm::opcode::{Inject, InjectAt};
-use orca_wasm::{DataType, Opcode};
 use wasm_encoder::{Encode, Section};
 use wasmparser::ExternalKind;
 use wasmparser::MemArg;
 use wasmparser::Operator;
+use wirm::ir::function::{FunctionBuilder, FunctionModifier};
+use wirm::ir::id::{ExportsID, FunctionID, LocalID};
+use wirm::ir::module::Module;
+use wirm::ir::types::{BlockType, ElementItems, InstrumentationMode};
+use wirm::module_builder::AddLocal;
+use wirm::opcode::{Inject, InjectAt};
+use wirm::{DataType, Opcode};
 use wit_component::metadata::{decode, Bindgen};
 use wit_component::StringEncoding;
 use wit_parser::Resolve;
@@ -725,7 +725,7 @@ fn synthesize_import_functions(
 
         // create imported function table
         let els = module.elements.iter_mut().next().unwrap();
-        if let ElementItems::Functions(ref mut funcs) = &mut els.1 {
+        if let ElementItems::Functions(ref mut funcs) = &mut els.items {
             for fid in import_fnids {
                 funcs.push(fid);
             }
@@ -757,20 +757,25 @@ fn synthesize_import_functions(
             .get_fn_modifier(coreabi_get_import_fid)
             .unwrap();
 
-        // walk until we get to the const representing the table index
-        let mut table_instr_idx = 0;
-        for (idx, instr) in builder.body.instructions.iter_mut().enumerate() {
-            if let Operator::I32Const { value: ref mut v } = instr.op {
-                // we specifically need the const "around" 3393
-                // which is the coreabi_sample_i32 table offset
-                if *v < 1000 || *v > 5000 {
-                    continue;
+        // Find the I32Const base index and compute the delta to new base
+        let mut table_instr_idx = 0usize;
+        let mut delta: i32 = 0;
+        {
+            let ops_ro = builder.body.instructions.get_ops();
+            for (idx, op) in ops_ro.iter().enumerate() {
+                if let Operator::I32Const { value } = op {
+                    // we specifically need the const "around" 3393
+                    // which is the coreabi_sample_i32 table offset
+                    if *value < 1000 || *value > 5000 {
+                        continue;
+                    }
+                    delta = import_fn_table_start_idx - *value;
+                    table_instr_idx = idx;
+                    break;
                 }
-                *v = import_fn_table_start_idx;
-                table_instr_idx = idx;
-                break;
             }
         }
+
         builder.inject_at(
             table_instr_idx,
             InstrumentationMode::Before,
@@ -783,6 +788,17 @@ fn synthesize_import_functions(
             InstrumentationMode::Before,
             Operator::I32Add,
         );
+
+        if delta != 0 {
+            builder
+                .body
+                .instructions
+                .add_instr(table_instr_idx, Operator::I32Const { value: delta });
+            builder
+                .body
+                .instructions
+                .add_instr(table_instr_idx, Operator::I32Add);
+        }
     }
 
     // remove unnecessary exports
