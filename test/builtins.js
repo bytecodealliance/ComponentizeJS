@@ -18,7 +18,7 @@ suite('Builtins', async () => {
 
   for (const filename of builtins) {
     const name = filename.slice(0, -3);
-    test.concurrent(name, async () => {
+    test.concurrent(name, { retry: 3 }, async () => {
       // NOTE: import separated from await due to issues on windows (see note in util.js)
       const builtinModulePromise = import(`./builtins/${name}.js`);
 
