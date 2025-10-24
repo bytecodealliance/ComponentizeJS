@@ -51,6 +51,7 @@ jobs:
         os:
           - windows-latest
           - ubuntu-latest
+          - macos-latest
     steps:
       - uses: actions/checkout@v4
 
