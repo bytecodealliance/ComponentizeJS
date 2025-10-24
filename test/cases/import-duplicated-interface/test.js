@@ -11,3 +11,7 @@ export function test(instance) {
   );
   strictEqual(instance.exports.hello('unknown'), 'world unknown unknown');
 }
+
+export function importNameOverride(importName) {
+  return importName.replace('/', '-').replace(':', '-');
+}

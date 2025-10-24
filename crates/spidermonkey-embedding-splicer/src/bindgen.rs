@@ -1299,7 +1299,23 @@ fn binding_name(func_name: &str, iface_name: &Option<String>) -> String {
     }
 }
 
+/// Determine the binding name of a given import
+/// example wit:
+/// package local:hello;
+/// interface greeter {
+///   greet(name: string): string;
+/// }
+/// word main {
+///  export greeter;
+/// }
+///
+/// # Arguments
+/// * `func_name` - function name (e.g. `greet`)
+/// * `iface_name` - an interface name, if present (e.g. `greeter`)
+/// * `import_name` - qualified import specifier (e.g. `local:hello`)
+///
 fn binding_name_import(func_name: &str, iface_name: &Option<String>, import_name: &str) -> String {
+    // import_name is only valid when FunctionKind is Freestanding
     if import_name != "<<INVALID>>" {
         let valid_import = import_name
             .chars()
