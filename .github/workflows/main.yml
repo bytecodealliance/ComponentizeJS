@@ -46,6 +46,8 @@ jobs:
       matrix:
         node-version:
           - '24.10.0'
+        rust-version:
+          - 'stable'
         os:
           - windows-latest
           - ubuntu-latest
@@ -64,8 +66,8 @@ jobs:
       - name: Install Rust Toolchain
         if: steps.splicer-build.outputs.cache-hit != 'true'
         run: |
-          rustup toolchain install 1.80.0
-          rustup target add wasm32-wasip1 --toolchain 1.80.0
+          rustup toolchain install ${{ matrix.rust-version }}
+          rustup target add wasm32-wasip1 --toolchain ${{ matrix.rust-version }}
           rustup target add wasm32-wasip1
 
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
@@ -90,6 +92,8 @@ jobs:
       matrix:
         node-version:
           - '24.10.0'
+        rust-version:
+          - 'stable'
         os:
           # NOTE: at present the build does *not* work on windows. Required binaries are built here
           # (only on linux) and reused in later steps
@@ -115,8 +119,8 @@ jobs:
       - name: Install Rust Toolchain
         if: steps.starlingmonkey-build.outputs.cache-hit != 'true'
         run: |
-          rustup toolchain install 1.80.0
-          rustup target add wasm32-wasip1 --toolchain 1.80.0
+          rustup toolchain install ${{ matrix.rust-version }}
+          rustup target add wasm32-wasip1 --toolchain ${{ matrix.rust-version }}
           rustup target add wasm32-wasip1
 
       - name: Install wasm-tools
