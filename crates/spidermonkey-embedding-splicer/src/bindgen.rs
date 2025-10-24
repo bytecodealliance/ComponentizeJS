@@ -174,7 +174,7 @@ pub fn componentize_bindgen(
     let mut import_bindings = Vec::new();
     for (specifier, item) in bindgen.imports.iter() {
         // this import binding order matters
-        import_bindings.push(binding_name_import(
+        import_bindings.push(generate_binding_name_import(
             &item.resource.func_name(&item.name),
             &item.iface_name,
             specifier,
@@ -205,8 +205,11 @@ pub fn componentize_bindgen(
             let item = items.first().unwrap();
             if let Some(resource) = resource {
                 let export_name = resource.to_upper_camel_case();
-                let binding_name =
-                    binding_name_import(&export_name, &item.iface_name, &item.binding_name);
+                let binding_name = generate_binding_name_import(
+                    &export_name,
+                    &item.iface_name,
+                    &item.binding_name,
+                );
                 if item.iface {
                     specifier_list.push(format!("{export_name}: import_{binding_name}"));
                 } else {
@@ -655,11 +658,12 @@ impl JsBindgen<'_> {
         let fn_name = func.item_name();
         let fn_camel_name = fn_name.to_lower_camel_case();
 
-        use binding_name_import as binding_name_fn;
+        use generate_binding_name_import as binding_name_fn;
 
         let (binding_name, resource) = match &func.kind {
             FunctionKind::Freestanding => {
-                let binding_name = binding_name_import(&fn_camel_name, &iface_name, &import_name);
+                let binding_name =
+                    generate_binding_name_import(&fn_camel_name, &iface_name, &import_name);
 
                 uwrite!(self.src, "\nfunction import_{binding_name}");
 
@@ -1314,7 +1318,11 @@ fn binding_name(func_name: &str, iface_name: &Option<String>) -> String {
 /// * `iface_name` - an interface name, if present (e.g. `greeter`)
 /// * `import_name` - qualified import specifier (e.g. `local:hello`)
 ///
-fn binding_name_import(func_name: &str, iface_name: &Option<String>, import_name: &str) -> String {
+fn generate_binding_name_import(
+    func_name: &str,
+    iface_name: &Option<String>,
+    import_name: &str,
+) -> String {
     // import_name is only valid when FunctionKind is Freestanding
     if import_name != "<<INVALID>>" {
         let valid_import = import_name
