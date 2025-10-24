@@ -97,6 +97,8 @@ suite('Bindings', async () => {
           if (impt.startsWith('wasi:')) continue;
           if (impt.startsWith('[')) impt = impt.slice(impt.indexOf(']') + 1);
           let importName = impt.split('/').pop();
+          if (testcase.importNameOverride)
+            importName = testcase.importNameOverride(impt);
           if (importName === 'test') importName = 'imports';
           map[impt] = `../../cases/${name}/${importName}.js`;
         }

@@ -172,11 +172,12 @@ pub fn componentize_bindgen(
     // consolidate import specifiers and generate wrappers
     // we do this separately because function index order matters
     let mut import_bindings = Vec::new();
-    for (_, item) in bindgen.imports.iter() {
+    for (specifier, item) in bindgen.imports.iter() {
         // this import binding order matters
-        import_bindings.push(binding_name(
+        import_bindings.push(generate_binding_name_import(
             &item.resource.func_name(&item.name),
             &item.iface_name,
+            specifier,
         ));
     }
 
@@ -204,7 +205,11 @@ pub fn componentize_bindgen(
             let item = items.first().unwrap();
             if let Some(resource) = resource {
                 let export_name = resource.to_upper_camel_case();
-                let binding_name = binding_name(&export_name, &item.iface_name);
+                let binding_name = generate_binding_name_import(
+                    &export_name,
+                    &item.iface_name,
+                    &item.binding_name,
+                );
                 if item.iface {
                     specifier_list.push(format!("{export_name}: import_{binding_name}"));
                 } else {
@@ -213,13 +218,12 @@ pub fn componentize_bindgen(
             } else {
                 for BindingItem {
                     iface,
-                    iface_name,
                     name,
+                    binding_name,
                     ..
                 } in items
                 {
                     let export_name = name.to_lower_camel_case();
-                    let binding_name = binding_name(&export_name, iface_name);
                     if *iface {
                         specifier_list.push(format!("{export_name}: import_{binding_name}"));
                     } else {
@@ -654,11 +658,12 @@ impl JsBindgen<'_> {
         let fn_name = func.item_name();
         let fn_camel_name = fn_name.to_lower_camel_case();
 
-        use binding_name as binding_name_fn;
+        use generate_binding_name_import as binding_name_fn;
 
         let (binding_name, resource) = match &func.kind {
             FunctionKind::Freestanding => {
-                let binding_name = binding_name(&fn_camel_name, &iface_name);
+                let binding_name =
+                    generate_binding_name_import(&fn_camel_name, &iface_name, &import_name);
 
                 uwrite!(self.src, "\nfunction import_{binding_name}");
 
@@ -702,7 +707,11 @@ impl JsBindgen<'_> {
             func.params.len(),
             &format!(
                 "$import_{}",
-                binding_name_fn(&resource.func_name(fn_name), &iface_name)
+                binding_name_fn(
+                    &resource.func_name(fn_name),
+                    &iface_name,
+                    import_name.as_str()
+                )
             ),
             StringEncoding::UTF8,
             func,
@@ -1291,6 +1300,40 @@ fn binding_name(func_name: &str, iface_name: &Option<String>) -> String {
     match iface_name {
         Some(iface_name) => format!("{iface_name}${func_name}"),
         None => func_name.to_string(),
+    }
+}
+
+/// Determine the binding name of a given import
+/// example wit:
+/// package local:hello;
+/// interface greeter {
+///   greet(name: string): string;
+/// }
+/// word main {
+///  export greeter;
+/// }
+///
+/// # Arguments
+/// * `func_name` - function name (e.g. `greet`)
+/// * `iface_name` - an interface name, if present (e.g. `greeter`)
+/// * `import_name` - qualified import specifier (e.g. `local:hello`)
+///
+fn generate_binding_name_import(
+    func_name: &str,
+    iface_name: &Option<String>,
+    import_name: &str,
+) -> String {
+    // import_name is only valid when FunctionKind is Freestanding
+    if import_name != "<<INVALID>>" {
+        let valid_import = import_name
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '_' })
+            .collect::<String>();
+        format!("{valid_import}${func_name}")
+    } else if let Some(iface_name) = iface_name {
+        format!("{iface_name}${func_name}")
+    } else {
+        func_name.to_string()
     }
 }
 

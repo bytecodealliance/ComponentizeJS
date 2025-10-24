@@ -1,0 +1,10 @@
+package test:test;
+
+world hello {
+  import local:hello/hello;
+  import local:hello-second/hello;
+
+  export exports: interface {
+    hello: func(name: string) -> string;
+  }
+}
