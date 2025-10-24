@@ -209,13 +209,15 @@ jobs:
           npm run test:${{matrix.build-type}}
 
   test-example:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs:
       - build
     strategy:
       matrix:
         node-version:
           - '24.10.0'
+        os:
+          - ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -234,7 +236,7 @@ jobs:
         uses: actions/cache/restore@v4
         id: splicer-build
         with:
-          key: splicer-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
+          key: splicer-${{ matrix.os }}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
           path: |
             lib
             target
