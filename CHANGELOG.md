@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.19.3] - 2025-10-27
+
+### 🐛 Bug Fixes
+
+* move jco dependency back to active (#315) by @vados-cosmonic in #315
+
+* *(ci)* miscellaneous improvements to CI and tests (#310) by @vados-cosmonic in #310
+
+* duplicated function names for same interfaces and export (#306) by @SanderVanRiessen in #306
+
+
+### Other Changes
+
+* *(other changes)* Updated orca_wasm into wirm latest version (#300) by @EngoDev in #300
+
+
+
+## New Contributors
+* @EngoDev made their first contribution in [#300](https://github.com/bytecodealliance/ComponentizeJS/pull/300)
+* @SanderVanRiessen made their first contribution in [#306](https://github.com/bytecodealliance/ComponentizeJS/pull/306)
+
+
 ## [0.19.2] - 2025-10-17
 
 ### 🚀 Features
