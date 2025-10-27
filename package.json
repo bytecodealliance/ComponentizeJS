@@ -1,6 +1,6 @@
 {
   "name": "@bytecodealliance/componentize-js",
-  "version": "0.19.2",
+  "version": "0.19.3",
   "homepage": "https://github.com/bytecodealliance/componentize-js#readme",
   "description": "ESM -> WebAssembly Component creator, via a SpiderMonkey JS engine embedding",
   "type": "module",
