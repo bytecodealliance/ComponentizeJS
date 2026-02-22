@@ -141,8 +141,6 @@ cabi_realloc_adapter(void *ptr, size_t orig_size, size_t org_align,
 __attribute__((export_name("cabi_realloc"))) void *
 cabi_realloc(void *ptr, size_t orig_size, size_t org_align, size_t new_size) {
   void *ret = JS_realloc(Runtime.cx, ptr, orig_size, new_size);
-  // track all allocations during a function "call" for freeing
-  Runtime.free_list.push_back(ret);
   if (!ret) {
     Runtime.engine->abort("(cabi_realloc) Unable to realloc");
   }
@@ -233,6 +231,7 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
   if (fn->retptr) {
     LOG("(call) setting retptr at arg %d\n", argcnt);
     retptr = cabi_realloc(nullptr, 0, 4, fn->retsize);
+    Runtime.free_list.push_back(retptr);
     args[argcnt].setInt32((uint32_t)retptr);
   }
 
@@ -295,6 +294,7 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
   if (!fn->retptr && fn->ret.has_value()) {
     LOG("(call) singular return");
     retptr = cabi_realloc(0, 0, 4, fn->retsize);
+    Runtime.free_list.push_back(retptr);
     switch (fn->ret.value()) {
     case CoreVal::I32:
       *((uint32_t *)retptr) = ret.toInt32();
