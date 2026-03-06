@@ -16,6 +16,7 @@ export async function componentizeCmd(jsSource, opts) {
     debugBindings: opts.debugBindings,
     debugBuild: opts.useDebugBuild,
     enableWizerLogging: opts.enableWizerLogging,
+    wizerBin: opts.wizerBin,
   });
   await writeFile(opts.out, component);
 }
@@ -42,6 +43,10 @@ program
   .option(
     '--enable-wizer-logging',
     'enable debug logging for calls in the generated component',
+  )
+  .option(
+    '--wizer-bin <path>',
+    'specify a path to a local wizer binary',
   )
   .requiredOption('-o, --out <out>', 'output component file')
   .action(asyncAction(componentizeCmd));
