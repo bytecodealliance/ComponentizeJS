@@ -4,7 +4,7 @@ import {
   OutgoingBody,
   OutgoingResponse,
   Fields,
-} from 'wasi:http/types@0.2.3';
+} from 'wasi:http/types@0.2.10';
 
 export const incomingHandler = {
   handle(incomingRequest, responseOutparam) {

@@ -22,8 +22,8 @@ suite('WASI', () => {
     const { instance } = await setupComponent({
       componentize: {
         src: `
-      import { now } from 'wasi:clocks/wall-clock@0.2.3';
-      import { getRandomBytes } from 'wasi:random/random@0.2.3';
+      import { now } from 'wasi:clocks/wall-clock@0.2.10';
+      import { getRandomBytes } from 'wasi:random/random@0.2.10';
 
       let result;
       export const run = {
