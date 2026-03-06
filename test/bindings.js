@@ -9,6 +9,7 @@ import { suite, test } from 'vitest';
 import {
   DEBUG_TRACING_ENABLED,
   DEBUG_TEST_ENABLED,
+  WEVAL_TEST_ENABLED,
   maybeLogging,
 } from './util.js';
 
@@ -79,6 +80,7 @@ suite('Bindings', async () => {
           enableFeatures,
           disableFeatures: maybeLogging(disableFeatures),
           debugBuild: DEBUG_TEST_ENABLED,
+          enableAot: WEVAL_TEST_ENABLED,
         });
 
         const map = {
