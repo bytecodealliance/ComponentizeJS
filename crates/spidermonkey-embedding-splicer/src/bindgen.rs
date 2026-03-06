@@ -359,8 +359,6 @@ pub fn componentize_bindgen(
             let repCnt = 1;
             let repTable = new Map();
 
-            contentGlobal.Symbol.dispose = Symbol.dispose = Symbol.for('dispose');
-
             let [$memory, $realloc{}] = $bindings;
             delete globalThis.$bindings;
 

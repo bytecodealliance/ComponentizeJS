@@ -1,7 +1,7 @@
 import { MyFloat as ImportFloat } from "resource-floats-imports";
 import { MyFloat as ImportFloat2 } from "test:test/resource-floats";
 
-const symbolDispose = Symbol.for('dispose');
+const symbolDispose = Symbol.dispose;
 
 class MyFloat {
     constructor(value) {
