@@ -266,7 +266,7 @@ export async function componentize(
 
   // Ensure source path is relative to workspacePrefix for the args list,
   // regardless of the directory
-  if (resolve(sourcePath).startsWith(resolve(workspacePrefix))) {
+  if (!opts.enableAot && resolve(sourcePath).startsWith(resolve(workspacePrefix))) {
       sourcePath = relative(workspacePrefix, sourcePath);
   }
 
