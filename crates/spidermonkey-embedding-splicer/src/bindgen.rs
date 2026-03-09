@@ -1119,10 +1119,10 @@ impl EsmBindgen {
             };
             if let Some(alias) = interface_name_from_string(expt_name_sans_version)
                 && !self.exports.contains_key(&alias)
-                    && !self.export_aliases.values().any(|_alias| &alias == _alias)
-                {
-                    self.export_aliases.insert(expt_name.to_string(), alias);
-                }
+                && !self.export_aliases.values().any(|_alias| &alias == _alias)
+            {
+                self.export_aliases.insert(expt_name.to_string(), alias);
+            }
         }
     }
 
