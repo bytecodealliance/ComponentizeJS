@@ -1117,13 +1117,12 @@ impl EsmBindgen {
             } else {
                 expt_name
             };
-            if let Some(alias) = interface_name_from_string(expt_name_sans_version) {
-                if !self.exports.contains_key(&alias)
+            if let Some(alias) = interface_name_from_string(expt_name_sans_version)
+                && !self.exports.contains_key(&alias)
                     && !self.export_aliases.values().any(|_alias| &alias == _alias)
                 {
                     self.export_aliases.insert(expt_name.to_string(), alias);
                 }
-            }
         }
     }
 
@@ -1292,12 +1291,12 @@ fn interface_name_from_string(name: &str) -> Option<String> {
     let name = &name[path_idx + 1..];
     let at_idx = name.rfind('@');
     let alias = name[..at_idx.unwrap_or(name.len())].to_lower_camel_case();
-    let iface_name = Some(if let Some(at_idx) = at_idx {
+
+    Some(if let Some(at_idx) = at_idx {
         format!("{alias}_{}", name[at_idx + 1..].replace(['.', '-'], "_"))
     } else {
         alias
-    });
-    iface_name
+    })
 }
 
 fn binding_name(func_name: &str, iface_name: &Option<String>) -> String {

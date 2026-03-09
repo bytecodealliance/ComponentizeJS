@@ -563,11 +563,11 @@ fn synthesize_import_functions(
 
             // stack the return arg now as it chains with the
             // args we're about to add to the stack
-            if impt_sig.ret.is_some() {
+            if let Some(ret) = impt_sig.ret {
                 func.local_get(vp_arg);
 
                 // if an i64 return, then we need to stack the extra BigInt constructor arg for that now
-                if matches!(impt_sig.ret.unwrap(), CoreTy::I64) {
+                if matches!(ret, CoreTy::I64) {
                     func.local_get(ctx_arg);
                 }
             }
@@ -726,7 +726,7 @@ fn synthesize_import_functions(
 
         // create imported function table
         let els = module.elements.iter_mut().next().unwrap();
-        if let ElementItems::Functions(ref mut funcs) = &mut els.items {
+        if let ElementItems::Functions(funcs) = &mut els.items {
             for fid in import_fnids {
                 funcs.push(fid);
             }
