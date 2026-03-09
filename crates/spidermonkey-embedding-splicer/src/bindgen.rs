@@ -6,7 +6,7 @@ use heck::*;
 use js_component_bindgen::function_bindgen::{
     ErrHandling, FunctionBindgen, ResourceData, ResourceMap, ResourceTable,
 };
-use js_component_bindgen::intrinsics::{render_intrinsics, Intrinsic};
+use js_component_bindgen::intrinsics::{Intrinsic, render_intrinsics};
 use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
 use wit_bindgen_core::abi::{self, LiftLower};
@@ -1238,9 +1238,15 @@ impl EsmBindgen {
                             "verifyInterfaceFn"
                         };
                         if let Some(alias) = self.export_aliases.get(export_name) {
-                            uwriteln!(bind_exports, "{verify_name}({local_name}, '{export_name}', '{external_name}', '{alias}');");
+                            uwriteln!(
+                                bind_exports,
+                                "{verify_name}({local_name}, '{export_name}', '{external_name}', '{alias}');"
+                            );
                         } else {
-                            uwriteln!(bind_exports, "{verify_name}({local_name}, '{export_name}', '{external_name}', null);");
+                            uwriteln!(
+                                bind_exports,
+                                "{verify_name}({local_name}, '{export_name}', '{external_name}', null);"
+                            );
                         };
                     }
                 }

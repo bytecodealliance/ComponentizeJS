@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use wit_parser::{PackageId, Resolve};
 
 pub mod bindgen;

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use wasmparser::{MemArg, TypeRef};
 use wirm::ir::function::FunctionBuilder;
 use wirm::ir::id::{FunctionID, LocalID};

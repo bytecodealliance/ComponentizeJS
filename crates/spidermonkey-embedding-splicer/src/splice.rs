@@ -6,14 +6,15 @@ use wasmparser::ExternalKind;
 use wasmparser::MemArg;
 use wasmparser::Operator;
 use wirm::ir::function::{FunctionBuilder, FunctionModifier};
-use wirm::ir::id::{ExportsID, FunctionID, LocalID};
+use wirm::ir::id::{ExportsID, FunctionID, GlobalID, LocalID};
 use wirm::ir::module::Module;
-use wirm::ir::types::{BlockType, ElementItems, InstrumentationMode};
+use wirm::ir::module::module_globals::GlobalKind;
+use wirm::ir::types::{BlockType, ElementItems, InitInstr, InstrumentationMode, Value};
 use wirm::module_builder::AddLocal;
 use wirm::opcode::{Inject, InjectAt};
 use wirm::{DataType, Opcode};
-use wit_component::metadata::{decode, Bindgen};
 use wit_component::StringEncoding;
+use wit_component::metadata::{Bindgen, decode};
 use wit_parser::Resolve;
 
 use crate::bindgen::BindingItem;
@@ -757,7 +758,27 @@ fn synthesize_import_functions(
             .get_fn_modifier(coreabi_get_import_fid)
             .unwrap();
 
-        // Find the I32Const base index and compute the delta to new base
+        // Save the idx parameter to local at the start of the function,
+        // so that orignal code does not oeverwrit it.
+        let idx_local = builder.add_local(DataType::I32);
+        builder.inject_at(
+            0,
+            InstrumentationMode::Before,
+            Operator::LocalGet {
+                local_index: *arg_idx,
+            },
+        );
+        builder.inject_at(
+            0,
+            InstrumentationMode::Before,
+            Operator::LocalSet {
+                local_index: *idx_local,
+            },
+        );
+
+        // Find the I32Const base index and compute the delta to new base.
+        // The codegen may split the base index into:
+        // `global.get N` + `i32.const X` where the global is a constant.
         let mut table_instr_idx = 0usize;
         let mut delta: i32 = 0;
         {
@@ -769,7 +790,20 @@ fn synthesize_import_functions(
                     if *value < 1000 || *value > 5000 {
                         continue;
                     }
-                    delta = import_fn_table_start_idx - *value;
+                    // Check if instruction just before is a global.get with a
+                    // constant value and if so, include the global's init value
+                    // in the base computation.
+                    let mut base = *value;
+                    if idx > 0
+                        && let Operator::GlobalGet { global_index } = &ops_ro[idx - 1]
+                        && let GlobalKind::Local(local_global) =
+                            module.globals.get_kind(GlobalID(*global_index))
+                        && let [InitInstr::Value(Value::I32(v))] =
+                            local_global.init_expr.instructions()
+                    {
+                        base += v;
+                    }
+                    delta = import_fn_table_start_idx - base;
                     table_instr_idx = idx;
                     break;
                 }
@@ -780,7 +814,7 @@ fn synthesize_import_functions(
             table_instr_idx,
             InstrumentationMode::Before,
             Operator::LocalGet {
-                local_index: *arg_idx,
+                local_index: *idx_local,
             },
         );
         builder.inject_at(
