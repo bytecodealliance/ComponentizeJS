@@ -184,19 +184,13 @@ jobs:
 
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: ">=22"
-
-      - name: Add npmrc
-        run: |
-          echo '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' > .npmrc
+          node-version: ">=24"
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: artifacts
 
       - name: Publish componentize-js to NPM
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
         shell: bash
         run: |
           export PACKAGE_FILE_PATH=${{ github.workspace }}/artifacts/artifact/${{ needs.meta.outputs.artifact-name }}
