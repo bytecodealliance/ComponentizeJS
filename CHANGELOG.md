@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.19.4-rc.1] - 2026-03-10
+
+### 🚀 Features
+
+* *(ci)* enable trusted publishing (#328) by @vados-cosmonic in #328
+
+
+
+
 ## [0.19.4-rc.0] - 2026-03-10
 
 ### 🚀 Features
