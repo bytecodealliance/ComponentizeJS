@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.19.4-rc.0] - 2026-03-10
+
+### 🚀 Features
+
+* support easy use of custom wizer bin (#323) by @vados-cosmonic in #323
+
+
+### ⚙️ Miscellaneous Tasks
+
+* update codeowners (#326) by @vados-cosmonic in #326
+
+
+
+
 ## [0.19.3] - 2025-10-27
 
 ### 🐛 Bug Fixes
