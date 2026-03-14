@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 wit_bindgen::generate!({
     world: "spidermonkey-embedding-splicer",

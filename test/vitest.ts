@@ -40,5 +40,6 @@ export default defineConfig({
     testTimeout: TIMEOUT_MS,
     hookTimeout: TIMEOUT_MS,
     teardownTimeout: TIMEOUT_MS,
+    retry: RETRY,
   },
 });
