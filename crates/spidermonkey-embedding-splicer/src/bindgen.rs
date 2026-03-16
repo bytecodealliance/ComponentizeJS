@@ -6,7 +6,7 @@ use heck::*;
 use js_component_bindgen::function_bindgen::{
     ErrHandling, FunctionBindgen, ResourceData, ResourceMap, ResourceTable,
 };
-use js_component_bindgen::intrinsics::{render_intrinsics, Intrinsic};
+use js_component_bindgen::intrinsics::{Intrinsic, render_intrinsics};
 use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
 use wit_bindgen_core::abi::{self, LiftLower};
@@ -358,8 +358,6 @@ pub fn componentize_bindgen(
 
             let repCnt = 1;
             let repTable = new Map();
-
-            contentGlobal.Symbol.dispose = Symbol.dispose = Symbol.for('dispose');
 
             let [$memory, $realloc{}] = $bindings;
             delete globalThis.$bindings;
@@ -1119,12 +1117,11 @@ impl EsmBindgen {
             } else {
                 expt_name
             };
-            if let Some(alias) = interface_name_from_string(expt_name_sans_version) {
-                if !self.exports.contains_key(&alias)
-                    && !self.export_aliases.values().any(|_alias| &alias == _alias)
-                {
-                    self.export_aliases.insert(expt_name.to_string(), alias);
-                }
+            if let Some(alias) = interface_name_from_string(expt_name_sans_version)
+                && !self.exports.contains_key(&alias)
+                && !self.export_aliases.values().any(|_alias| &alias == _alias)
+            {
+                self.export_aliases.insert(expt_name.to_string(), alias);
             }
         }
     }
@@ -1240,9 +1237,15 @@ impl EsmBindgen {
                             "verifyInterfaceFn"
                         };
                         if let Some(alias) = self.export_aliases.get(export_name) {
-                            uwriteln!(bind_exports, "{verify_name}({local_name}, '{export_name}', '{external_name}', '{alias}');");
+                            uwriteln!(
+                                bind_exports,
+                                "{verify_name}({local_name}, '{export_name}', '{external_name}', '{alias}');"
+                            );
                         } else {
-                            uwriteln!(bind_exports, "{verify_name}({local_name}, '{export_name}', '{external_name}', null);");
+                            uwriteln!(
+                                bind_exports,
+                                "{verify_name}({local_name}, '{export_name}', '{external_name}', null);"
+                            );
                         };
                     }
                 }
@@ -1288,12 +1291,12 @@ fn interface_name_from_string(name: &str) -> Option<String> {
     let name = &name[path_idx + 1..];
     let at_idx = name.rfind('@');
     let alias = name[..at_idx.unwrap_or(name.len())].to_lower_camel_case();
-    let iface_name = Some(if let Some(at_idx) = at_idx {
+
+    Some(if let Some(at_idx) = at_idx {
         format!("{alias}_{}", name[at_idx + 1..].replace(['.', '-'], "_"))
     } else {
         alias
-    });
-    iface_name
+    })
 }
 
 fn binding_name(func_name: &str, iface_name: &Option<String>) -> String {

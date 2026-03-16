@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use wasmparser::{MemArg, TypeRef};
 use wirm::ir::function::FunctionBuilder;
 use wirm::ir::id::{FunctionID, LocalID};
@@ -15,7 +15,7 @@ use wit_parser::Resolve;
 use crate::parse_wit;
 use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::Feature;
 
-const WASI_VERSIONS: [&str; 4] = ["0.2.0", "0.2.1", "0.2.2", "0.2.3"];
+const WASI_VERSIONS: [&str; 5] = ["0.2.0", "0.2.1", "0.2.2", "0.2.3", "0.2.10"];
 
 fn stub_wasi_imports<StubFn>(
     module: &mut Module,

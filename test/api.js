@@ -10,6 +10,7 @@ import { setupComponent } from "./util.js";
 import {
     DEBUG_TRACING_ENABLED,
     DEBUG_TEST_ENABLED,
+    WEVAL_TEST_ENABLED,
 } from './util.js';
 
 suite('API', () => {
@@ -27,6 +28,7 @@ suite('API', () => {
                     witPath: fileURLToPath(new URL('./wit', import.meta.url)),
                     worldName: 'test1',
                     debugBuild: DEBUG_TEST_ENABLED,
+                    enableAot: WEVAL_TEST_ENABLED,
                 },
             },
             transpile: {

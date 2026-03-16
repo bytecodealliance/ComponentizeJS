@@ -14,6 +14,7 @@ import { setupComponent } from "./util.js";
 import {
   DEBUG_TRACING_ENABLED,
   DEBUG_TEST_ENABLED,
+  WEVAL_TEST_ENABLED,
 } from './util.js';
 
 suite('WASI', () => {
@@ -21,8 +22,8 @@ suite('WASI', () => {
     const { instance } = await setupComponent({
       componentize: {
         src: `
-      import { now } from 'wasi:clocks/wall-clock@0.2.3';
-      import { getRandomBytes } from 'wasi:random/random@0.2.3';
+      import { now } from 'wasi:clocks/wall-clock@0.2.10';
+      import { getRandomBytes } from 'wasi:random/random@0.2.10';
 
       let result;
       export const run = {
@@ -38,6 +39,7 @@ suite('WASI', () => {
           witPath: fileURLToPath(new URL('./wit', import.meta.url)),
           worldName: 'test1',
           debugBuild: DEBUG_TEST_ENABLED,
+          enableAot: WEVAL_TEST_ENABLED,
         },
       },
       transpile: {
@@ -66,6 +68,7 @@ suite('WASI', () => {
           witPath: fileURLToPath(new URL('./wit', import.meta.url)),
           worldName: 'test1',
           debugBuild: DEBUG_TEST_ENABLED,
+          enableAot: WEVAL_TEST_ENABLED,
         },
       },
       transpile: {
