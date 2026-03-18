@@ -16,12 +16,13 @@ export async function componentizeCmd(jsSource, opts) {
     debugBindings: opts.debugBindings,
     debugBuild: opts.useDebugBuild,
     enableWizerLogging: opts.enableWizerLogging,
+    wizerBin: opts.wizerBin,
   });
   await writeFile(opts.out, component);
 }
 
 program
-  .version('0.19.3')
+  .version('0.19.4-rc.1')
   .description('Create a component from a JavaScript module')
   .usage('<js-source> --wit wit-world.wit -o <component-path>')
   .argument('<js-source>', 'JS source file to build')
@@ -42,6 +43,10 @@ program
   .option(
     '--enable-wizer-logging',
     'enable debug logging for calls in the generated component',
+  )
+  .option(
+    '--wizer-bin <path>',
+    'specify a path to a local wizer binary',
   )
   .requiredOption('-o, --out <out>', 'output component file')
   .action(asyncAction(componentizeCmd));
