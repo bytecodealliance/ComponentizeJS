@@ -351,6 +351,8 @@ Before being able to use `componentize-js` with AOT support (ex. via `npm link`,
 npm run build:weval
 ```
 
+(`npm run build` will also execute the weval build)
+
 This will produce `lib/starlingmonkey_embedding_weval.wasm` and `lib/starlingmonkey_ics.wevalcache`.
 
 To clean up a local installation (i.e. remove the installation of StarlingMonkey):

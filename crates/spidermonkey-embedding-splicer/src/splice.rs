@@ -759,7 +759,7 @@ fn synthesize_import_functions(
             .unwrap();
 
         // Save the idx parameter to local at the start of the function,
-        // so that orignal code does not oeverwrit it.
+        // so that original code does not overwrite it.
         let idx_local = builder.add_local(DataType::I32);
         builder.inject_at(
             0,

@@ -12,12 +12,16 @@ export async function componentizeCmd(jsSource, opts) {
     worldName: opts.worldName,
     runtimeArgs: opts.runtimeArgs,
     enableAot: opts.aot,
+    engine: opts.engine,
     disableFeatures: opts.disable,
     preview2Adapter: opts.preview2Adapter,
     debugBindings: opts.debugBindings,
     debugBuild: opts.useDebugBuild,
     enableWizerLogging: opts.enableWizerLogging,
     wizerBin: opts.wizerBin,
+    wevalBin: opts.wevalBin,
+    aotCache: opts.aotCacheDir,
+    aotMinStackSizeBytes: opts.aotMinStackSize,
   });
   await writeFile(opts.out, component);
 }
@@ -31,6 +35,10 @@ program
   .option('-n, --world-name <name>', 'WIT world to build')
   .option('--runtime-args <string>', 'arguments to pass to the runtime')
   .option('--aot', 'enable AOT compilation')
+  .option(
+    '--engine <path>',
+    'provide a custom ComponentizeJS engine build path',
+  )
   .addOption(
     new Option('-d, --disable <feature...>', 'disable WASI features').choices(
       DEFAULT_FEATURES,
@@ -49,6 +57,18 @@ program
   .option(
     '--wizer-bin <path>',
     'specify a path to a local wizer binary',
+  )
+  .option(
+    '--weval-bin <path>',
+    'specify a path to a local weval binary',
+  )
+  .option(
+    '--aot-cache-dir <path>',
+    'specify a custom AOT weval cache path',
+  )
+  .option(
+    '--aot-min-stack-size <bytes>',
+    'set the minimum stack size (RUST_MIN_STACK) for weval AOT compilation',
   )
   .requiredOption('-o, --out <out>', 'output component file')
   .action(asyncAction(componentizeCmd));
