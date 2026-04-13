@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.20.0-rc.0] - 2026-04-13
+
+### 🐛 Bug Fixes
+
+* use-after-free in cabi_realloc free_list on repeated export calls (#319) by @chaynabors in #319
+
+
+### Other Changes
+
+* *(other changes)* Update StarlingMonkey (#325) by @andreiltd in #325
+
+
+
+## New Contributors
+* @chaynabors made their first contribution in [#319](https://github.com/bytecodealliance/ComponentizeJS/pull/319)
+
+
 ## [0.19.4-rc.1] - 2026-03-10
 
 ### 🚀 Features
