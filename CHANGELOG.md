@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.20.0] - 2026-04-14
+
+### 🚀 Features
+
+* *(ci)* enable trusted publishing (#328) by @vados-cosmonic in #328
+
+* support easy use of custom wizer bin (#323) by @vados-cosmonic in #323
+
+
+### 🐛 Bug Fixes
+
+* use-after-free in cabi_realloc free_list on repeated export calls (#319) by @chaynabors in #319
+
+
+### ⚙️ Miscellaneous Tasks
+
+* update codeowners (#326) by @vados-cosmonic in #326
+
+
+### Other Changes
+
+* *(other changes)* Update StarlingMonkey (#325) by @andreiltd in #325
+
+
+
+## New Contributors
+* @chaynabors made their first contribution in [#319](https://github.com/bytecodealliance/ComponentizeJS/pull/319)
+
+
 ## [0.20.0-rc.0] - 2026-04-13
 
 ### 🐛 Bug Fixes
