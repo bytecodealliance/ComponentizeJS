@@ -281,6 +281,7 @@ export async function componentize(
   }
 
   let postProcess;
+  let postProcessName;
   if (opts.enableAot) {
     // Determine the weval bin path, possibly using a pre-downloaded version
     let wevalBin;
@@ -302,6 +303,7 @@ export async function componentize(
       env.RUST_MIN_STACK = defaultMinStackSize();
     }
 
+    postProcessName = `weval (${wevalBin})`;
     postProcess = spawnSync(
       wevalBin,
       [
@@ -323,6 +325,7 @@ export async function componentize(
     );
   } else {
     const wizerBin = opts.wizerBin ?? wizer;
+    postProcessName = `wizer (${wizerBin})`;
     postProcess = spawnSync(
       wizerBin,
       [
@@ -345,9 +348,15 @@ export async function componentize(
   }
 
   // If the wizer (or weval) process failed, parse the output and display to the user
-  if (postProcess.status !== 0) {
-    let wizerErr = parseWizerStderr(postProcess.stderr);
-    let err = `Failed to initialize component:\n${wizerErr}`;
+  if (postProcess.status !== 0 || postProcess.signal) {
+    let procErr = parseWizerStderr(postProcess.stderr);
+    if (postProcess.signal) {
+      procErr += `\nProcess was killed by signal: ${postProcess.signal}`;
+    }
+    if (postProcess.error) {
+      procErr += `\nProcess error: ${postProcess.error.message}`;
+    }
+    let err = `Failed to initialize component (${postProcessName}):\n${procErr}`;
     if (debugBindings) {
       err += `\n\nBinary and sources available for debugging at ${workDir}\n`;
     } else {
