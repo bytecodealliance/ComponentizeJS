@@ -6,7 +6,10 @@ use heck::*;
 use js_component_bindgen::function_bindgen::{
     ErrHandling, FunctionBindgen, ResourceData, ResourceMap, ResourceTable,
 };
-use js_component_bindgen::intrinsics::{Intrinsic, render_intrinsics};
+use js_component_bindgen::intrinsics::{
+    AsyncDeterminismProfile, Intrinsic, RenderIntrinsicsArgs, render_intrinsics,
+};
+use js_component_bindgen::TranspileOpts;
 use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
 use wit_bindgen_core::abi::{self, LiftLower};
@@ -160,9 +163,8 @@ pub fn componentize_bindgen(
 
     bindgen.sizes.fill(resolve);
 
-    bindgen
-        .local_names
-        .exclude_globals(Intrinsic::get_global_names());
+    let globals: Vec<&str> = Intrinsic::get_global_names().into_iter().collect();
+    bindgen.local_names.exclude_globals(&globals);
 
     bindgen.imports_bindgen();
 
@@ -244,11 +246,7 @@ pub fn componentize_bindgen(
     let mut finalization_registries = Vec::new();
     for (key, export) in &resolve.worlds[wid].exports {
         let key_name = resolve.name_world_key(key);
-        if let WorldItem::Interface {
-            id: iface_id,
-            stability: _,
-        } = export
-        {
+        if let WorldItem::Interface { id: iface_id, .. } = export {
             let iface = &resolve.interfaces[*iface_id];
             for ty_id in iface.types.values() {
                 let ty = &resolve.types[*ty_id];
@@ -294,10 +292,7 @@ pub fn componentize_bindgen(
     for (key, import) in &resolve.worlds[wid].imports {
         let key_name = resolve.name_world_key(key);
         match import {
-            WorldItem::Interface {
-                id: iface_id,
-                stability: _,
-            } => {
+            WorldItem::Interface { id: iface_id, .. } => {
                 let iface = &resolve.interfaces[*iface_id];
                 for ty_id in iface.types.values() {
                     let ty = &resolve.types[*ty_id];
@@ -307,7 +302,7 @@ pub fn componentize_bindgen(
                 }
             }
             WorldItem::Function(_) => {}
-            WorldItem::Type(id) => {
+            WorldItem::Type { id, .. } => {
                 let ty = &resolve.types[*id];
                 if ty.kind == TypeDefKind::Resource {
                     imported_resource_modules.insert(*id, key_name.clone());
@@ -376,7 +371,14 @@ pub fn componentize_bindgen(
             .concat(),
     );
 
-    let js_intrinsics = render_intrinsics(&mut bindgen.all_intrinsics, false, true);
+    let transpile_opts = TranspileOpts::default();
+    let js_intrinsics = render_intrinsics(RenderIntrinsicsArgs {
+        intrinsics: &mut bindgen.all_intrinsics,
+        no_nodejs_compat: false,
+        instantiation: true,
+        determinism: AsyncDeterminismProfile::default(),
+        transpile_opts: &transpile_opts,
+    });
     output.push_str(&js_intrinsics);
     output.push_str(&bindgen.src);
 
@@ -424,7 +426,7 @@ impl JsBindgen<'_> {
                         func.name.to_lower_camel_case(),
                     );
                 }
-                WorldItem::Interface { id, stability: _ } => {
+                WorldItem::Interface { id, .. } => {
                     let iface = &self.resolve.interfaces[*id];
                     for id in iface.types.values() {
                         if let TypeDefKind::Resource = &self.resolve.types[*id].kind {
@@ -490,7 +492,7 @@ impl JsBindgen<'_> {
                 }
 
                 // ignore type exports for now
-                WorldItem::Type(_) => {}
+                WorldItem::Type { .. } => {}
             }
         }
         Ok(())
@@ -558,10 +560,7 @@ impl JsBindgen<'_> {
                     }
                     self.import_bindgen(import_name, f, false, None);
                 }
-                WorldItem::Interface {
-                    id: i,
-                    stability: _,
-                } => {
+                WorldItem::Interface { id: i, .. } => {
                     let iface = &self.resolve.interfaces[*i];
                     for id in iface.types.values() {
                         if let TypeDefKind::Resource = &self.resolve.types[*id].kind {
@@ -606,7 +605,7 @@ impl JsBindgen<'_> {
                         }
                     }
                 }
-                WorldItem::Type(id) => {
+                WorldItem::Type { id, .. } => {
                     let ty = &self.resolve.types[*id];
                     if ty.kind == TypeDefKind::Resource {
                         self.resource_directions
@@ -753,8 +752,8 @@ impl JsBindgen<'_> {
 
     fn create_resource_map(&self, func: &Function) -> ResourceMap {
         let mut resource_map = BTreeMap::new();
-        for (_, ty) in func.params.iter() {
-            self.iter_resources(ty, &mut resource_map);
+        for param in func.params.iter() {
+            self.iter_resources(&param.ty, &mut resource_map);
         }
         if let Some(ty) = func.result {
             self.iter_resources(&ty, &mut resource_map);
@@ -800,6 +799,7 @@ impl JsBindgen<'_> {
                         data: ResourceData::Guest {
                             resource_name: ty.name.clone().unwrap(),
                             prefix,
+                            extra: None,
                         },
                     },
                 );
@@ -834,7 +834,20 @@ impl JsBindgen<'_> {
             TypeDefKind::Type(ty) => {
                 self.iter_resources(ty, map);
             }
-            _ => unreachable!(),
+            TypeDefKind::Stream(ty) | TypeDefKind::Future(ty) => {
+                if let Some(ty) = ty {
+                    self.iter_resources(ty, map);
+                }
+            }
+            TypeDefKind::Resource => {}
+            TypeDefKind::Map(k, v) => {
+                self.iter_resources(k, map);
+                self.iter_resources(v, map);
+            }
+            TypeDefKind::FixedLengthList(ty, _) => {
+                self.iter_resources(ty, map);
+            }
+            TypeDefKind::Unknown => unreachable!(),
         }
     }
 
@@ -900,7 +913,7 @@ impl JsBindgen<'_> {
             },
             src: Source::default(),
             resource_map: &resource_map,
-            cur_resource_borrows: false,
+            clear_resource_borrows: false,
             resolve: self.resolve,
             callee_resource_dynamic: false,
         };

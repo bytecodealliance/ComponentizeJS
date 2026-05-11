@@ -55,7 +55,7 @@ pub fn splice_bindings(
     };
 
     let world = resolve
-        .select_world(id, world_name.as_deref())
+        .select_world(&[id], world_name.as_deref())
         .map_err(|e| e.to_string())?;
 
     let mut wasm_bytes =
@@ -109,7 +109,9 @@ pub fn splice_bindings(
         let map = resolve
             .merge(engine_resolve)
             .expect("unable to merge with engine world");
-        let engine_world = map.map_world(engine_world, None).unwrap();
+        let engine_world = map
+            .map_world(engine_world, wit_parser::Span::default())
+            .unwrap();
         (engine_world, producers)
     } else {
         unreachable!();
@@ -118,8 +120,9 @@ pub fn splice_bindings(
     let componentized =
         bindgen::componentize_bindgen(&resolve, world, &features).map_err(|err| err.to_string())?;
 
+    let mut clone_maps = wit_parser::CloneMaps::default();
     resolve
-        .merge_worlds(engine_world, world)
+        .merge_worlds(engine_world, world, &mut clone_maps)
         .expect("unable to merge with engine world");
 
     let encoded =
@@ -344,7 +347,7 @@ pub fn splice(
     features: Vec<Feature>,
     debug: bool,
 ) -> Result<Vec<u8>> {
-    let mut module = Module::parse(&engine, false).unwrap();
+    let mut module = Module::parse(&engine, false, false).unwrap();
 
     // since StarlingMonkey implements CLI Run and incoming handler,
     // we override them only if the guest content exports those functions
@@ -378,7 +381,7 @@ pub fn splice(
     // create the exported functions as wrappers around the "cabi_call" function
     synthesize_export_functions(&mut module, &exports)?;
 
-    Ok(module.encode())
+    Ok(module.encode()?)
 }
 
 fn remove_if_exported_by_js(
@@ -439,14 +442,17 @@ fn synthesize_import_functions(
 
     let memory = 0;
 
-    let main_tid = module.tables.main_function().unwrap();
+    let main_tid = module
+        .tables
+        .main_function()?
+        .ok_or_else(|| anyhow::anyhow!("module has no main function table"))?;
 
     let import_fn_table_start_idx = module.tables.get(main_tid).unwrap().initial as i32;
 
     let cabi_realloc_fid = get_export_fid(module, &cabi_realloc.unwrap());
 
     let fid = get_export_fid(module, &coreabi_sample_ids[0]);
-    let coreabi_sample_i32 = module.functions.get(fid).unwrap_local();
+    let coreabi_sample_i32 = module.functions.get(fid).unwrap_local()?;
     let _coreabi_sample_i64 = module
         .functions
         .get(get_export_fid(module, &coreabi_sample_ids[1]))
@@ -605,13 +611,13 @@ fn synthesize_import_functions(
                         });
                         func.local_tee(tmp_local);
                         func.i64_const(32);
-                        func.i64_shr_unsigned();
+                        func.i64_shr_u();
                         func.i64_const(0xFFFFFF81);
                         func.i64_eq();
                         func.if_stmt(BlockType::Type(DataType::F32));
                         func.local_get(tmp_local);
                         func.i32_wrap_i64();
-                        func.f32_convert_i32s();
+                        func.f32_convert_i32_s();
                         func.else_stmt();
                         func.local_get(tmp_local);
                         func.f64_reinterpret_i64();
@@ -628,13 +634,13 @@ fn synthesize_import_functions(
                         });
                         func.local_tee(tmp_local);
                         func.i64_const(32);
-                        func.i64_shr_unsigned();
+                        func.i64_shr_u();
                         func.i64_const(0xFFFFFF81);
                         func.i64_eq();
                         func.if_stmt(BlockType::Type(DataType::F64));
                         func.local_get(tmp_local);
                         func.i32_wrap_i64();
-                        func.f64_convert_i32s();
+                        func.f64_convert_i32_s();
                         func.else_stmt();
                         func.local_get(tmp_local);
                         func.f64_reinterpret_i64();
@@ -683,7 +689,7 @@ fn synthesize_import_functions(
                 }),
                 Some(CoreTy::I64) => {
                     func.call(get_export_fid(module, &coreabi_to_bigint64));
-                    func.i64_extend_i32u();
+                    func.i64_extend_i32_u();
                     func.i64_const(-511101108224);
                     func.i64_or();
                     func.i64_store(MemArg {
@@ -720,7 +726,7 @@ fn synthesize_import_functions(
         }
 
         // extend the main table to include indices for generated imported functions
-        let table = module.tables.get_mut(main_tid);
+        let table = module.tables.get_mut(main_tid)?;
         table.initial += imports.len() as u64;
         table.maximum = Some(table.maximum.unwrap() + imports.len() as u64);
 
@@ -748,7 +754,7 @@ fn synthesize_import_functions(
             .functions
             .get(coreabi_get_import_fid)
             .kind()
-            .unwrap_local()
+            .unwrap_local()?
             .args;
 
         let arg_idx = args[0];
