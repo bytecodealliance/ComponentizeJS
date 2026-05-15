@@ -1,10 +1,7 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use wasm_encoder::{Encode, Section};
-use wasmparser::ExternalKind;
-use wasmparser::MemArg;
-use wasmparser::Operator;
 use wirm::ir::function::{FunctionBuilder, FunctionModifier};
 use wirm::ir::id::{ExportsID, FunctionID, GlobalID, LocalID};
 use wirm::ir::module::Module;
@@ -12,6 +9,8 @@ use wirm::ir::module::module_globals::GlobalKind;
 use wirm::ir::types::{BlockType, ElementItems, InitInstr, InstrumentationMode, Value};
 use wirm::module_builder::AddLocal;
 use wirm::opcode::{Inject, InjectAt};
+use wirm::wasmparser::MemArg;
+use wirm::wasmparser::Operator;
 use wirm::{DataType, Opcode};
 use wit_component::StringEncoding;
 use wit_component::metadata::{Bindgen, decode};
@@ -23,14 +22,7 @@ use crate::wit::exports::local::spidermonkey_embedding_splicer::splicer::{
 };
 use crate::{bindgen, map_core_fn, parse_wit, splice};
 
-// Returns
-// pub struct SpliceResult {
-//     pub wasm: _rt::Vec::<u8>,
-//     pub js_bindings: _rt::String,
-//     pub exports: _rt::Vec::<(_rt::String, CoreFn,)>,
-//     pub import_wrappers: _rt::Vec::<(_rt::String, _rt::String,)>,
-//     pub imports: _rt::Vec::<(_rt::String, _rt::String, u32,)>,
-// }
+/// Splice bindings into a given JS engine WebAssembly binary
 pub fn splice_bindings(
     engine: Vec<u8>,
     features: Vec<Feature>,
@@ -55,71 +47,74 @@ pub fn splice_bindings(
     };
 
     let world = resolve
-        .select_world(id, world_name.as_deref())
+        .select_world(&[id], world_name.as_deref())
         .map_err(|e| e.to_string())?;
 
     let mut wasm_bytes =
         wit_component::dummy_module(&resolve, world, wit_parser::ManglingAndAbi::Standard32);
 
-    // merge the engine world with the target world, retaining the engine producers
-
-    let (engine_world, producers) = if let Ok((
+    // Merge the engine world with the target world, retaining the engine producers
+    let Ok((
         _,
         Bindgen {
             resolve: mut engine_resolve,
-            world: engine_world,
+            world: engine_world_id,
             metadata: _,
             producers,
         },
     )) = decode(&engine)
-    {
-        // we disable the engine run and incoming handler as we recreate these exports
-        // when needed, so remove these from the world before initiating the merge
-        let maybe_run = engine_resolve.worlds[engine_world]
-            .exports
-            .iter()
-            .find(|(key, _)| {
-                engine_resolve
-                    .name_world_key(key)
-                    .starts_with("wasi:cli/run@0.2")
-            })
-            .map(|(key, _)| key.clone());
-        if let Some(run) = maybe_run {
-            engine_resolve.worlds[engine_world]
-                .exports
-                .shift_remove(&run)
-                .unwrap();
-        }
-        let maybe_serve = engine_resolve.worlds[engine_world]
-            .exports
-            .iter()
-            .find(|(key, _)| {
-                engine_resolve
-                    .name_world_key(key)
-                    .starts_with("wasi:http/incoming-handler@0.2.")
-            })
-            .map(|(key, _)| key.clone());
-
-        if let Some(serve) = maybe_serve {
-            engine_resolve.worlds[engine_world]
-                .exports
-                .shift_remove(&serve)
-                .unwrap();
-        }
-        let map = resolve
-            .merge(engine_resolve)
-            .expect("unable to merge with engine world");
-        let engine_world = map.map_world(engine_world, None).unwrap();
-        (engine_world, producers)
-    } else {
-        unreachable!();
+    else {
+        unreachable!("failed to decode engine");
     };
+
+    // we disable the engine run and incoming handler as we recreate these exports
+    // when needed, so remove these from the world before initiating the merge
+    let maybe_run = engine_resolve.worlds[engine_world_id]
+        .exports
+        .iter()
+        .find(|(key, _)| {
+            engine_resolve
+                .name_world_key(key)
+                .starts_with("wasi:cli/run@0.2")
+        })
+        .map(|(key, _)| key.clone());
+    if let Some(run) = maybe_run {
+        engine_resolve.worlds[engine_world_id]
+            .exports
+            .shift_remove(&run)
+            .unwrap();
+    }
+    let maybe_serve = engine_resolve.worlds[engine_world_id]
+        .exports
+        .iter()
+        .find(|(key, _)| {
+            engine_resolve
+                .name_world_key(key)
+                .starts_with("wasi:http/incoming-handler@0.2.")
+        })
+        .map(|(key, _)| key.clone());
+
+    if let Some(serve) = maybe_serve {
+        engine_resolve.worlds[engine_world_id]
+            .exports
+            .shift_remove(&serve)
+            .unwrap();
+    }
+
+    let engine_world_span = engine_resolve.worlds[engine_world_id].span.clone();
+
+    let map = resolve
+        .merge(engine_resolve)
+        .expect("unable to merge with engine world");
+
+    let engine_world_id = map.map_world(engine_world_id, engine_world_span).unwrap();
 
     let componentized =
         bindgen::componentize_bindgen(&resolve, world, &features).map_err(|err| err.to_string())?;
 
+    let mut clone_maps = wit_parser::CloneMaps::default();
     resolve
-        .merge_worlds(engine_world, world)
+        .merge_worlds(engine_world_id, world, &mut clone_maps)
         .expect("unable to merge with engine world");
 
     let encoded =
@@ -344,7 +339,7 @@ pub fn splice(
     features: Vec<Feature>,
     debug: bool,
 ) -> Result<Vec<u8>> {
-    let mut module = Module::parse(&engine, false).unwrap();
+    let mut module = Module::parse(&engine, false, false).unwrap();
 
     // since StarlingMonkey implements CLI Run and incoming handler,
     // we override them only if the guest content exports those functions
@@ -361,16 +356,7 @@ pub fn splice(
         );
     }
 
-    // we reencode the WASI world component data, so strip it out from the
-    // custom section
-    let maybe_component_section_id = module
-        .custom_sections
-        .get_id("component-type:bindings".to_string());
-    if let Some(component_section_id) = maybe_component_section_id {
-        module.custom_sections.delete(component_section_id);
-    }
-
-    // extract the native instructions from sample functions
+    // Extract the native instructions from sample functions
     // then inline the imported functions and main import gating function
     // (erasing sample functions in the process)
     synthesize_import_functions(&mut module, &imports, debug)?;
@@ -378,7 +364,11 @@ pub fn splice(
     // create the exported functions as wrappers around the "cabi_call" function
     synthesize_export_functions(&mut module, &exports)?;
 
-    Ok(module.encode())
+    let encoded = module
+        .encode()
+        .context("failed to encode module during splice")?;
+
+    Ok(encoded)
 }
 
 fn remove_if_exported_by_js(
@@ -413,7 +403,7 @@ fn get_export_fid(module: &Module, expt_id: &ExportsID) -> FunctionID {
     let expt = module.exports.get_by_id(*expt_id).unwrap();
 
     match expt.kind {
-        ExternalKind::Func => FunctionID::from(expt.index),
+        wirm::wasmparser::ExternalKind::Func => FunctionID::from(expt.index),
         _ => panic!("Missing coreabi_get_import"),
     }
 }
@@ -439,26 +429,37 @@ fn synthesize_import_functions(
 
     let memory = 0;
 
-    let main_tid = module.tables.main_function().unwrap();
+    let main_tid = module
+        .tables
+        .main_function()
+        .context("failed to retreive main function tid")?
+        .context("missing tid")?;
 
     let import_fn_table_start_idx = module.tables.get(main_tid).unwrap().initial as i32;
 
     let cabi_realloc_fid = get_export_fid(module, &cabi_realloc.unwrap());
 
     let fid = get_export_fid(module, &coreabi_sample_ids[0]);
-    let coreabi_sample_i32 = module.functions.get(fid).unwrap_local();
+    let coreabi_sample_i32 = module
+        .functions
+        .get(fid)
+        .unwrap_local()
+        .context("missing coreabi_sample_i32 function")?;
     let _coreabi_sample_i64 = module
         .functions
         .get(get_export_fid(module, &coreabi_sample_ids[1]))
-        .unwrap_local();
+        .unwrap_local()
+        .context("missing coreabi_sample_i64 function")?;
     let _coreabi_sample_f32 = module
         .functions
         .get(get_export_fid(module, &coreabi_sample_ids[2]))
-        .unwrap_local();
+        .unwrap_local()
+        .context("missing coreabi_sample_f32 function")?;
     let _coreabi_sample_f64 = module
         .functions
         .get(get_export_fid(module, &coreabi_sample_ids[3]))
-        .unwrap_local();
+        .unwrap_local()
+        .context("missing coreabi_sample_f64 function")?;
 
     // These functions retrieve the corresponding type
     // from a JS::HandleValue
@@ -471,7 +472,7 @@ fn synthesize_import_functions(
         .unwrap();
 
     // Sets the return value on args from the stack
-    let args_ret_i32: Vec<Operator> = vec![
+    let args_ret_i32: Vec<wirm::wasmparser::Operator> = vec![
         Operator::I64ExtendI32U,
         Operator::I64Const {
             value: -545460846592,
@@ -492,7 +493,7 @@ fn synthesize_import_functions(
     let coreabi_to_bigint64 = module
         .exports
         .get_export_id_by_name("coreabi_to_bigint64".to_string())
-        .unwrap();
+        .context("failed to get export id by name")?;
 
     // create the import functions
     // All JS wrapper function bindings have the same type, the
@@ -584,7 +585,7 @@ fn synthesize_import_functions(
                 func.i32_add();
                 match arg {
                     CoreTy::I32 => {
-                        func.i64_load(MemArg {
+                        func.i64_load(wirm::wasmparser::MemArg {
                             align: 3,
                             max_align: 0,
                             offset: 0,
@@ -597,7 +598,7 @@ fn synthesize_import_functions(
                     }
                     CoreTy::F32 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
-                        func.i64_load(MemArg {
+                        func.i64_load(wirm::wasmparser::MemArg {
                             align: 3,
                             max_align: 0,
                             offset: 0,
@@ -605,13 +606,13 @@ fn synthesize_import_functions(
                         });
                         func.local_tee(tmp_local);
                         func.i64_const(32);
-                        func.i64_shr_unsigned();
+                        func.i64_shr_u();
                         func.i64_const(0xFFFFFF81);
                         func.i64_eq();
                         func.if_stmt(BlockType::Type(DataType::F32));
                         func.local_get(tmp_local);
                         func.i32_wrap_i64();
-                        func.f32_convert_i32s();
+                        func.f32_convert_i32_s();
                         func.else_stmt();
                         func.local_get(tmp_local);
                         func.f64_reinterpret_i64();
@@ -620,7 +621,7 @@ fn synthesize_import_functions(
                     }
                     CoreTy::F64 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
-                        func.i64_load(MemArg {
+                        func.i64_load(wirm::wasmparser::MemArg {
                             align: 3,
                             max_align: 0,
                             offset: 0,
@@ -628,13 +629,13 @@ fn synthesize_import_functions(
                         });
                         func.local_tee(tmp_local);
                         func.i64_const(32);
-                        func.i64_shr_unsigned();
+                        func.i64_shr_u();
                         func.i64_const(0xFFFFFF81);
                         func.i64_eq();
                         func.if_stmt(BlockType::Type(DataType::F64));
                         func.local_get(tmp_local);
                         func.i32_wrap_i64();
-                        func.f64_convert_i32s();
+                        func.f64_convert_i32_s();
                         func.else_stmt();
                         func.local_get(tmp_local);
                         func.f64_reinterpret_i64();
@@ -683,10 +684,10 @@ fn synthesize_import_functions(
                 }),
                 Some(CoreTy::I64) => {
                     func.call(get_export_fid(module, &coreabi_to_bigint64));
-                    func.i64_extend_i32u();
+                    func.i64_extend_i32_u();
                     func.i64_const(-511101108224);
                     func.i64_or();
-                    func.i64_store(MemArg {
+                    func.i64_store(wirm::wasmparser::MemArg {
                         align: 3,
                         max_align: 0,
                         offset: 0,
@@ -695,7 +696,7 @@ fn synthesize_import_functions(
                 }
                 Some(CoreTy::F32) => {
                     func.f64_promote_f32();
-                    func.f64_store(MemArg {
+                    func.f64_store(wirm::wasmparser::MemArg {
                         align: 3,
                         max_align: 0,
                         offset: 0,
@@ -703,7 +704,7 @@ fn synthesize_import_functions(
                     });
                 }
                 Some(CoreTy::F64) => {
-                    func.f64_store(MemArg {
+                    func.f64_store(wirm::wasmparser::MemArg {
                         align: 3,
                         max_align: 0,
                         offset: 0,
@@ -720,7 +721,10 @@ fn synthesize_import_functions(
         }
 
         // extend the main table to include indices for generated imported functions
-        let table = module.tables.get_mut(main_tid);
+        let table = module
+            .tables
+            .get_mut(main_tid)
+            .context("failed to retrieve mutable table by tid")?;
         table.initial += imports.len() as u64;
         table.maximum = Some(table.maximum.unwrap() + imports.len() as u64);
 
@@ -749,6 +753,7 @@ fn synthesize_import_functions(
             .get(coreabi_get_import_fid)
             .kind()
             .unwrap_local()
+            .context("missing function for coreabi_get_import_fid")?
             .args;
 
         let arg_idx = args[0];
@@ -771,7 +776,7 @@ fn synthesize_import_functions(
         builder.inject_at(
             0,
             InstrumentationMode::Before,
-            Operator::LocalSet {
+            wirm::wasmparser::Operator::LocalSet {
                 local_index: *idx_local,
             },
         );
@@ -784,7 +789,7 @@ fn synthesize_import_functions(
         {
             let ops_ro = builder.body.instructions.get_ops();
             for (idx, op) in ops_ro.iter().enumerate() {
-                if let Operator::I32Const { value } = op {
+                if let wirm::wasmparser::Operator::I32Const { value } = op {
                     // we specifically need the const "around" 3393
                     // which is the coreabi_sample_i32 table offset
                     if *value < 1000 || *value > 5000 {
@@ -795,7 +800,8 @@ fn synthesize_import_functions(
                     // in the base computation.
                     let mut base = *value;
                     if idx > 0
-                        && let Operator::GlobalGet { global_index } = &ops_ro[idx - 1]
+                        && let wirm::wasmparser::Operator::GlobalGet { global_index } =
+                            &ops_ro[idx - 1]
                         && let GlobalKind::Local(local_global) =
                             module.globals.get_kind(GlobalID(*global_index))
                         && let [InitInstr::Value(Value::I32(v))] =
@@ -813,25 +819,25 @@ fn synthesize_import_functions(
         builder.inject_at(
             table_instr_idx,
             InstrumentationMode::Before,
-            Operator::LocalGet {
+            wirm::wasmparser::Operator::LocalGet {
                 local_index: *idx_local,
             },
         );
         builder.inject_at(
             table_instr_idx + 1,
             InstrumentationMode::Before,
-            Operator::I32Add,
+            wirm::wasmparser::Operator::I32Add,
         );
 
         if delta != 0 {
+            builder.body.instructions.add_instr(
+                table_instr_idx,
+                wirm::wasmparser::Operator::I32Const { value: delta },
+            );
             builder
                 .body
                 .instructions
-                .add_instr(table_instr_idx, Operator::I32Const { value: delta });
-            builder
-                .body
-                .instructions
-                .add_instr(table_instr_idx, Operator::I32Add);
+                .add_instr(table_instr_idx, wirm::wasmparser::Operator::I32Add);
         }
     }
 
@@ -942,7 +948,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                     func.local_get(args[idx]);
                     match param {
                         CoreTy::I32 => {
-                            func.i32_store(MemArg {
+                            func.i32_store(wirm::wasmparser::MemArg {
                                 align: 2,
                                 max_align: 0,
                                 offset,
@@ -951,7 +957,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                             offset += 4;
                         }
                         CoreTy::I64 => {
-                            func.i64_store(MemArg {
+                            func.i64_store(wirm::wasmparser::MemArg {
                                 align: 3,
                                 offset,
                                 memory,
@@ -960,7 +966,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                             offset += 8;
                         }
                         CoreTy::F32 => {
-                            func.f32_store(MemArg {
+                            func.f32_store(wirm::wasmparser::MemArg {
                                 align: 2,
                                 max_align: 0,
                                 offset,
@@ -969,7 +975,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                             offset += 4;
                         }
                         CoreTy::F64 => {
-                            func.f64_store(MemArg {
+                            func.f64_store(wirm::wasmparser::MemArg {
                                 align: 3,
                                 offset,
                                 memory,
@@ -997,7 +1003,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                 // value type from the retptr
                 match expt_sig.ret.unwrap() {
                     CoreTy::I32 => {
-                        func.i32_load(MemArg {
+                        func.i32_load(wirm::wasmparser::MemArg {
                             align: 2,
                             max_align: 0,
                             offset: 0,
@@ -1005,7 +1011,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                         });
                     }
                     CoreTy::I64 => {
-                        func.i64_load(MemArg {
+                        func.i64_load(wirm::wasmparser::MemArg {
                             align: 3,
                             max_align: 0,
                             offset: 0,
@@ -1013,7 +1019,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                         });
                     }
                     CoreTy::F32 => {
-                        func.f32_load(MemArg {
+                        func.f32_load(wirm::wasmparser::MemArg {
                             align: 2,
                             max_align: 0,
                             offset: 0,
@@ -1021,7 +1027,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                         });
                     }
                     CoreTy::F64 => {
-                        func.f64_load(MemArg {
+                        func.f64_load(wirm::wasmparser::MemArg {
                             align: 3,
                             offset: 0,
                             memory,
