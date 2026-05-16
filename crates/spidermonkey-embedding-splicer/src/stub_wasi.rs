@@ -8,6 +8,7 @@ use wirm::ir::id::{FunctionID, LocalID};
 use wirm::ir::module::module_functions::FuncKind;
 use wirm::ir::types::{BlockType, InitExpr, Value};
 use wirm::module_builder::AddLocal;
+use wirm::wasmparser::{MemArg, TypeRef};
 use wirm::{DataType, InitInstr, Module, Opcode};
 use wit_parser::Resolve;
 
@@ -31,7 +32,7 @@ where
             continue;
         };
 
-        let wirm::wasmparser::TypeRef::Func(_) = module.imports.get(iid).ty else {
+        let TypeRef::Func(_) = module.imports.get(iid).ty else {
             bail!("'{full_import}#{name}' is not a function.")
         };
         let fid: FunctionID = FunctionID(*iid);
@@ -74,7 +75,7 @@ where
         return Ok(None);
     };
 
-    let wirm::wasmparser::TypeRef::Func(_) = module.imports.get(iid).ty else {
+    let TypeRef::Func(_) = module.imports.get(iid).ty else {
         bail!("'{import}#{name}' is not a function.")
     };
     let fid: FunctionID = FunctionID(*iid);
@@ -269,7 +270,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
 
         // *retptr = outptr
         // *retptr + 1 = len
-        body.i32_store(wirm::wasmparser::MemArg {
+        body.i32_store(MemArg {
             align: 2,
             max_align: 0,
             offset: 0,
@@ -279,7 +280,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
         body.local_get(retptr);
         body.local_get(num_bytes);
         body.i32_wrap_i64();
-        body.i32_store(wirm::wasmparser::MemArg {
+        body.i32_store(MemArg {
             align: 2,
             max_align: 0,
             offset: 4,
@@ -294,7 +295,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
         body.loop_stmt(BlockType::Empty);
         body.local_get(curptr);
         body.call(random_u64);
-        body.i64_store(wirm::wasmparser::MemArg {
+        body.i64_store(MemArg {
             align: 3,
             max_align: 0,
             offset: 0,
@@ -351,7 +352,7 @@ fn stub_clocks(module: &mut Module) -> Result<()> {
         body.local_get(time_ptr);
         body.local_get(time_ptr);
         body.i64_const(i64::try_from(unix_time.as_nanos())?);
-        body.i64_store(wirm::wasmparser::MemArg {
+        body.i64_store(MemArg {
             align: 3,
             offset: 0,
             max_align: 0,

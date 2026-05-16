@@ -959,9 +959,9 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
 [[package]]
 name = "wirm"
-version = "4.0.6"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3398cfb47e9ac60f209294450b58f9577ba3019e299da09e9b1efeeba726930a"
+checksum = "8da24f7393e7008c1b2102f4d69340d388a6687a0e687a77fedaa440dbec1286"
 dependencies = [
  "log",
  "paste",

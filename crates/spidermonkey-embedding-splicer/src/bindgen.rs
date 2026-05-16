@@ -17,6 +17,7 @@ use wit_bindgen_core::wit_parser::{
     WorldId, WorldItem,
 };
 use wit_component::StringEncoding;
+use wit_parser::Param;
 use wit_parser::abi::WasmType;
 use wit_parser::abi::{AbiVariant, WasmSignature};
 
@@ -771,7 +772,7 @@ impl JsBindgen<'_> {
 
     fn create_resource_map(&self, func: &Function) -> ResourceMap {
         let mut resource_map = BTreeMap::new();
-        for wit_parser::Param { ty, .. } in func.params.iter() {
+        for Param { ty, .. } in func.params.iter() {
             self.iter_resources(ty, &mut resource_map);
         }
         if let Some(ty) = func.result {

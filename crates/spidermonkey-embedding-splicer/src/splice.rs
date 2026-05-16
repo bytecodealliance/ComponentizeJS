@@ -9,8 +9,7 @@ use wirm::ir::module::module_globals::GlobalKind;
 use wirm::ir::types::{BlockType, ElementItems, InitInstr, InstrumentationMode, Value};
 use wirm::module_builder::AddLocal;
 use wirm::opcode::{Inject, InjectAt};
-use wirm::wasmparser::MemArg;
-use wirm::wasmparser::Operator;
+use wirm::wasmparser::{ExternalKind, MemArg, Operator};
 use wirm::{DataType, Opcode};
 use wit_component::StringEncoding;
 use wit_component::metadata::{Bindgen, decode};
@@ -356,6 +355,15 @@ pub fn splice(
         );
     }
 
+    // we reencode the WASI world component data, so strip it out from the
+    // custom section
+    let maybe_component_section_id = module
+        .custom_sections
+        .get_id("component-type:bindings".to_string());
+    if let Some(component_section_id) = maybe_component_section_id {
+        module.delete_custom_section(component_section_id);
+    }
+
     // Extract the native instructions from sample functions
     // then inline the imported functions and main import gating function
     // (erasing sample functions in the process)
@@ -403,7 +411,7 @@ fn get_export_fid(module: &Module, expt_id: &ExportsID) -> FunctionID {
     let expt = module.exports.get_by_id(*expt_id).unwrap();
 
     match expt.kind {
-        wirm::wasmparser::ExternalKind::Func => FunctionID::from(expt.index),
+        ExternalKind::Func => FunctionID::from(expt.index),
         _ => panic!("Missing coreabi_get_import"),
     }
 }
@@ -472,7 +480,7 @@ fn synthesize_import_functions(
         .unwrap();
 
     // Sets the return value on args from the stack
-    let args_ret_i32: Vec<wirm::wasmparser::Operator> = vec![
+    let args_ret_i32: Vec<Operator> = vec![
         Operator::I64ExtendI32U,
         Operator::I64Const {
             value: -545460846592,
@@ -585,7 +593,7 @@ fn synthesize_import_functions(
                 func.i32_add();
                 match arg {
                     CoreTy::I32 => {
-                        func.i64_load(wirm::wasmparser::MemArg {
+                        func.i64_load(MemArg {
                             align: 3,
                             max_align: 0,
                             offset: 0,
@@ -598,7 +606,7 @@ fn synthesize_import_functions(
                     }
                     CoreTy::F32 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
-                        func.i64_load(wirm::wasmparser::MemArg {
+                        func.i64_load(MemArg {
                             align: 3,
                             max_align: 0,
                             offset: 0,
@@ -621,7 +629,7 @@ fn synthesize_import_functions(
                     }
                     CoreTy::F64 => {
                         // isInt: (r.asRawBits() >> 32) == 0xFFFFFF81
-                        func.i64_load(wirm::wasmparser::MemArg {
+                        func.i64_load(MemArg {
                             align: 3,
                             max_align: 0,
                             offset: 0,
@@ -687,7 +695,7 @@ fn synthesize_import_functions(
                     func.i64_extend_i32_u();
                     func.i64_const(-511101108224);
                     func.i64_or();
-                    func.i64_store(wirm::wasmparser::MemArg {
+                    func.i64_store(MemArg {
                         align: 3,
                         max_align: 0,
                         offset: 0,
@@ -696,7 +704,7 @@ fn synthesize_import_functions(
                 }
                 Some(CoreTy::F32) => {
                     func.f64_promote_f32();
-                    func.f64_store(wirm::wasmparser::MemArg {
+                    func.f64_store(MemArg {
                         align: 3,
                         max_align: 0,
                         offset: 0,
@@ -704,7 +712,7 @@ fn synthesize_import_functions(
                     });
                 }
                 Some(CoreTy::F64) => {
-                    func.f64_store(wirm::wasmparser::MemArg {
+                    func.f64_store(MemArg {
                         align: 3,
                         max_align: 0,
                         offset: 0,
@@ -776,7 +784,7 @@ fn synthesize_import_functions(
         builder.inject_at(
             0,
             InstrumentationMode::Before,
-            wirm::wasmparser::Operator::LocalSet {
+            Operator::LocalSet {
                 local_index: *idx_local,
             },
         );
@@ -789,7 +797,7 @@ fn synthesize_import_functions(
         {
             let ops_ro = builder.body.instructions.get_ops();
             for (idx, op) in ops_ro.iter().enumerate() {
-                if let wirm::wasmparser::Operator::I32Const { value } = op {
+                if let Operator::I32Const { value } = op {
                     // we specifically need the const "around" 3393
                     // which is the coreabi_sample_i32 table offset
                     if *value < 1000 || *value > 5000 {
@@ -800,8 +808,7 @@ fn synthesize_import_functions(
                     // in the base computation.
                     let mut base = *value;
                     if idx > 0
-                        && let wirm::wasmparser::Operator::GlobalGet { global_index } =
-                            &ops_ro[idx - 1]
+                        && let Operator::GlobalGet { global_index } = &ops_ro[idx - 1]
                         && let GlobalKind::Local(local_global) =
                             module.globals.get_kind(GlobalID(*global_index))
                         && let [InitInstr::Value(Value::I32(v))] =
@@ -819,25 +826,25 @@ fn synthesize_import_functions(
         builder.inject_at(
             table_instr_idx,
             InstrumentationMode::Before,
-            wirm::wasmparser::Operator::LocalGet {
+            Operator::LocalGet {
                 local_index: *idx_local,
             },
         );
         builder.inject_at(
             table_instr_idx + 1,
             InstrumentationMode::Before,
-            wirm::wasmparser::Operator::I32Add,
+            Operator::I32Add,
         );
 
         if delta != 0 {
-            builder.body.instructions.add_instr(
-                table_instr_idx,
-                wirm::wasmparser::Operator::I32Const { value: delta },
-            );
             builder
                 .body
                 .instructions
-                .add_instr(table_instr_idx, wirm::wasmparser::Operator::I32Add);
+                .add_instr(table_instr_idx, Operator::I32Const { value: delta });
+            builder
+                .body
+                .instructions
+                .add_instr(table_instr_idx, Operator::I32Add);
         }
     }
 
@@ -948,7 +955,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                     func.local_get(args[idx]);
                     match param {
                         CoreTy::I32 => {
-                            func.i32_store(wirm::wasmparser::MemArg {
+                            func.i32_store(MemArg {
                                 align: 2,
                                 max_align: 0,
                                 offset,
@@ -957,7 +964,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                             offset += 4;
                         }
                         CoreTy::I64 => {
-                            func.i64_store(wirm::wasmparser::MemArg {
+                            func.i64_store(MemArg {
                                 align: 3,
                                 offset,
                                 memory,
@@ -966,7 +973,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                             offset += 8;
                         }
                         CoreTy::F32 => {
-                            func.f32_store(wirm::wasmparser::MemArg {
+                            func.f32_store(MemArg {
                                 align: 2,
                                 max_align: 0,
                                 offset,
@@ -975,7 +982,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                             offset += 4;
                         }
                         CoreTy::F64 => {
-                            func.f64_store(wirm::wasmparser::MemArg {
+                            func.f64_store(MemArg {
                                 align: 3,
                                 offset,
                                 memory,
@@ -1003,7 +1010,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                 // value type from the retptr
                 match expt_sig.ret.unwrap() {
                     CoreTy::I32 => {
-                        func.i32_load(wirm::wasmparser::MemArg {
+                        func.i32_load(MemArg {
                             align: 2,
                             max_align: 0,
                             offset: 0,
@@ -1011,7 +1018,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                         });
                     }
                     CoreTy::I64 => {
-                        func.i64_load(wirm::wasmparser::MemArg {
+                        func.i64_load(MemArg {
                             align: 3,
                             max_align: 0,
                             offset: 0,
@@ -1019,7 +1026,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                         });
                     }
                     CoreTy::F32 => {
-                        func.f32_load(wirm::wasmparser::MemArg {
+                        func.f32_load(MemArg {
                             align: 2,
                             max_align: 0,
                             offset: 0,
@@ -1027,7 +1034,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                         });
                     }
                     CoreTy::F64 => {
-                        func.f64_load(wirm::wasmparser::MemArg {
+                        func.f64_load(MemArg {
                             align: 3,
                             offset: 0,
                             memory,

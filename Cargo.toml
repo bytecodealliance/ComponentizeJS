@@ -15,7 +15,7 @@ anyhow = { version = "1.0.95", default-features = false }
 heck = { version = "0.5", default-features = false }
 rand = { version = "0.8", default-features = false }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
-wirm = { version = "4.0.6", default-features = false }
+wirm = { version = "5.0.0", default-features = false }
 
 wasm-encoder = { version = "0.245.1", features = ["component-model", "std"] }
 wasmparser = { version = "0.245.1", features = [
