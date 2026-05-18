@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
  *
  * This issues primarily happen in CI and not locally on a sufficiently powerful machine.
  */
-const TIMEOUT_MS = process.env.CI ? 240_000 : 120_000;
+const TIMEOUT_MS = process.env.CI ? 480_000 : 120_000;
 
 const REPORTERS = process.env.GITHUB_ACTIONS
   ? ['verbose', 'github-actions']
