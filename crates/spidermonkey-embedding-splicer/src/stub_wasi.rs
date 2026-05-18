@@ -2,13 +2,13 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{Result, bail};
-use wasmparser::{MemArg, TypeRef};
+use anyhow::{Context as _, Result, bail};
 use wirm::ir::function::FunctionBuilder;
 use wirm::ir::id::{FunctionID, LocalID};
 use wirm::ir::module::module_functions::FuncKind;
 use wirm::ir::types::{BlockType, InitExpr, Value};
 use wirm::module_builder::AddLocal;
+use wirm::wasmparser::{MemArg, TypeRef};
 use wirm::{DataType, InitInstr, Module, Opcode};
 use wit_parser::Resolve;
 
@@ -44,10 +44,17 @@ where
         };
 
         let ty = module.types.get(ty_id).unwrap();
-        let mut builder = FunctionBuilder::new(ty.params().as_slice(), ty.results().as_slice());
+        let mut builder = FunctionBuilder::new(
+            ty.params()
+                .with_context(|| format!("failed to retrieve params for '{full_import}#{name}'"))?
+                .as_slice(),
+            ty.results()
+                .with_context(|| format!("failed to retrieve results for '{full_import}#{name}'"))?
+                .as_slice(),
+        );
         let _args = stub(&mut builder)?;
 
-        builder.replace_import_in_module(module, iid);
+        builder.replace_import_in_module(module, iid)?;
 
         return Ok(Some(fid));
     }
@@ -80,11 +87,18 @@ where
     };
 
     let ty = module.types.get(ty_id).unwrap();
-    let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
+    let (params, results) = (
+        ty.params()
+            .with_context(|| format!("failed to retrieve params for '{import}#{name}'"))?
+            .to_vec(),
+        ty.results()
+            .with_context(|| format!("failed to retrieve results for '{import}#{name}'"))?
+            .to_vec(),
+    );
     let mut builder = FunctionBuilder::new(params.as_slice(), results.as_slice());
     let _args = stub(&mut builder)?;
 
-    builder.replace_import_in_module(module, iid);
+    builder.replace_import_in_module(module, iid)?;
 
     Ok(Some(fid))
 }
@@ -111,7 +125,7 @@ pub fn stub_wasi(
         parse_wit(PathBuf::from(wit_path.unwrap()))?
     };
 
-    let world = resolve.select_world(ids, world_name.as_deref())?;
+    let world = resolve.select_world(&[ids], world_name.as_deref())?;
 
     let target_world = &resolve.worlds[world];
     let mut target_world_imports = HashSet::new();
@@ -120,7 +134,7 @@ pub fn stub_wasi(
         target_world_imports.insert(resolve.name_canonicalized_world_key(key));
     }
 
-    let mut module = Module::parse(wasm.as_slice(), false).unwrap();
+    let mut module = Module::parse(wasm.as_slice(), false, false).unwrap();
 
     stub_preview1(&mut module)?;
 
@@ -169,7 +183,10 @@ pub fn stub_wasi(
     }
 
     stub_sockets(&mut module, &target_world_imports)?;
-    Ok(module.encode())
+    let encoded = module
+        .encode()
+        .context("failed to encode module during stub")?;
+    Ok(encoded)
 }
 
 fn target_world_requires_io(target_world_imports: &HashSet<String>) -> bool {
@@ -242,7 +259,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
         body.local_get(num_bytes);
         body.i32_wrap_i64();
         body.i32_const(3);
-        body.i32_shr_unsigned();
+        body.i32_shr_u();
         body.i32_const(3);
         body.i32_shl();
         body.i32_const(8);
@@ -292,7 +309,7 @@ fn stub_random(module: &mut Module) -> Result<()> {
         body.i32_sub();
         body.local_get(num_bytes);
         body.i32_wrap_i64();
-        body.i32_lt_unsigned();
+        body.i32_lt_u();
         body.br_if(0);
         body.end(); // This is for the loop
         Ok(vec![num_bytes, retptr])

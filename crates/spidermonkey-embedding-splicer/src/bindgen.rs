@@ -3,10 +3,11 @@ use std::fmt::Write;
 
 use anyhow::Result;
 use heck::*;
+use js_component_bindgen::TranspileOpts;
 use js_component_bindgen::function_bindgen::{
     ErrHandling, FunctionBindgen, ResourceData, ResourceMap, ResourceTable,
 };
-use js_component_bindgen::intrinsics::{Intrinsic, render_intrinsics};
+use js_component_bindgen::intrinsics::{Intrinsic, RenderIntrinsicsArgs, render_intrinsics};
 use js_component_bindgen::names::LocalNames;
 use js_component_bindgen::source::Source;
 use wit_bindgen_core::abi::{self, LiftLower};
@@ -16,6 +17,7 @@ use wit_bindgen_core::wit_parser::{
     WorldId, WorldItem,
 };
 use wit_component::StringEncoding;
+use wit_parser::Param;
 use wit_parser::abi::WasmType;
 use wit_parser::abi::{AbiVariant, WasmSignature};
 
@@ -160,9 +162,10 @@ pub fn componentize_bindgen(
 
     bindgen.sizes.fill(resolve);
 
-    bindgen
-        .local_names
-        .exclude_globals(Intrinsic::get_global_names());
+    let globals = Intrinsic::get_global_names()
+        .into_iter()
+        .collect::<Vec<_>>();
+    bindgen.local_names.exclude_globals(&globals);
 
     bindgen.imports_bindgen();
 
@@ -247,6 +250,7 @@ pub fn componentize_bindgen(
         if let WorldItem::Interface {
             id: iface_id,
             stability: _,
+            ..
         } = export
         {
             let iface = &resolve.interfaces[*iface_id];
@@ -297,6 +301,7 @@ pub fn componentize_bindgen(
             WorldItem::Interface {
                 id: iface_id,
                 stability: _,
+                ..
             } => {
                 let iface = &resolve.interfaces[*iface_id];
                 for ty_id in iface.types.values() {
@@ -307,7 +312,7 @@ pub fn componentize_bindgen(
                 }
             }
             WorldItem::Function(_) => {}
-            WorldItem::Type(id) => {
+            WorldItem::Type { id, .. } => {
                 let ty = &resolve.types[*id];
                 if ty.kind == TypeDefKind::Resource {
                     imported_resource_modules.insert(*id, key_name.clone());
@@ -376,7 +381,13 @@ pub fn componentize_bindgen(
             .concat(),
     );
 
-    let js_intrinsics = render_intrinsics(&mut bindgen.all_intrinsics, false, true);
+    let transpile_opts = TranspileOpts::default();
+    let render_args = RenderIntrinsicsArgs::builder()
+        .intrinsics(&mut bindgen.all_intrinsics)
+        .instantiation_occurred(true)
+        .transpile_opts(&transpile_opts)
+        .build();
+    let js_intrinsics = render_intrinsics(render_args);
     output.push_str(&js_intrinsics);
     output.push_str(&bindgen.src);
 
@@ -424,7 +435,9 @@ impl JsBindgen<'_> {
                         func.name.to_lower_camel_case(),
                     );
                 }
-                WorldItem::Interface { id, stability: _ } => {
+                WorldItem::Interface {
+                    id, stability: _, ..
+                } => {
                     let iface = &self.resolve.interfaces[*id];
                     for id in iface.types.values() {
                         if let TypeDefKind::Resource = &self.resolve.types[*id].kind {
@@ -490,7 +503,7 @@ impl JsBindgen<'_> {
                 }
 
                 // ignore type exports for now
-                WorldItem::Type(_) => {}
+                WorldItem::Type { .. } => {}
             }
         }
         Ok(())
@@ -561,6 +574,7 @@ impl JsBindgen<'_> {
                 WorldItem::Interface {
                     id: i,
                     stability: _,
+                    ..
                 } => {
                     let iface = &self.resolve.interfaces[*i];
                     for id in iface.types.values() {
@@ -606,7 +620,7 @@ impl JsBindgen<'_> {
                         }
                     }
                 }
-                WorldItem::Type(id) => {
+                WorldItem::Type { id, .. } => {
                     let ty = &self.resolve.types[*id];
                     if ty.kind == TypeDefKind::Resource {
                         self.resource_directions
@@ -699,6 +713,9 @@ impl JsBindgen<'_> {
             FunctionKind::AsyncStatic(_id) => todo!(),
         };
 
+        // All imports are sync
+        let requires_async_porcelain = false;
+
         // imports are canonicalized as exports because
         // the function bindgen as currently written still makes this assumption
         self.bindgen(
@@ -714,6 +731,8 @@ impl JsBindgen<'_> {
             StringEncoding::UTF8,
             func,
             AbiVariant::GuestExport,
+            &iface_name,
+            requires_async_porcelain,
         );
         self.src.push_str("\n");
 
@@ -753,7 +772,7 @@ impl JsBindgen<'_> {
 
     fn create_resource_map(&self, func: &Function) -> ResourceMap {
         let mut resource_map = BTreeMap::new();
-        for (_, ty) in func.params.iter() {
+        for Param { ty, .. } in func.params.iter() {
             self.iter_resources(ty, &mut resource_map);
         }
         if let Some(ty) = func.result {
@@ -800,6 +819,7 @@ impl JsBindgen<'_> {
                         data: ResourceData::Guest {
                             resource_name: ty.name.clone().unwrap(),
                             prefix,
+                            extra: None,
                         },
                     },
                 );
@@ -845,6 +865,8 @@ impl JsBindgen<'_> {
         string_encoding: StringEncoding,
         func: &Function,
         abi: AbiVariant,
+        iface_name: &Option<String>,
+        requires_async_porcelain: bool,
     ) {
         self.src.push_str("(");
         let mut params = Vec::new();
@@ -878,32 +900,37 @@ impl JsBindgen<'_> {
             ErrHandling::None
         };
 
-        let mut f = FunctionBindgen {
-            is_async: false,
-            tracing_prefix: None,
-            intrinsics: &mut self.all_intrinsics,
-            valid_lifting_optimization: true,
-            sizes: &self.sizes,
-            err,
-            block_storage: Vec::new(),
-            blocks: Vec::new(),
-            callee,
-            memory: Some(&self.memory),
-            realloc: Some(&self.realloc),
-            tmp: 0,
-            params,
-            post_return: None,
-            encoding: match string_encoding {
+        let tracing_prefix = String::new();
+        let mut f = FunctionBindgen::builder()
+            .is_async(false)
+            .tracing_prefix(&tracing_prefix)
+            .intrinsics(&mut self.all_intrinsics)
+            .valid_lifting_optimization(true)
+            .sizes(&self.sizes)
+            .err(err)
+            .block_storage(Vec::new())
+            .blocks(Vec::new())
+            .callee(callee)
+            .memory(&self.memory)
+            .realloc(&self.realloc)
+            .tmp(0)
+            .params(params)
+            .encoding(match string_encoding {
                 StringEncoding::UTF8 => StringEncoding::UTF8,
                 StringEncoding::UTF16 => todo!("UTF16 encoding"),
                 StringEncoding::CompactUTF16 => todo!("Compact UTF16 encoding"),
-            },
-            src: Source::default(),
-            resource_map: &resource_map,
-            cur_resource_borrows: false,
-            resolve: self.resolve,
-            callee_resource_dynamic: false,
-        };
+            })
+            .src(Source::default())
+            .resource_map(&resource_map)
+            .clear_resource_borrows(false)
+            .resolve(self.resolve)
+            .callee_resource_dynamic(false)
+            .asmjs(false)
+            .requires_async_porcelain(requires_async_porcelain)
+            .tracing_enabled(false)
+            .maybe_iface_name(iface_name.as_deref())
+            .build();
+
         abi::call(
             self.resolve,
             abi,
@@ -918,6 +945,7 @@ impl JsBindgen<'_> {
             &mut f,
             false,
         );
+
         self.src.push_str(&f.src);
         self.src.push_str("}");
     }
@@ -965,12 +993,23 @@ impl JsBindgen<'_> {
         // the function bindgen as currently written still makes this assumption
         let sig = self.resolve.wasm_signature(AbiVariant::GuestImport, func);
 
+        // We treat all functions as requiring async porcelain to
+        // allow for use of `fetch()`
+        //
+        // Requiring async porcelain is distinct from a "real"
+        // P3 async export, in that the callee is *not* expected to follow
+        // the async ABI, but instead essentially be treated like an async
+        // JS function.
+        let requires_async_porcelain = true;
+
         self.bindgen(
             sig.params.len(),
-            &format!("await {callee}"),
+            &callee,
             string_encoding,
             func,
             AbiVariant::GuestImport,
+            &iface_name,
+            requires_async_porcelain,
         );
         self.src.push_str("\n");
 
