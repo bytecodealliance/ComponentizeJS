@@ -50,7 +50,11 @@ obj/builtins:
 	mkdir -p obj/builtins
 
 clean:
-	rm -r obj
-	rm lib/spidermonkey-embedding-splicer.js
-	rm lib/starlingmonkey_embedding.wasm
-	rm lib/starlingmonkey_embedding.debug.wasm
+	echo "removing build artifacts"
+	rm -r obj || true
+	rm lib/spidermonkey-embedding-splicer.js || true
+	rm lib/starlingmonkey_embedding.wasm || true
+	rm lib/starlingmonkey_embedding.debug.wasm || true
+	echo "removing cmake outputs"
+	rm build-debug || true
+	rm build-release || true
