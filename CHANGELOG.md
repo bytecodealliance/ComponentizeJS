@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.21.0] - 2026-05-19
+
+### 🐛 Bug Fixes
+
+* improve weval and wizer error reporting (#333) by @andreiltd in #333
+
+
+### ⚙️ Miscellaneous Tasks
+
+* *(deps)* update js-component-bindgen (#337) by @vados-cosmonic in #337
+
+
+
+
 ## [0.20.0] - 2026-04-14
 
 ### 🚀 Features
