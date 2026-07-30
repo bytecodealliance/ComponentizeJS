@@ -29,6 +29,7 @@ pub enum Resource {
     Constructor(String),
     Static(String),
     Method(String),
+    Destructor(String),
 }
 
 impl Resource {
@@ -38,6 +39,7 @@ impl Resource {
             Resource::Constructor(name) => format!("[constructor]{name}"),
             Resource::Static(name) => format!("[static]{name}.{fn_name}"),
             Resource::Method(name) => format!("[method]{name}.{fn_name}"),
+            Resource::Destructor(name) => format!("[dtor]{name}"),
         }
     }
 
@@ -64,6 +66,9 @@ impl Resource {
                     name.to_lower_camel_case(),
                     fn_name.to_lower_camel_case()
                 )
+            }
+            Resource::Destructor(name) => {
+                format!("{}$dtor", name.to_lower_camel_case())
             }
         }
     }
@@ -190,7 +195,8 @@ pub fn componentize_bindgen(
                     Resource::None => None,
                     Resource::Method(name)
                     | Resource::Static(name)
-                    | Resource::Constructor(name) => Some(name),
+                    | Resource::Constructor(name)
+                    | Resource::Destructor(name) => Some(name),
                 })
                 .or_default()
                 .push(item);
@@ -426,10 +432,12 @@ impl JsBindgen<'_> {
                 }
                 WorldItem::Interface { id, stability: _ } => {
                     let iface = &self.resolve.interfaces[*id];
-                    for id in iface.types.values() {
-                        if let TypeDefKind::Resource = &self.resolve.types[*id].kind {
+                    let iface_name = interface_name(self.resolve, *id);
+                    for ty_id in iface.types.values() {
+                        if let TypeDefKind::Resource = &self.resolve.types[*ty_id].kind {
                             self.resource_directions
-                                .insert(*id, AbiVariant::GuestExport);
+                                .insert(*ty_id, AbiVariant::GuestExport);
+                            self.resource_dtor_bindgen(name.clone(), iface_name.clone(), *ty_id);
                         }
                     }
                     for (func_name, func) in &iface.functions {
@@ -987,6 +995,59 @@ impl JsBindgen<'_> {
                     func,
                     &self.resolve.wasm_signature(AbiVariant::GuestExport, func),
                 ),
+            },
+        ));
+    }
+
+    fn resource_dtor_bindgen(
+        &mut self,
+        export_name: String,
+        iface_name: Option<String>,
+        resource: TypeId,
+    ) {
+        let resource_name = self.resolve.types[resource].name.as_ref().unwrap();
+        let resource_name_camel = resource_name.to_lower_camel_case();
+        let prefix = iface_name
+            .as_deref()
+            .map(|name| format!("{name}$"))
+            .unwrap_or_default();
+        let symbol_dispose = self.intrinsic(Intrinsic::SymbolDispose);
+        let symbol_resource_handle = self.intrinsic(Intrinsic::SymbolResourceHandle);
+        let binding_name = format!(
+            "export_{}",
+            binding_name(&format!("{resource_name_camel}$dtor"), &iface_name)
+        );
+
+        uwriteln!(
+            self.src,
+            "
+            async function {binding_name}(rep) {{
+                const entry = repTable.get(rep);
+                if (!entry) return;
+                repTable.delete(rep);
+                const resource = entry.rep;
+                delete resource[{symbol_resource_handle}];
+                finalizationRegistry_export${prefix}{resource_name_camel}.unregister(resource);
+                if (resource[{symbol_dispose}]) resource[{symbol_dispose}]();
+            }}
+            "
+        );
+
+        self.exports.push((
+            export_name,
+            BindingItem {
+                iface: true,
+                iface_name,
+                binding_name,
+                resource: Resource::Destructor(resource_name.clone()),
+                name: resource_name.clone(),
+                func: CoreFn {
+                    params: vec![CoreTy::I32],
+                    ret: None,
+                    retptr: false,
+                    retsize: 0,
+                    paramptr: false,
+                },
             },
         ));
     }

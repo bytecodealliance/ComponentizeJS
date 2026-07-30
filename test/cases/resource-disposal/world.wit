@@ -1,0 +1,14 @@
+package test:test;
+
+interface resources {
+  resource example {
+    constructor(id: u32);
+    get-id: func() -> u32;
+  }
+
+  dispose-count: func() -> u32;
+}
+
+world test {
+  export resources;
+}

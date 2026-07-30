@@ -199,7 +199,11 @@ pub fn splice_bindings(
         } else {
             export_name.clone()
         };
-        exports.push((expt, map_core_fn(func)));
+        exports.push((
+            expt,
+            map_core_fn(func),
+            matches!(resource, bindgen::Resource::Destructor(_)),
+        ));
     }
 
     let mut imports = Vec::new();
@@ -340,7 +344,7 @@ pub fn splice_bindings(
 pub fn splice(
     engine: Vec<u8>,
     imports: Vec<(String, String, CoreFn, Option<i32>)>,
-    exports: Vec<(String, CoreFn)>,
+    exports: Vec<(String, CoreFn, bool)>,
     features: Vec<Feature>,
     debug: bool,
 ) -> Result<Vec<u8>> {
@@ -383,13 +387,13 @@ pub fn splice(
 
 fn remove_if_exported_by_js(
     module: &mut Module,
-    content_exports: &[(String, CoreFn)],
+    content_exports: &[(String, CoreFn, bool)],
     name_start: &str,
     name_end: &str,
 ) {
     let content_exports_run = content_exports
         .iter()
-        .any(|(name, _)| name.starts_with(name_start) && name.ends_with(name_end));
+        .any(|(name, _, _)| name.starts_with(name_start) && name.ends_with(name_end));
     if content_exports_run {
         let exported_run_fn = module
             .exports
@@ -846,7 +850,10 @@ fn synthesize_import_functions(
     Ok(())
 }
 
-fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]) -> Result<()> {
+fn synthesize_export_functions(
+    module: &mut Module,
+    exports: &[(String, CoreFn, bool)],
+) -> Result<()> {
     let cabi_realloc = get_export_fid(
         module,
         &module
@@ -867,7 +874,7 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
 
     let memory = 0;
     // (2) Export call function synthesis
-    for (export_num, (expt_name, expt_sig)) in exports.iter().enumerate() {
+    for (export_num, (expt_name, expt_sig, inline_post_call)) in exports.iter().enumerate() {
         // Export function synthesis
         {
             // add the function type
@@ -1031,8 +1038,17 @@ fn synthesize_export_functions(module: &mut Module, exports: &[(String, CoreFn)]
                 }
             }
 
+            if *inline_post_call {
+                func.i32_const(export_num as i32);
+                func.call(post_call);
+            }
+
             let fid = func.finish_module(module);
             module.exports.add_export_func((*expt_name).clone(), *fid);
+        }
+
+        if *inline_post_call {
+            continue;
         }
 
         // Post export function synthesis
