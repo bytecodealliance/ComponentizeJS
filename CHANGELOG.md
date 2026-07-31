@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.22.0] - 2026-07-31
+
+### 🚀 Features
+
+* *(splicer)* add destructor metadata (#345) by @vados-cosmonic in #345
+
+
+### ⚙️ Miscellaneous Tasks
+
+* add removal of cmake artifacts to make clean (#338) by @vados-cosmonic in #338
+
+
+
+
 ## [0.21.0] - 2026-05-20
 
 ### 🐛 Bug Fixes
