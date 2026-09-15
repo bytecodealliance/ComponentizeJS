@@ -1,6 +1,7 @@
 #include "embedding.h"
 #include "debugger.h"
 #include "builtins/web/performance.h"
+#include "js/Conversions.h"
 
 namespace builtins::web::console {
 
@@ -140,6 +141,16 @@ cabi_realloc_adapter(void *ptr, size_t orig_size, size_t org_align,
 // see: https://github.com/bytecodealliance/wasmtime/blob/aec935f2e746d71934c8a131be15bbbb4392138c/crates/wasmtime/src/runtime/component/func/host.rs#L741
 __attribute__((export_name("cabi_realloc"))) void *
 cabi_realloc(void *ptr, size_t orig_size, size_t org_align, size_t new_size) {
+  // Empty canonical buffers have no backing allocation.
+  if (new_size == 0) {
+    if (orig_size != 0) {
+      JS_free(Runtime.cx, ptr);
+    }
+    return nullptr;
+  }
+  if (orig_size == 0) {
+    ptr = nullptr;
+  }
   void *ret = JS_realloc(Runtime.cx, ptr, orig_size, new_size);
   if (!ret) {
     Runtime.engine->abort("(cabi_realloc) Unable to realloc");
@@ -162,6 +173,9 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
     Runtime.engine->abort("(call) unexpected call state, post_call was not called after last call");
   }
   Runtime.cur_fn_idx = fn_idx;
+  if (argptr) {
+    Runtime.free_list.push_back(argptr);
+  }
   ComponentizeRuntime::CoreFn *fn = &Runtime.fns[fn_idx];
   if (Runtime.debug) {
     fprintf(stderr, "(call) Function [%d] - ", fn_idx);
@@ -464,8 +478,28 @@ static bool ReallocFn(JSContext *cx, unsigned argc, JS::Value *vp) {
   size_t old_len = args[1].toInt32();
   size_t align = args[2].toInt32();
   size_t new_len = args[3].toInt32();
+  // This wrapper is only used by generated lowering code. Native JS values
+  // can retain allocations made through the general cabi_realloc export.
+  if (old_ptr) {
+    Runtime.free_list_remove(old_ptr);
+  }
   void *ptr = cabi_realloc(old_ptr, old_len, align, new_len);
+  if (ptr) {
+    Runtime.free_list.push_back(ptr);
+  }
   args.rval().setInt32((uint32_t)ptr);
+  return true;
+}
+
+static bool DeallocFn(JSContext *cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  uint32_t ptr;
+  if (!JS::ToUint32(cx, args[0], &ptr)) {
+    return false;
+  }
+  Runtime.free_list_remove((void *)ptr);
+  cabi_free((void *)ptr);
+  args.rval().setUndefined();
   return true;
 }
 
@@ -537,7 +571,7 @@ bool install(api::Engine *engine) {
   uint32_t import_cnt = atoi(getenv("IMPORT_CNT"));
 
   JS::RootedObject import_bindings(
-      Runtime.cx, JS::NewArrayObject(Runtime.cx, 2 + import_cnt));
+      Runtime.cx, JS::NewArrayObject(Runtime.cx, 3 + import_cnt));
 
   LOG("(wizer) create the memory buffer JS object");
   JS::RootedObject mem(Runtime.cx, JS_NewPlainObject(Runtime.cx));
@@ -557,6 +591,15 @@ bool install(api::Engine *engine) {
   JS::RootedObject function_obj(Runtime.cx, JS_GetFunctionObject(realloc_fn));
   JS_SetElement(Runtime.cx, import_bindings, 1, function_obj);
 
+  JSFunction *dealloc_fn = JS_NewFunction(Runtime.cx, DeallocFn, 0, 0, "dealloc");
+  if (!dealloc_fn) {
+    return false;
+  }
+  function_obj = JS_GetFunctionObject(dealloc_fn);
+  if (!JS_SetElement(Runtime.cx, import_bindings, 2, function_obj)) {
+    return false;
+  }
+
   LOG("(wizer) create the %d import JS functions", import_cnt);
   for (size_t i = 0; i < import_cnt; i++) {
     sprintf(&env_name[0], "IMPORT%zu_NAME", i);
@@ -569,7 +612,7 @@ bool install(api::Engine *engine) {
       return false;
     }
     JS::RootedObject function_obj(Runtime.cx, JS_GetFunctionObject(import_fn));
-    JS_SetElement(Runtime.cx, import_bindings, 2 + i, function_obj);
+    JS_SetElement(Runtime.cx, import_bindings, 3 + i, function_obj);
   }
 
   LOG("(wizer) setting the binding global");

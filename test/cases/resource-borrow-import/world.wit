@@ -16,4 +16,5 @@ world test {
   export test: func(v: u32) -> u32;
   export test-borrow: func(v: borrow<thing>) -> u32;
   export test-borrow-early-drop: func(v: borrow<thing>) -> u32;
+  export test-borrow-async: func(v: borrow<thing>, fail: bool) -> result<u32, u32>;
 }
