@@ -1,6 +1,6 @@
 export class Y {
     constructor (value) {
-        this.value = value
+        this.a = value
     }
     getA () {
         return this.a;
@@ -13,4 +13,3 @@ export class Y {
         return x;
     }
 }
-

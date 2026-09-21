@@ -41,13 +41,13 @@ export const exports = {
     let y = new Y(3);
     const sum1 = Y.add(y, 4).getA();
     if (sum1 != 7) {
-      return { tag: 'err', value: `expected 7; got ${sum1}` };
+      return { tag: 'err', val: `expected 7; got ${sum1}` };
     }
 
     y.setA(5);
     const sum2 = Y.add(y, 4).getA();
     if (sum2 != 9) {
-      return { tag: 'err', value: `expected 9; got ${sum2}` };
+      return { tag: 'err', val: `expected 9; got ${sum2}` };
     }
 
     return { tag: 'ok' };

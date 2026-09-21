@@ -82,6 +82,7 @@ namespace componentize::embedding
 
     // the current export function call
     int cur_fn_idx = -1;
+    // Owned call areas and buffers produced by generated JS lowering.
     std::vector<void *> free_list;
 
     void free_list_remove(void *ptr)

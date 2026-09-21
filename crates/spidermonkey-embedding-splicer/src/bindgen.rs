@@ -104,6 +104,7 @@ struct JsBindgen<'a> {
     sizes: SizeAlign,
     memory: String,
     realloc: String,
+    dealloc: String,
 
     // export "name"
     exports: Vec<(String, BindingItem)>,
@@ -158,6 +159,7 @@ pub fn componentize_bindgen(
         sizes: SizeAlign::default(),
         memory: "$memory".to_string(),
         realloc: "$realloc".to_string(),
+        dealloc: "$dealloc".to_string(),
         exports: Vec::new(),
         imports: Vec::new(),
         resource_directions: HashMap::new(),
@@ -370,7 +372,7 @@ pub fn componentize_bindgen(
             let repCnt = 1;
             let repTable = new Map();
 
-            let [$memory, $realloc{}] = $bindings;
+            let [$memory, $realloc, $dealloc{}] = $bindings;
             delete globalThis.$bindings;
 
             {finalization_registries}
@@ -908,9 +910,17 @@ impl JsBindgen<'_> {
             ErrHandling::None
         };
 
+        // Imports use the guest-export ABI here because the native glue returns
+        // its allocated result area to JS. Release it only after lifting finishes.
+        let needs_post_return =
+            abi == AbiVariant::GuestExport && self.resolve.wasm_signature(abi, func).retptr;
         let tracing_prefix = String::new();
+        // Lifting copies owned export parameters as well as import results.
         let mut f = FunctionBindgen::builder()
+            .skip_fn_call_task_management(true)
             .is_async(false)
+            .canonical_abi_async(false)
+            .wrap_async_future_result(false)
             .tracing_prefix(&tracing_prefix)
             .intrinsics(&mut self.all_intrinsics)
             .valid_lifting_optimization(true)
@@ -921,6 +931,8 @@ impl JsBindgen<'_> {
             .callee(callee)
             .memory(&self.memory)
             .realloc(&self.realloc)
+            .dealloc(&self.dealloc)
+            .maybe_post_return(needs_post_return.then_some(&self.dealloc))
             .tmp(0)
             .params(params)
             .encoding(match string_encoding {
@@ -936,6 +948,7 @@ impl JsBindgen<'_> {
             .asmjs(false)
             .requires_async_porcelain(requires_async_porcelain)
             .tracing_enabled(false)
+            .no_component_error_wrapping(false)
             .maybe_iface_name(iface_name.as_deref())
             .build();
 

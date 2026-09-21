@@ -15,3 +15,10 @@ export function testBorrowEarlyDrop(value) {
     value[Symbol.dispose]();
     return result;
 }
+
+export async function testBorrowAsync(value, fail) {
+    await Promise.resolve();
+    const result = foo(value) + 10;
+    if (fail) throw result;
+    return result;
+}
