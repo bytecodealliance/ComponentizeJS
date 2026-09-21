@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.23.0] - 2026-09-21
+
+### 🐛 Bug Fixes
+
+* use STARLINGMONKEY_SRC variable in include_directories (#348) by @cuban-goats in #348
+
+
+### Other Changes
+
+* *(other changes)* bump js-component-bindgen crate (#353) by @andreiltd in #353
+
+* *(other changes)* bump weval to v0.5.0 (#352) by @walf443 in #352
+
+
+
+## New Contributors
+* @walf443 made their first contribution in [#352](https://github.com/bytecodealliance/ComponentizeJS/pull/352)
+* @cuban-goats made their first contribution in [#348](https://github.com/bytecodealliance/ComponentizeJS/pull/348)
+
+
 ## [0.22.0] - 2026-07-31
 
 ### 🚀 Features
