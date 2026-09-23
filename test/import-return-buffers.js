@@ -4,7 +4,11 @@ import { assert, test } from 'vitest';
 
 import { splicer } from '../lib/spidermonkey-embedding-splicer.js';
 
-import { DEBUG_TEST_ENABLED, WEVAL_TEST_ENABLED } from './util.js';
+import {
+  DEBUG_TEST_ENABLED,
+  NIGHTMONKEY_TEST_ENABLED,
+  WEVAL_TEST_ENABLED,
+} from './util.js';
 
 test('frees an imported string and its return area after copying', async () => {
   const wit = `
@@ -18,6 +22,8 @@ world test {
 `;
   const engineName = WEVAL_TEST_ENABLED
     ? 'starlingmonkey_embedding_weval.wasm'
+    : NIGHTMONKEY_TEST_ENABLED
+    ? 'starlingmonkey_embedding_nightmonkey.wasm'
     : `starlingmonkey_embedding${DEBUG_TEST_ENABLED ? '.debug' : ''}.wasm`;
   const engine = await readFile(new URL(`../lib/${engineName}`, import.meta.url));
   const { jsBindings } = splicer.spliceBindings(

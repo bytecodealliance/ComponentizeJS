@@ -67,6 +67,21 @@ AOT compilation can also be configured with the following options:
 
 To use a custom (pre-downloaded) [`weval`][weval] binary, set the `wevalBin` option to the path to your desired weval binary.
 
+### NightMonkey AOT Compilation
+
+[NightMonkey][nightmonkey] is an ahead-of-time JS-to-Wasm compiler: after the Wizer snapshot is taken, it compiles the JS functions in the snapshot to WebAssembly, using a whole-program type analysis with dynamic guards (and falling back to the interpreter where it cannot compile).
+
+To enable it, set the `enableNightmonkey: true` option or use the `--nightmonkey` CLI flag. It cannot be combined with weval AOT compilation.
+
+NightMonkey compiles with a native `nightmonkey` binary that must match the engine exactly, so the package includes one for each supported host (Linux x86-64 and AArch64, macOS AArch64 and Windows x86-64), built alongside the engine. A local engine build (`npm run build:nightmonkey`) adds the one it built for the host. It can also be configured with the following options:
+
+| Option            | Type       | Example       | Description                                                    |
+|-------------------|------------|---------------|----------------------------------------------------------------|
+| `nightmonkeyBin`  | `string`   | `./nightmonkey` | Path to the NightMonkey compiler matching the engine (CLI: `--nightmonkey-bin`) |
+| `nightmonkeyArgs` | `string[]` | `['--stats']` | Extra arguments to pass to the compiler                        |
+
+[nightmonkey]: https://github.com/bytecodealliance/nightmonkey
+
 ## Platform APIs
 
 The following APIs are available:
@@ -241,6 +256,19 @@ export function componentize(opts: {
    * Use a pre-existing path to the `weval` binary, if present
    */
   wevalBin?: string;
+  /**
+   * Enable AoT using NightMonkey (cannot be combined with `enableAot`)
+   */
+  enableNightmonkey?: boolean;
+  /**
+   * Path to the NightMonkey compiler; it must match the engine. Defaults to
+   * the one for the host that ships with the NightMonkey engine.
+   */
+  nightmonkeyBin?: string;
+  /**
+   * Extra arguments to pass to the NightMonkey compiler (e.g. `['--stats']`)
+   */
+  nightmonkeyArgs?: string[];
   /**
    * Use a pre-existing path to the `wizer` binary, if present
    */
