@@ -2,12 +2,12 @@ import { freemem } from 'node:os';
 import { TextDecoder } from 'node:util';
 import { Buffer } from 'node:buffer';
 import { fileURLToPath, URL } from 'node:url';
-import { cwd, stdout, platform } from 'node:process';
+import { cwd, stdout, platform, arch } from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve, join, dirname, relative } from 'node:path';
 import { readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
-import { rmSync, existsSync } from 'node:fs';
+import { rmSync, existsSync, accessSync, chmodSync, constants } from 'node:fs';
 import { createHash } from 'node:crypto';
 
 import oxc from 'oxc-parser';
@@ -48,6 +48,14 @@ const CHECK_INIT_RETURN_TYPE_PARSE = 2;
 const DEFAULT_AOT_CACHE = fileURLToPath(
   new URL(`../lib/starlingmonkey_ics.wevalcache`, import.meta.url),
 );
+
+/** The NightMonkey compiler in lib/nightmonkey/ for each supported host */
+const NIGHTMONKEY_HOST_ASSETS = {
+  'linux x64': 'nightmonkey-x86_64-linux',
+  'linux arm64': 'nightmonkey-aarch64-linux',
+  'darwin arm64': 'nightmonkey-aarch64-macos',
+  'win32 x64': 'nightmonkey-x86_64-windows.exe',
+};
 
 /** Default settings for debug options */
 const DEFAULT_DEBUG_SETTINGS = {
@@ -117,8 +125,17 @@ export async function componentize(
   debugBuild = debugBuild || debug?.build;
   enableWizerLogging = enableWizerLogging || debug?.enableWizerLogging;
 
+  if (opts.enableAot && opts.enableNightmonkey) {
+    throw new Error(
+      'enableAot (weval) and enableNightmonkey cannot be used together',
+    );
+  }
+
   // Determine the path to the StarlingMonkey binary
   const engine = getEnginePath(opts);
+  const nightmonkeyBin = opts.enableNightmonkey
+    ? getNightmonkeyPath(opts)
+    : null;
 
   // Determine the default features that should be included
   const features = new Set();
@@ -365,8 +382,45 @@ export async function componentize(
     throw new Error(err);
   }
 
+  // AOT-compile the JS in the wizened snapshot with NightMonkey. This runs on
+  // the core module, before the WASI imports are stubbed out and it is wrapped
+  // into a component.
+  let snapshotWasmPath = outputWasmPath;
+  if (opts.enableNightmonkey) {
+    const compiledWasmPath = join(workDir, 'out.nightmonkey.wasm');
+    const nightmonkey = spawnSync(
+      nightmonkeyBin,
+      [
+        ...(opts.nightmonkeyArgs ?? []),
+        outputWasmPath,
+        '-o',
+        compiledWasmPath,
+      ],
+      {
+        stdio: [null, stdout, 'pipe'],
+        encoding: 'utf-8',
+      },
+    );
+    if (nightmonkey.status !== 0 || nightmonkey.signal || nightmonkey.error) {
+      let err = `Failed to AOT-compile with NightMonkey (${nightmonkeyBin}):\n${nightmonkey.stderr ?? ''}`;
+      if (nightmonkey.signal) {
+        err += `\nProcess was killed by signal: ${nightmonkey.signal}`;
+      }
+      if (nightmonkey.error) {
+        err += `\nProcess error: ${nightmonkey.error.message}`;
+      }
+      if (debugBindings) {
+        err += `\n\nBinary and sources available for debugging at ${workDir}\n`;
+      } else {
+        await rm(workDir, { recursive: true });
+      }
+      throw new Error(err);
+    }
+    snapshotWasmPath = compiledWasmPath;
+  }
+
   // Read the generated WASM back into memory
-  const bin = await readFile(outputWasmPath);
+  const bin = await readFile(snapshotWasmPath);
 
   // Check for initialization errors, by actually executing the binary in
   // a mini sandbox to get back the initialization state
@@ -508,8 +562,45 @@ function getEnginePath(opts) {
   let engineBinaryRelPath = `../lib/starlingmonkey_embedding${debugSuffix}.wasm`;
   if (opts.enableAot) {
     engineBinaryRelPath = '../lib/starlingmonkey_embedding_weval.wasm';
+  } else if (opts.enableNightmonkey) {
+    engineBinaryRelPath = '../lib/starlingmonkey_embedding_nightmonkey.wasm';
   }
   return fileURLToPath(new URL(engineBinaryRelPath, import.meta.url));
+}
+
+/**
+ * Determine the path to the NightMonkey compiler for the host.
+ *
+ * The compiler is a native binary that must match the engine exactly, so the
+ * package ships one per supported host, built alongside the engine.
+ */
+function getNightmonkeyPath(opts) {
+  if (opts.nightmonkeyBin) {
+    return opts.nightmonkeyBin;
+  }
+  const asset = NIGHTMONKEY_HOST_ASSETS[`${platform} ${arch}`];
+  if (!asset) {
+    throw new Error(
+      `No NightMonkey compiler is available for ${platform}/${arch}; set nightmonkeyBin to one matching the engine`,
+    );
+  }
+  const bin = fileURLToPath(
+    new URL(`../lib/nightmonkey/${asset}`, import.meta.url),
+  );
+  if (!existsSync(bin)) {
+    throw new Error(
+      `NightMonkey compiler not found at ${bin}; build it with \`npm run build:nightmonkey\`, or set nightmonkeyBin to one matching the engine`,
+    );
+  }
+  // Packaging and artifact transfers do not always preserve the executable bit.
+  if (platform !== 'win32') {
+    try {
+      accessSync(bin, constants.X_OK);
+    } catch {
+      chmodSync(bin, 0o755);
+    }
+  }
+  return bin;
 }
 
 /** Prepare a work directory for use with componentization */

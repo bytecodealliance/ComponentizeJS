@@ -10,6 +10,7 @@ export const DEBUG_TRACING_ENABLED = isEnabledEnvVar(env.DEBUG_TRACING);
 export const LOG_DEBUGGING_ENABLED = isEnabledEnvVar(env.LOG_DEBUGGING);
 export const DEBUG_TEST_ENABLED = isEnabledEnvVar(env.DEBUG_TEST);
 export const WEVAL_TEST_ENABLED = isEnabledEnvVar(env.WEVAL_TEST);
+export const NIGHTMONKEY_TEST_ENABLED = isEnabledEnvVar(env.NIGHTMONKEY_TEST);
 
 function isEnabledEnvVar(v) {
   return (

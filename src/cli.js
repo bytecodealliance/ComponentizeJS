@@ -12,6 +12,8 @@ export async function componentizeCmd(jsSource, opts) {
     worldName: opts.worldName,
     runtimeArgs: opts.runtimeArgs,
     enableAot: opts.aot,
+    enableNightmonkey: opts.nightmonkey,
+    nightmonkeyBin: opts.nightmonkeyBin,
     engine: opts.engine,
     disableFeatures: opts.disable,
     preview2Adapter: opts.preview2Adapter,
@@ -35,6 +37,7 @@ program
   .option('-n, --world-name <name>', 'WIT world to build')
   .option('--runtime-args <string>', 'arguments to pass to the runtime')
   .option('--aot', 'enable AOT compilation')
+  .option('--nightmonkey', 'enable NightMonkey AOT compilation')
   .option(
     '--engine <path>',
     'provide a custom ComponentizeJS engine build path',
@@ -61,6 +64,10 @@ program
   .option(
     '--weval-bin <path>',
     'specify a path to a local weval binary',
+  )
+  .option(
+    '--nightmonkey-bin <path>',
+    'specify a path to the NightMonkey compiler matching the engine',
   )
   .option(
     '--aot-cache-dir <path>',

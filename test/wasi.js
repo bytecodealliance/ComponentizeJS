@@ -15,6 +15,7 @@ import {
   DEBUG_TRACING_ENABLED,
   DEBUG_TEST_ENABLED,
   WEVAL_TEST_ENABLED,
+NIGHTMONKEY_TEST_ENABLED,
 } from './util.js';
 
 suite('WASI', () => {
@@ -40,6 +41,7 @@ suite('WASI', () => {
           worldName: 'test1',
           debugBuild: DEBUG_TEST_ENABLED,
           enableAot: WEVAL_TEST_ENABLED,
+          enableNightmonkey: NIGHTMONKEY_TEST_ENABLED,
         },
       },
       transpile: {
@@ -69,6 +71,7 @@ suite('WASI', () => {
           worldName: 'test1',
           debugBuild: DEBUG_TEST_ENABLED,
           enableAot: WEVAL_TEST_ENABLED,
+          enableNightmonkey: NIGHTMONKEY_TEST_ENABLED,
         },
       },
       transpile: {

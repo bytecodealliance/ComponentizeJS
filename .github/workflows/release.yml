@@ -98,10 +98,16 @@ jobs:
           export PRERELEASE_TAG=$(node scripts/semver-get-prerelease.mjs $NEXT_VERSION);
           echo -e "prerelease-tag=$PRERELEASE_TAG" >> $GITHUB_OUTPUT;
 
+  nightmonkey-compilers:
+    needs:
+      - meta
+    uses: ./.github/workflows/nightmonkey-compilers.yml
+
   pack-npm-release:
     runs-on: ubuntu-24.04
     needs:
       - meta
+      - nightmonkey-compilers
     strategy:
       matrix:
         rust-version:
@@ -137,6 +143,15 @@ jobs:
       - name: Install NPM packages
         run: |
           npm install
+
+      # The engines are built by `npm pack` below; the NightMonkey compilers
+      # for every host are built natively by the job above.
+      - name: Download NightMonkey compilers
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: nightmonkey-*
+          path: lib/nightmonkey
+          merge-multiple: true
 
       - name: Create release package
         working-directory: ${{ needs.meta.outputs.project-dir }}

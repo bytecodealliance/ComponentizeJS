@@ -16,6 +16,7 @@ all: release
 debug: lib/starlingmonkey_embedding.debug.wasm lib/spidermonkey-embedding-splicer.js
 release: lib/starlingmonkey_embedding.wasm lib/spidermonkey-embedding-splicer.js
 release-weval: lib/starlingmonkey_ics.wevalcache lib/spidermonkey-embedding-splicer.js
+release-nightmonkey: lib/starlingmonkey_embedding_nightmonkey.wasm lib/spidermonkey-embedding-splicer.js
 
 lib/spidermonkey-embedding-splicer.js: target/wasm32-wasip1/release/splicer_component.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj lib
 	@$(JCO) new target/wasm32-wasip1/release/splicer_component.wasm -o obj/spidermonkey-embedding-splicer.wasm --wasi-reactor
@@ -31,6 +32,12 @@ lib/starlingmonkey_embedding.wasm: $(STARLINGMONKEY_DEPS) | lib
 lib/starlingmonkey_embedding_weval.wasm: $(STARLINGMONKEY_DEPS) | lib
 	cmake -B build-release-weval -DCMAKE_BUILD_TYPE=Release -DUSE_WASM_OPT=OFF -DWEVAL=ON
 	make -j16 -C build-release-weval starlingmonkey_embedding
+
+# Also puts the NightMonkey compiler this build made for the host in
+# lib/nightmonkey/ (CI adds those for the other hosts when packaging).
+lib/starlingmonkey_embedding_nightmonkey.wasm: $(STARLINGMONKEY_DEPS) | lib
+	cmake -B build-release-nightmonkey -DCMAKE_BUILD_TYPE=Release -DNIGHTMONKEY=ON
+	make -j16 -C build-release-nightmonkey starlingmonkey_embedding
 
 lib/starlingmonkey_ics.wevalcache: lib/starlingmonkey_embedding_weval.wasm
 	@cp build-release-weval/starling-raw.wasm/starling-ics.wevalcache $@
@@ -55,6 +62,8 @@ clean:
 	rm lib/spidermonkey-embedding-splicer.js || true
 	rm lib/starlingmonkey_embedding.wasm || true
 	rm lib/starlingmonkey_embedding.debug.wasm || true
+	rm -r lib/starlingmonkey_embedding_nightmonkey.wasm lib/nightmonkey || true
 	echo "removing cmake outputs"
 	rm build-debug || true
 	rm build-release || true
+	rm build-release-nightmonkey || true

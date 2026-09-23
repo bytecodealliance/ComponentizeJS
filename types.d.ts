@@ -30,6 +30,19 @@ interface ComponentizeOptions {
    */
   wevalBin?: string;
   /**
+   * Enable AoT using NightMonkey (cannot be combined with `enableAot`)
+   */
+  enableNightmonkey?: boolean;
+  /**
+   * Path to the NightMonkey compiler; it must match the engine. Defaults to
+   * the one for the host that ships with the NightMonkey engine.
+   */
+  nightmonkeyBin?: string;
+  /**
+   * Extra arguments to pass to the NightMonkey compiler (e.g. `['--stats']`)
+   */
+  nightmonkeyArgs?: string[];
+  /**
    * Use a pre-existing path to the `wizer` binary, if present
    */
   wizerBin?: string;

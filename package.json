@@ -31,13 +31,15 @@
   "scripts": {
     "clean": "npm run clean:starlingmonkey",
     "clean:starlingmonkey": "rm -rf build-release",
-    "build": "npm run build:release && npm run build:debug && npm run build:weval",
+    "build": "npm run build:release && npm run build:debug && npm run build:weval && npm run build:nightmonkey",
     "build:release": "make release",
     "build:debug": "make debug",
     "build:weval": "make release-weval",
+    "build:nightmonkey": "make release-nightmonkey",
     "test": "vitest run -c test/vitest.ts",
     "test:release": "vitest run -c test/vitest.ts",
     "test:weval": "cross-env WEVAL_TEST=1 vitest run -c test/vitest.ts",
+    "test:nightmonkey": "cross-env NIGHTMONKEY_TEST=1 vitest run -c test/vitest.ts",
     "test:debug": "cross-env DEBUG_TEST=1 vitest run -c test/vitest.ts",
     "prepack": "node scripts/prepack.mjs"
   },
@@ -48,6 +50,8 @@
     "lib/starlingmonkey_embedding.debug.wasm",
     "lib/starlingmonkey_embedding_weval.wasm",
     "lib/starlingmonkey_ics.wevalcache",
+    "lib/starlingmonkey_embedding_nightmonkey.wasm",
+    "lib/nightmonkey",
     "src",
     "types.d.ts"
   ],

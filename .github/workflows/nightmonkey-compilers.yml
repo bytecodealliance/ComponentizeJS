@@ -1,0 +1,80 @@
+name: nightmonkey-compilers
+
+# Builds the NightMonkey compiler for each supported host from the NightMonkey
+# revision and engine version the StarlingMonkey submodule pins, and uploads
+# each as an artifact named after its file in lib/nightmonkey/ (see
+# NIGHTMONKEY_HOST_ASSETS in src/componentize.js). The compiler is a native
+# binary, so unlike the engine it cannot be built once on Linux.
+on:
+  workflow_call:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: NightMonkey compiler (${{ matrix.asset }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: nightmonkey-x86_64-linux
+            binary: nightmonkey
+          - os: ubuntu-24.04-arm
+            asset: nightmonkey-aarch64-linux
+            binary: nightmonkey
+          - os: macos-14
+            asset: nightmonkey-aarch64-macos
+            binary: nightmonkey
+          - os: windows-2022
+            asset: nightmonkey-x86_64-windows.exe
+            binary: nightmonkey.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Read NightMonkey pins
+        id: pins
+        run: |
+          file=StarlingMonkey/cmake/nightmonkey.cmake
+          revision="$(awk '/^set\(NIGHTMONKEY_TAG / {gsub(/set\(NIGHTMONKEY_TAG |\)/, ""); print}' "$file")"
+          engine="$(awk '/^set\(NIGHTMONKEY_ENGINE_VERSION / {gsub(/"/, "", $2); print $2}' "$file")"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "engine=$engine" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          key: ${{ matrix.asset }}-${{ steps.pins.outputs.revision }}-${{ steps.pins.outputs.engine }}
+          path: ${{ matrix.asset }}
+
+      - uses: actions/checkout@v4
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          repository: bytecodealliance/nightmonkey
+          ref: ${{ steps.pins.outputs.revision }}
+          path: nightmonkey
+
+      - name: Build compiler
+        if: steps.cache.outputs.cache-hit != 'true'
+        # Run from the StarlingMonkey tree so that rustup uses its toolchain, as
+        # the engine build does.
+        working-directory: StarlingMonkey
+        run: |
+          cargo build --release -p nightmonkey --manifest-path ../nightmonkey/Cargo.toml \
+            --target-dir ../nightmonkey-target \
+            --no-default-features --features "${{ steps.pins.outputs.engine }}"
+          cp "../nightmonkey-target/release/${{ matrix.binary }}" "../${{ matrix.asset }}"
+
+      - name: Check compiler
+        run: ./${{ matrix.asset }} --help
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error

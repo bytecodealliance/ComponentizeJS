@@ -27,6 +27,7 @@ set(EMBEDDING_DEP "starling-raw.wasm")
 set(OUTPUT_NAME_RELEASE "starlingmonkey_embedding.wasm")
 set(OUTPUT_NAME_DEBUG "starlingmonkey_embedding.debug.wasm")
 set(OUTPUT_NAME_WEVAL "starlingmonkey_embedding_weval.wasm")
+set(OUTPUT_NAME_NIGHTMONKEY "starlingmonkey_embedding_nightmonkey.wasm")
 
 # Set the appropriate name based on current configuration
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
@@ -34,6 +35,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInf
 elseif(WEVAL)
     set(OUTPUT_FILENAME ${OUTPUT_NAME_WEVAL})
     set(EMBEDDING_DEP "starling-ics.wevalcache")
+elseif(NIGHTMONKEY)
+    set(OUTPUT_FILENAME ${OUTPUT_NAME_NIGHTMONKEY})
 else()
     set(OUTPUT_FILENAME ${OUTPUT_NAME_RELEASE})
 endif()
@@ -46,6 +49,33 @@ add_custom_target(starlingmonkey_embedding
             ${CMAKE_CURRENT_BINARY_DIR}/starling-raw.wasm/starling-raw.wasm
             ${OUTPUT_FILENAME}
 )
+
+# The NightMonkey compiler is a native binary that must match the engine
+# exactly. The package ships one per supported host (built by CI from the
+# NightMonkey revision StarlingMonkey pins) in lib/nightmonkey/, named as in
+# NIGHTMONKEY_HOST_ASSETS in src/componentize.js; a local build puts the one
+# it built there for the host.
+if(NIGHTMONKEY)
+    set(NIGHTMONKEY_HOST_ASSET "")
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+        set(NIGHTMONKEY_HOST_ASSET "nightmonkey-x86_64-linux")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+        set(NIGHTMONKEY_HOST_ASSET "nightmonkey-aarch64-linux")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
+        set(NIGHTMONKEY_HOST_ASSET "nightmonkey-aarch64-macos")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+        set(NIGHTMONKEY_HOST_ASSET "nightmonkey-x86_64-windows.exe")
+    endif()
+    if(NIGHTMONKEY_HOST_ASSET)
+        add_dependencies(starlingmonkey_embedding nightmonkey_compiler)
+        add_custom_command(TARGET starlingmonkey_embedding POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    ${NIGHTMONKEY_BIN}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/lib/nightmonkey/${NIGHTMONKEY_HOST_ASSET}
+            VERBATIM
+        )
+    endif()
+endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     add_custom_command(TARGET starlingmonkey_embedding POST_BUILD

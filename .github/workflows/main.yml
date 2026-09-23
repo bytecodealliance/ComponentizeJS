@@ -103,6 +103,7 @@ jobs:
           - 'release'
           - 'debug'
           - 'weval'
+          - 'nightmonkey'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -154,6 +155,9 @@ jobs:
           npm run clean
           npm run build:${{matrix.build-type}}
 
+  nightmonkey-compilers:
+    uses: ./.github/workflows/nightmonkey-compilers.yml
+
   ########
   # Test #
   ########
@@ -162,6 +166,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs:
       - build
+      - nightmonkey-compilers
     strategy:
       fail-fast: false
       matrix:
@@ -176,6 +181,7 @@ jobs:
           - 'release'
           - 'debug'
           - 'weval'
+          - 'nightmonkey'
     steps:
       - uses: actions/checkout@v4
 
@@ -199,6 +205,14 @@ jobs:
           path: |
             lib
             target
+
+      - name: Download NightMonkey compilers
+        if: matrix.build-type == 'nightmonkey'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nightmonkey-*
+          path: lib/nightmonkey
+          merge-multiple: true
 
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
