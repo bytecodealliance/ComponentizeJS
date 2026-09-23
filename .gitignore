@@ -11,6 +11,8 @@ examples/hello-world/guest/hello.component.wasm
 /build-debug
 /build-release
 /build-release-weval
+/build-release-nightmonkey
+/deps
 .vscode
 /package-lock.json
 .idea
