@@ -587,15 +587,17 @@ impl JsBindgen<'_> {
                     ..
                 } => {
                     let iface = &self.resolve.interfaces[*i];
+                    let mut resource_function_groups = BTreeMap::<_, Vec<_>>::new();
                     for id in iface.types.values() {
                         if let TypeDefKind::Resource = &self.resolve.types[*id].kind {
                             self.resource_directions
                                 .insert(*id, AbiVariant::GuestImport);
+                            resource_function_groups.entry(Some(*id)).or_default();
                         }
                     }
 
                     let by_resource = iface.functions.iter().fold(
-                        BTreeMap::<_, Vec<_>>::new(),
+                        resource_function_groups,
                         |mut map, (name, func)| {
                             map.entry(match &func.kind {
                                 FunctionKind::Freestanding | FunctionKind::AsyncFreestanding => {
