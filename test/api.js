@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { copyFile, mkdtemp } from 'node:fs/promises';
 
+import { componentize } from '@bytecodealliance/componentize-js';
 import { suite, test, assert } from 'vitest';
 
 import { setupComponent } from "./util.js";
@@ -14,6 +15,18 @@ import {
 } from './util.js';
 
 suite('API', () => {
+    test('inline WIT takes precedence over an unreadable WIT path', async () => {
+        const { component } = await componentize('export function answer() { return 42; }', {
+            witWorld: 'package test:inline; world inline { export answer: func() -> u32; }',
+            witPath: join(tmpdir(), 'missing-componentize-inline-wit', 'world.wit'),
+            disableFeatures: ['stdio', 'random', 'clocks', 'http', 'fetch-event'],
+            debugBuild: DEBUG_TEST_ENABLED,
+            enableAot: WEVAL_TEST_ENABLED,
+        });
+        assert.instanceOf(component, Uint8Array);
+        assert.isAbove(component.length, 8);
+    });
+
     // When using a different directory sourcePath as an arg to componentize()
     // (called via setupComponent() in this test), wizer would fail to initialize the component
     // due to a missing file -- the path prefix stripping was not correctly being resolved.

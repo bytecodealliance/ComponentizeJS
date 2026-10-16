@@ -33,4 +33,4 @@ wit-parser = { version = "0.258.0", features = ["decoding", "serde"] }
 wit-bindgen = { version = "0.54.0", features = ["macros", "async", "realloc"] }
 wit-bindgen-core = { version = "0.61.1", default-features = false }
 
-js-component-bindgen = { version = "2.11.0" }
+js-component-bindgen = { version = "=2.11.0" }
