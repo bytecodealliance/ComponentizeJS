@@ -6,7 +6,8 @@ interface ComponentizeOptions {
    */
   sourcePath: string;
   /**
-   * Path to WIT file or folder
+   * Path to a WIT file or folder. Dependencies must be inside the given folder
+   * or, for a file, its parent folder. Subfolders are included.
    */
   witPath?: string;
   /**

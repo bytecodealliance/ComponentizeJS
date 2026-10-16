@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { Script } from 'node:vm';
 import { assert, test } from 'vitest';
 
-import { splicer } from '../lib/spidermonkey-embedding-splicer.js';
+import { createSplicer } from '../src/splicer.js';
 
 import { DEBUG_TEST_ENABLED, WEVAL_TEST_ENABLED } from './util.js';
 
@@ -20,6 +20,7 @@ world test {
     ? 'starlingmonkey_embedding_weval.wasm'
     : `starlingmonkey_embedding${DEBUG_TEST_ENABLED ? '.debug' : ''}.wasm`;
   const engine = await readFile(new URL(`../lib/${engineName}`, import.meta.url));
+  const { splicer } = await createSplicer();
   const { jsBindings } = splicer.spliceBindings(
     engine, [], wit, undefined, undefined, false,
   );

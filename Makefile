@@ -17,9 +17,9 @@ debug: lib/starlingmonkey_embedding.debug.wasm lib/spidermonkey-embedding-splice
 release: lib/starlingmonkey_embedding.wasm lib/spidermonkey-embedding-splicer.js
 release-weval: lib/starlingmonkey_ics.wevalcache lib/spidermonkey-embedding-splicer.js
 
-lib/spidermonkey-embedding-splicer.js: target/wasm32-wasip1/release/splicer_component.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj lib
+lib/spidermonkey-embedding-splicer.js: Makefile target/wasm32-wasip1/release/splicer_component.wasm crates/spidermonkey-embedding-splicer/wit/spidermonkey-embedding-splicer.wit | obj lib
 	@$(JCO) new target/wasm32-wasip1/release/splicer_component.wasm -o obj/spidermonkey-embedding-splicer.wasm --wasi-reactor
-	@$(JCO) transpile -q --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o lib -- -O1
+	@$(JCO) transpile -q --instantiation async --no-wasi-shim --name spidermonkey-embedding-splicer obj/spidermonkey-embedding-splicer.wasm -o lib -- -O1
 
 target/wasm32-wasip1/release/splicer_component.wasm: Cargo.toml Cargo.lock crates/spidermonkey-embedding-splicer/Cargo.toml crates/spidermonkey-embedding-splicer/src/*.rs crates/splicer-component/src/*.rs
 	cargo build --locked --lib --release --target wasm32-wasip1

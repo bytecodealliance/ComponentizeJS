@@ -59,7 +59,7 @@ jobs:
         uses: actions/cache@v4
         id: splicer-build
         with:
-          key: splicer-${{ matrix.os }}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
+          key: splicer-${{ matrix.os }}-${{ hashFiles('Makefile', 'Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
           path: |
             lib
             target
@@ -134,7 +134,7 @@ jobs:
         uses: actions/cache/restore@v4
         id: splicer-build
         with:
-          key: splicer-${{ matrix.os }}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
+          key: splicer-${{ matrix.os }}-${{ hashFiles('Makefile', 'Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
           path: |
             lib
             target
@@ -195,7 +195,7 @@ jobs:
         uses: actions/cache/restore@v4
         id: splicer-build
         with:
-          key: splicer-${{ matrix.os }}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
+          key: splicer-${{ matrix.os }}-${{ hashFiles('Makefile', 'Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
           path: |
             lib
             target
@@ -239,7 +239,7 @@ jobs:
         uses: actions/cache/restore@v4
         id: splicer-build
         with:
-          key: splicer-${{ matrix.os }}-${{ hashFiles('Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
+          key: splicer-${{ matrix.os }}-${{ hashFiles('Makefile', 'Cargo.lock', 'crates/spidermonkey-embedding-splicer/src/**/*.rs') }}
           path: |
             lib
             target

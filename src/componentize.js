@@ -19,7 +19,7 @@ import {
   preview1AdapterReactorPath,
 } from '@bytecodealliance/jco';
 
-import { splicer } from '../lib/spidermonkey-embedding-splicer.js';
+import { createSplicer } from './splicer.js';
 
 import { maybeWindowsPath } from './platform.js';
 
@@ -148,12 +148,16 @@ export async function componentize(
     features.delete('fetch-event');
   }
 
-  // Splice the bindigns for the given WIT world into the engine WASM
+  const { splicer, witPath: splicerWitPath } = await createSplicer(
+    witWorld == null ? witPath : undefined,
+  );
+
+  // Splice the bindings for the given WIT world into the engine WASM
   let { wasm, jsBindings, exports, imports } = splicer.spliceBindings(
     await readFile(engine),
     [...features],
     witWorld,
-    maybeWindowsPath(witPath),
+    splicerWitPath,
     worldName,
     false,
   );
@@ -393,7 +397,7 @@ export async function componentize(
     bin,
     [...features],
     witWorld,
-    maybeWindowsPath(witPath),
+    splicerWitPath,
     worldName,
   );
 
