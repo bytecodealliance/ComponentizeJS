@@ -1,0 +1,12 @@
+package test:test;
+
+interface opaque-resource-import {
+  resource item;
+  make: func(value: u32) -> item;
+  value: func(item: borrow<item>) -> u32;
+}
+
+world test {
+  import opaque-resource-import;
+  export test: func() -> u32;
+}
