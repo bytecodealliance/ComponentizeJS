@@ -2,7 +2,7 @@ import { componentize } from '@bytecodealliance/componentize-js';
 import { transpile } from '@bytecodealliance/jco';
 import { assert, beforeAll, suite, test } from 'vitest';
 
-import { DEBUG_TEST_ENABLED, WEVAL_TEST_ENABLED, maybeLogging } from './util.js';
+import { DEBUG_TEST_ENABLED, WEVAL_TEST_ENABLED, NIGHTMONKEY_TEST_ENABLED, maybeLogging } from './util.js';
 
 const source = `
 let saved;
@@ -33,6 +33,7 @@ beforeAll(async () => {
     ]),
     debugBuild: DEBUG_TEST_ENABLED,
     enableAot: WEVAL_TEST_ENABLED,
+    enableNightmonkey: NIGHTMONKEY_TEST_ENABLED,
   });
   const { files } = await transpile(component, {
     name: 'export-buffers',
