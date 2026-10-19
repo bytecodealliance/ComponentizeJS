@@ -2,8 +2,9 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join, relative, toNamespacedPath } from 'node:path';
 import { preopens } from '@bytecodealliance/preview2-shim/filesystem';
-import { afterAll, assert, beforeAll, expect, suite, test } from 'vitest';
+import { afterAll, assert, beforeAll, expect, suite, test, vi } from 'vitest';
 
+import * as generatedSplicer from '../lib/spidermonkey-embedding-splicer.js';
 import { createSplicer } from '../src/splicer.js';
 
 const emptyModule = Uint8Array.from([0, 97, 115, 109, 1, 0, 0, 0]);
@@ -111,5 +112,47 @@ suite('Splicer filesystem', () => {
   test.runIf(process.platform === 'win32')('reads namespaced Windows paths', async () => {
     readWorld(await createSplicer(toNamespacedPath(witFile)), 'first');
     readWorld(await createSplicer(toNamespacedPath(firstDir)), 'dependent');
+  });
+
+  test('reuses concurrent calls with the same filesystem scope', async () => {
+    const [inline, repeated, file, directory] = await Promise.all([
+      createSplicer(),
+      createSplicer(),
+      createSplicer(witFile),
+      createSplicer(firstDir),
+    ]);
+    assert.strictEqual(inline.splicer, repeated.splicer);
+    assert.strictEqual(file.splicer, directory.splicer);
+    assert.notStrictEqual(inline.splicer, file.splicer);
+    assert.equal(file.witPath, '/wit/world file.wit');
+    assert.equal(directory.witPath, '/wit');
+  });
+
+  test('evicts the least recently used scope without retargeting live instances', async () => {
+    const first = await createSplicer(firstDir);
+    const second = await createSplicer(secondDir);
+    assert.strictEqual((await createSplicer(firstDir)).splicer, first.splicer);
+    await createSplicer();
+    assert.strictEqual((await createSplicer(firstDir)).splicer, first.splicer);
+    const replacement = await createSplicer(secondDir);
+    assert.notStrictEqual(replacement.splicer, second.splicer);
+    readWorld(first, 'first');
+    readWorld(second, 'second');
+    readWorld(replacement, 'second');
+    assert.throws(() => readWorld(second, 'first'), /World `first` not found/);
+  });
+
+  test('does not cache failed instantiation', async () => {
+    const directory = await mkdtemp(join(tempDir, 'retry-'));
+    const error = new Error('Splicer initialization failed');
+    const instantiate = vi.spyOn(generatedSplicer, 'instantiate')
+      .mockRejectedValueOnce(error);
+    try {
+      await expect(createSplicer(directory)).rejects.toBe(error);
+      await expect(createSplicer(directory)).resolves.toHaveProperty('splicer');
+      expect(instantiate).toHaveBeenCalledTimes(2);
+    } finally {
+      instantiate.mockRestore();
+    }
   });
 });
