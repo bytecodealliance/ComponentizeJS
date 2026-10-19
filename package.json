@@ -25,7 +25,7 @@
     "@bytecodealliance/weval": "^0.5.0",
     "@bytecodealliance/wizer": "^10.0.0",
     "es-module-lexer": "^1.6.0",
-    "oxc-parser": "^0.76.0"
+    "oxc-parser": "^0.154.0"
   },
   "types": "types.d.ts",
   "scripts": {

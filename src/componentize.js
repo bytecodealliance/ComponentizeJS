@@ -10,7 +10,7 @@ import { readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
 import { rmSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
-import oxc from 'oxc-parser';
+import { parse } from 'oxc-parser';
 import wizer from '@bytecodealliance/wizer';
 import getWeval from '@bytecodealliance/weval';
 import {
@@ -638,7 +638,7 @@ async function detectKnownSourceExportNames(filename, code) {
 
   const names = new Set();
 
-  const results = await oxc.parseAsync(filename, code);
+  const results = await parse(filename, code);
   if (results.errors.length > 0) {
     throw new Error(
       `failed to parse JS source, encountered [${results.errors.length}] errors`,
