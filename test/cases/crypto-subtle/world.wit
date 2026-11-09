@@ -1,0 +1,9 @@
+package local:crypto-subtle;
+
+world crypto-subtle {
+  export exports: interface {
+    pbkdf2-sha256: func(password: string, salt: string, iterations: u32, length: u32) -> string;
+    aes-cbc-encrypt: func(key: list<u8>, iv: list<u8>, plaintext: string) -> string;
+    aes-cbc-decrypt: func(key: list<u8>, iv: list<u8>, ciphertext: string) -> string;
+  }
+}
