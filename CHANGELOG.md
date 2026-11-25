@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.24.0] - 2026-11-25
+
+### 🐛 Bug Fixes
+
+* emit bindings for imported resources without methods (#357) by @carsonfarmer in #357
+
+* lock js-component-bindgen version (#358) by @andreiltd in #358
+
+
+### ⚡ Performance
+
+* reuse splicer instances by fs scope (#359) by @andreiltd in #359
+
+
+### ⚙️ Miscellaneous Tasks
+
+* *(deps)* bump oxc-parser (#360) by @andreiltd in #360
+
+
+### Other Changes
+
+* *(other changes)* Add NightMonkey support. (#356) by @cfallin in #356
+
+
+
+## New Contributors
+* @cfallin made their first contribution in [#356](https://github.com/bytecodealliance/ComponentizeJS/pull/356)
+* @carsonfarmer made their first contribution in [#357](https://github.com/bytecodealliance/ComponentizeJS/pull/357)
+
+
 ## [0.23.0] - 2026-09-21
 
 ### 🐛 Bug Fixes
