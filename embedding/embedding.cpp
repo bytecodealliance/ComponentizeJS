@@ -2,6 +2,9 @@
 #include "debugger.h"
 #include "builtins/web/performance.h"
 #include "js/Conversions.h"
+#ifdef ENABLE_JS_NIGHTMONKEY
+#include "runtime/NightRegistration.h"
+#endif
 
 namespace builtins::web::console {
 
@@ -161,6 +164,13 @@ cabi_realloc(void *ptr, size_t orig_size, size_t org_align, size_t new_size) {
 __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
                                                    void *argptr) {
   if (Runtime.first_call) {
+#ifdef ENABLE_JS_NIGHTMONKEY
+    // Enable the AOT-compiled bodies the NightMonkey snapshot transform
+    // added, if any; they are not dispatched to before this.
+    if (!JS::NightActivate(Runtime.cx)) {
+      Runtime.engine->abort("(call) unable to activate NightMonkey");
+    }
+#endif
     content_debugger::maybe_init_debugger(Runtime.engine, true);
     js::ResetMathRandomSeed(Runtime.cx);
     Runtime.first_call = false;
