@@ -1,5 +1,6 @@
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { env } from 'node:process';
+import { pathToFileURL } from 'node:url';
 import { readFile, readdir, mkdir, writeFile, mkdtemp } from 'node:fs/promises';
 import { createServer } from 'node:net';
 
@@ -57,7 +58,7 @@ export async function setupComponent(opts) {
     await writeFile(join(wasiDir, file), files[file]);
   }
 
-  const componentJsPath = join(wasiDir, 'component.js');
+  const componentJsUrl = pathToFileURL(resolve(wasiDir, 'component.js')).href;
 
   // NOTE: On Windows, vitest has stated suddenly hanging when processing code with an
   // `await import(...)` in it, when the `...` is a bare identifier.
@@ -68,7 +69,7 @@ export async function setupComponent(opts) {
   // - separating await and import() calls
   //
   // Here we choose to return the promise more traditionally
-  return import(componentJsPath)
+  return import(componentJsUrl)
     .then(instance => {
         return {
             instance,
