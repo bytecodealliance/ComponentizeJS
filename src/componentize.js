@@ -13,11 +13,16 @@ import { createHash } from 'node:crypto';
 import { parse } from 'oxc-parser';
 import wizer from '@bytecodealliance/wizer';
 import getWeval from '@bytecodealliance/weval';
+// Import `componentNew` and `metadataAdd` from `@bytecodealliance/jco-transpile`
+// while keeping `preview1AdapterReactorPath` pinned to `@bytecodealliance/jco`
+// 1.15.1 so async WIT encoding uses a current wasm-tools encoder without
+// upgrading the Preview 1 adapter past the WASI imports provided by the bundled
+// StarlingMonkey embedding.
 import {
   componentNew,
   metadataAdd,
-  preview1AdapterReactorPath,
-} from '@bytecodealliance/jco';
+} from '@bytecodealliance/jco-transpile/wasm-tools';
+import { preview1AdapterReactorPath } from '@bytecodealliance/jco';
 
 import { createSplicer } from './splicer.js';
 
