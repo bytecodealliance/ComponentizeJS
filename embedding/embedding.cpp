@@ -66,9 +66,27 @@ using componentize::embedding::Runtime;
 
 // These functions are used both internally and also exported for use directly
 // by the splicer codegen
+// Convert any JavaScript Number (Int32 or double-boxed u32) to its 32-bit
+// two's-complement core Wasm i32 bit pattern via JS::ToInt32
+// (ECMA-262 ToInt32: https://tc39.es/ecma262/#sec-toint32,
+// SpiderMonkey: https://searchfox.org/mozilla-central/source/js/public/Conversions.h).
+// Calling handle.toInt32() instead reads raw double storage bits whenever a
+// u32 value above INT32_MAX is stored as a SpiderMonkey double.
+__attribute__((noinline, export_name("coreabi_from_int32"))) int32_t
+from_int32(JS::MutableHandleValue handle) {
+  return JS::ToInt32(handle.toNumber());
+}
+
 __attribute__((noinline, export_name("coreabi_from_bigint64"))) int64_t
 from_bigint64(JS::MutableHandleValue handle) {
   JS::BigInt *arg0 = handle.toBigInt();
+  // Try signed s64 before unsigned u64 because a core Wasm i64 carries untyped
+  // bits and canonical bindings supply either representation. Checking only
+  // BigIntIsUint64 aborts the component on every negative s64 value.
+  int64_t arg0_int64;
+  if (JS::detail::BigIntIsInt64(arg0, &arg0_int64)) {
+    return arg0_int64;
+  }
   uint64_t arg0_uint64;
   if (!JS::detail::BigIntIsUint64(arg0, &arg0_uint64)) {
     Runtime.engine->abort(
@@ -94,7 +112,7 @@ to_bigint64(JSContext *cx, int64_t val) {
 __attribute__((export_name("coreabi_sample_i32"))) bool
 CoreAbiSampleI32(JSContext *cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-  int32_t arg0 = static_cast<int32_t>(args[0].toInt32());
+  int32_t arg0 = from_int32(args[0]);
   args.rval().setInt32(arg0 * 32771);
   return true;
 }
@@ -321,12 +339,10 @@ __attribute__((export_name("call"))) uint32_t call(uint32_t fn_idx,
     Runtime.free_list.push_back(retptr);
     switch (fn->ret.value()) {
     case CoreVal::I32:
-      *((uint32_t *)retptr) = ret.toInt32();
+      *((uint32_t *)retptr) = from_int32(&ret);
       break;
     case CoreVal::I64:
-      if (!JS::detail::BigIntIsUint64(ret.toBigInt(), (uint64_t *)retptr)) {
-        abort();
-      }
+      *((int64_t *)retptr) = from_bigint64(&ret);
       break;
     case CoreVal::F32:
       *((float *)retptr) = ret.isInt32() ? static_cast<float>(ret.toInt32())

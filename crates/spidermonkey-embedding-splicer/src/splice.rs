@@ -475,9 +475,17 @@ fn synthesize_import_functions(
 
     // These functions retrieve the corresponding type
     // from a JS::HandleValue
-    // All except for the BigInt one are trivial and thus
-    // do not require regular explicit template extraction
-    // unless there are major ABI changes in Spidermonkey
+    // Extract core integers through SpiderMonkey conversion helpers
+    // (https://searchfox.org/mozilla-central/source/js/public/Conversions.h,
+    // ECMA-262 ToInt32: https://tc39.es/ecma262/#sec-toint32) rather than
+    // loading the raw low 32 bits of a `JS::Value` inline. SpiderMonkey stores
+    // `u32` values above `INT32_MAX` as IEEE-754 doubles, so an inline
+    // `i64.load` + `i32.wrap_i64` reads double mantissa bits and silently
+    // corrupts every value in `2147483648..4294967295`.
+    let coreabi_from_int32 = module
+        .exports
+        .get_export_id_by_name("coreabi_from_int32".to_string())
+        .context("engine is missing coreabi_from_int32; rebuild the embedding")?;
     let coreabi_from_bigint64 = module
         .exports
         .get_export_id_by_name("coreabi_from_bigint64".to_string())
@@ -597,13 +605,7 @@ fn synthesize_import_functions(
                 func.i32_add();
                 match arg {
                     CoreTy::I32 => {
-                        func.i64_load(MemArg {
-                            align: 3,
-                            max_align: 0,
-                            offset: 0,
-                            memory,
-                        });
-                        func.i32_wrap_i64();
+                        func.call(get_export_fid(module, &coreabi_from_int32));
                     }
                     CoreTy::I64 => {
                         func.call(get_export_fid(module, &coreabi_from_bigint64));
@@ -855,6 +857,7 @@ fn synthesize_import_functions(
     // remove unnecessary exports
     module.exports.delete(coreabi_to_bigint64);
     module.exports.delete(coreabi_from_bigint64);
+    module.exports.delete(coreabi_from_int32);
     module.exports.delete(coreabi_get_import.unwrap());
     for id in coreabi_sample_ids {
         module.exports.delete(id);

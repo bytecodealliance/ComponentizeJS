@@ -1,0 +1,14 @@
+package local:integer-boundaries;
+interface integers {
+  %u32: func(x: u32) -> u32;
+  %s32: func(x: s32) -> s32;
+  %u64: func(x: u64) -> u64;
+  %s64: func(x: s64) -> s64;
+  pair: func(x: s64, y: u32) -> tuple<s64, u32>;
+  direct-u32: func() -> u32;
+  direct-s64: func() -> s64;
+}
+world the-world {
+  import integers;
+  export integers;
+}
